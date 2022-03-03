@@ -12,6 +12,7 @@ from utils.engine import train_one_epoch, evaluate
 from utils import utils
 from features import build_features, transforms as T
 import pdb
+import matplotlib.pyplot as plt
 
 
 def get_model_instance_segmentation(num_classes):
@@ -34,7 +35,7 @@ def get_model_instance_segmentation(num_classes):
     return model
 
 
-def get_transform(train):
+def get_transform(train=False):
     transforms = []
     transforms.append(T.ToTensor())
     if train:
@@ -50,7 +51,7 @@ num_classes = 1 + 3
 # use our dataset and defined transformations
 
 
-dataset = build_features.AmyBDataset('/home/vivek/Datasets/mask_rcnn/dataset/train', get_transform(train=True))
+dataset = build_features.AmyBDataset('/home/vivek/Datasets/mask_rcnn/dataset/train', get_transform(train=False))
 dataset_test = build_features.AmyBDataset('/home/vivek/Datasets/mask_rcnn/dataset/val', get_transform(train=False))
 
 # define training and validation data loaders
@@ -63,6 +64,7 @@ data_loader_test = torch.utils.data.DataLoader(
     collate_fn=utils.collate_fn)
 
 # get the model using our helper function
+pdb.set_trace()
 model = get_model_instance_segmentation(num_classes)
 
 # move model to the right device
@@ -78,7 +80,7 @@ lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
                                                 gamma=0.1)
 
 # let's train it for 10 epochs
-num_epochs = 30
+num_epochs = 10
 
 for epoch in range(num_epochs):
     # train for one epoch, printing every 10 iterations
@@ -86,7 +88,8 @@ for epoch in range(num_epochs):
     # update the learning rate
     lr_scheduler.step()
     # evaluate on the test dataset
-    evaluate(model, data_loader_test, device=device)
+
+    evaluate(model, data_loader, device=device)
 
 torch.save(model, '../../models/mrcnn_model.pth')
 

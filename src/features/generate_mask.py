@@ -23,6 +23,10 @@ from PIL import Image
 # Mask size should be same as image size
 ID_MASK_SHAPE = (224, 224)
 
+# Color Coding
+lablel2id = {'Core':'50', 'Diffused':'100',
+             'Neuritic':'150', 'Unknown':'250'}
+
 def save_mask(mask, file_name, save_dir, label="mask"):
     im = Image.fromarray(mask)
     file_name = file_name.split('.jpg')
@@ -97,9 +101,11 @@ def process_json(json_path, save_dir, visualize=False):
 
             # Create an Empty mask of size similar to image
             id_mask = np.zeros(ID_MASK_SHAPE, dtype=np.uint8)
+
+            region_id = 0
+            prev_label = ""
            
             for i in range(len(data[ele]['regions'])):
-
                 coords_x = data[ele]['regions'][i]['shape_attributes']['all_points_x']
                 coords_x = np.array(coords_x)
 
@@ -108,13 +114,22 @@ def process_json(json_path, save_dir, visualize=False):
 
                 # label
                 label = data[ele]['regions'][i]['region_attributes']['type']
+                
+                if i == 0:
+                    ids = int(lablel2id[label])
+                elif label == prev_label:
+                    ids = int(lablel2id[label])
 
                 # Use polygon2id function to create a mask
                 id_mask = polygon2id(ID_MASK_SHAPE, id_mask, ids, coords_y, coords_x)
-                        
-                save_mask(id_mask, ele, save_dir)
 
-                ids = ids + 1
+                # ids = ids + 5
+
+                prev_label = label
+
+            save_mask(id_mask, ele, save_dir)
+
+                
     
         if visualize:
             plt.imshow(id_mask)

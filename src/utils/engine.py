@@ -7,6 +7,7 @@ import torchvision.models.detection.mask_rcnn
 from utils import utils
 from utils.coco_eval import CocoEvaluator
 from utils.coco_utils import get_coco_api_from_dataset
+import pdb
 
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, scaler=None):
@@ -25,6 +26,11 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, sc
         )
 
     for images, targets in metric_logger.log_every(data_loader, print_freq, header):
+        # pdb.set_trace()
+        # x = images[0]
+        # y = np.asarray(x)
+        # y = y.transpose(2,1,0)
+        # plt.imshow(y)
         images = list(image.to(device) for image in images)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
         with torch.cuda.amp.autocast(enabled=scaler is not None):
@@ -98,6 +104,10 @@ def evaluate(model, data_loader, device):
         model_time = time.time() - model_time
 
         res = {target["image_id"].item(): output for target, output in zip(targets, outputs)}
+        # print(len(outputs))
+        # print("Outputs", outputs[0]['labels'])
+        pdb.set_trace()
+        
         evaluator_time = time.time()
         coco_evaluator.update(res)
         evaluator_time = time.time() - evaluator_time

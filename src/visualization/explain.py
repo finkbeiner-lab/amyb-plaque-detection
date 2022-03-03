@@ -68,8 +68,8 @@ def prepare_input(image):
 
 
 
-coco_names = ['Core', 'Neuritic', 'Diffused']
-input_path = '/home/vivek/Datasets/mask_rcnn/dataset/train/images/30.jpg'
+coco_names = ['Core', 'Diffused', 'Neuritic', "Unknown"]
+input_path = '/home/vivek/Datasets/mask_rcnn/dataset/train/images/6.jpg'
 
 
 # This will help us create a different color for each class

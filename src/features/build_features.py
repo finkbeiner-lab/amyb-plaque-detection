@@ -13,6 +13,15 @@ class AmyBDataset(object):
         # ensure that they are aligned
         self.imgs = list(sorted(os.listdir(os.path.join(root, "images"))))
         self.masks = list(sorted(os.listdir(os.path.join(root, "labels"))))
+        print(self.imgs)
+        print(self.masks)
+        # self.masks = []
+        # for img in self.imgs:
+        #     x = img.split('.')
+        #     x = x[0]
+        #     assert(x.isdigit())
+        #     x = x + "_mask.png"
+        #     self.masks.append(x)
         
 
     def __getitem__(self, idx):
@@ -49,9 +58,27 @@ class AmyBDataset(object):
 
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
         # there is only one class
-        labels = torch.ones((num_objs,), dtype=torch.int64)
+        # labels = torch.ones((num_objs,), dtype=torch.int64)
+        labels = np.zeros(3)
+        # print(obj_ids)
+
+        # Mapping the Category to one hot vector [0, 1, 0, 0]
+        for id in obj_ids:
+            if id >=50 and id < 100:
+                labels[0] = 1 #Core
+            elif id >= 100 and id < 150:
+                labels[1] = 1 # Diffused
+            elif id >=150 and id < 200:
+                labels[2] = 1 # Neuritic
+                
+        print(idx)
+        
+        labels = torch.tensor(labels, dtype=torch.int64)
+        print(labels)
+
         masks = torch.as_tensor(masks, dtype=torch.uint8)
 
+        
         image_id = torch.tensor([idx])
         area = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])
         # suppose all instances are not crowd
