@@ -106,7 +106,7 @@ def evaluate(model, data_loader, device):
         res = {target["image_id"].item(): output for target, output in zip(targets, outputs)}
         # print(len(outputs))
         # print("Outputs", outputs[0]['labels'])
-        pdb.set_trace()
+        # pdb.set_trace()
         
         evaluator_time = time.time()
         coco_evaluator.update(res)

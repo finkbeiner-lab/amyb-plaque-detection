@@ -26,7 +26,7 @@ def get_model_instance_segmentation(num_classes):
 
     # now get the number of input features for the mask classifier
     in_features_mask = model.roi_heads.mask_predictor.conv5_mask.in_channels
-    hidden_layer = 256
+    hidden_layer = 512
     # and replace the mask predictor with a new one
     model.roi_heads.mask_predictor = MaskRCNNPredictor(in_features_mask,
                                                        hidden_layer,
@@ -35,7 +35,7 @@ def get_model_instance_segmentation(num_classes):
     return model
 
 
-def get_transform(train=False):
+def get_transform(train):
     transforms = []
     transforms.append(T.ToTensor())
     if train:
@@ -51,7 +51,8 @@ num_classes = 1 + 3
 # use our dataset and defined transformations
 
 
-dataset = build_features.AmyBDataset('/home/vivek/Datasets/mask_rcnn/dataset/train', get_transform(train=False))
+
+dataset = build_features.AmyBDataset('/home/vivek/Datasets/mask_rcnn/dataset/train', get_transform(train=True))
 dataset_test = build_features.AmyBDataset('/home/vivek/Datasets/mask_rcnn/dataset/val', get_transform(train=False))
 
 # define training and validation data loaders
@@ -64,7 +65,6 @@ data_loader_test = torch.utils.data.DataLoader(
     collate_fn=utils.collate_fn)
 
 # get the model using our helper function
-pdb.set_trace()
 model = get_model_instance_segmentation(num_classes)
 
 # move model to the right device
@@ -72,25 +72,26 @@ model.to(device)
 
 # construct an optimizer
 params = [p for p in model.parameters() if p.requires_grad]
-optimizer = torch.optim.SGD(params, lr=0.005,
-                            momentum=0.9, weight_decay=0.0005)
+optimizer = torch.optim.SGD(params, lr=0.0001,
+                            momentum=0.9, weight_decay=0.00001)
 # and a learning rate scheduler
 lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
                                                 step_size=3,
                                                 gamma=0.1)
 
 # let's train it for 10 epochs
-num_epochs = 10
+num_epochs = 30
 
 for epoch in range(num_epochs):
     # train for one epoch, printing every 10 iterations
-    train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq=10)
+    train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq=20)
     # update the learning rate
     lr_scheduler.step()
     # evaluate on the test dataset
 
-    evaluate(model, data_loader, device=device)
+    evaluate(model, data_loader_test, device=device)
 
-torch.save(model, '../../models/mrcnn_model.pth')
+model_save_name = "../../models/mrcnn_model_{epoch:}.pth"
+torch.save(model, model_save_name.format(epoch=num_epochs))
 
 print("The Model is Trained!")

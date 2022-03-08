@@ -63,6 +63,7 @@ class AmyBDataset(object):
         # print(obj_ids)
 
         # Mapping the Category to one hot vector [0, 1, 0, 0]
+        id = 150
         for id in obj_ids:
             if id >=50 and id < 100:
                 labels[0] = 1 #Core
@@ -71,10 +72,10 @@ class AmyBDataset(object):
             elif id >=150 and id < 200:
                 labels[2] = 1 # Neuritic
                 
-        print(idx)
+       
         
         labels = torch.tensor(labels, dtype=torch.int64)
-        print(labels)
+        # labels = torch.ones((num_objs,), dtype=torch.int64)
 
         masks = torch.as_tensor(masks, dtype=torch.uint8)
 
