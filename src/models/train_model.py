@@ -72,24 +72,27 @@ model.to(device)
 
 # construct an optimizer
 params = [p for p in model.parameters() if p.requires_grad]
-optimizer = torch.optim.SGD(params, lr=0.0001,
-                            momentum=0.9, weight_decay=0.00001)
+# optimizer = torch.optim.SGD(params, lr=0.001,
+                            # momentum=0.9)
+optimizer = torch.optim.Adam(params,lr=0.00005,betas=(0.9,0.999),eps=1e-08,weight_decay=0,amsgrad=False)
 # and a learning rate scheduler
-lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
-                                                step_size=3,
-                                                gamma=0.1)
+# lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer,
+#                                                 step_size=3,
+#    
+# lr                                             gamma=0.1)
+lr_scheduler = None
 
 # let's train it for 10 epochs
-num_epochs = 30
+num_epochs = 6
 
 for epoch in range(num_epochs):
     # train for one epoch, printing every 10 iterations
     train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq=20)
     # update the learning rate
-    lr_scheduler.step()
+    # lr_scheduler.step()
     # evaluate on the test dataset
 
-    evaluate(model, data_loader_test, device=device)
+    # evaluate(model, data_loader_test, device=device)
 
 model_save_name = "../../models/mrcnn_model_{epoch:}.pth"
 torch.save(model, model_save_name.format(epoch=num_epochs))

@@ -13,16 +13,9 @@ class AmyBDataset(object):
         # ensure that they are aligned
         self.imgs = list(sorted(os.listdir(os.path.join(root, "images"))))
         self.masks = list(sorted(os.listdir(os.path.join(root, "labels"))))
-        print(self.imgs)
-        print(self.masks)
-        # self.masks = []
-        # for img in self.imgs:
-        #     x = img.split('.')
-        #     x = x[0]
-        #     assert(x.isdigit())
-        #     x = x + "_mask.png"
-        #     self.masks.append(x)
-        
+        print("\nImages Order ", self.imgs)
+        print("\nLabels Order", self.masks)
+       
 
     def __getitem__(self, idx):
         # load images and masks
@@ -59,7 +52,7 @@ class AmyBDataset(object):
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
         # there is only one class
         # labels = torch.ones((num_objs,), dtype=torch.int64)
-        labels = np.zeros(3)
+        labels = np.zeros(4)
         # print(obj_ids)
 
         # Mapping the Category to one hot vector [0, 1, 0, 0]

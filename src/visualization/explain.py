@@ -1,4 +1,5 @@
 import pdb
+from turtle import pd
 import torchvision
 import torch
 import os
@@ -49,6 +50,7 @@ def draw_segmentation_map(image, masks, boxes, labels):
         red_map = np.zeros_like(masks[i]).astype(np.uint8)
         green_map = np.zeros_like(masks[i]).astype(np.uint8)
         blue_map = np.zeros_like(masks[i]).astype(np.uint8)
+
         # apply a randon color mask to each object
         color = COLORS[random.randrange(0, len(COLORS))]
         red_map[masks[i] == 1], green_map[masks[i] == 1], blue_map[masks[i] == 1]  = color
@@ -142,13 +144,13 @@ coco_names = ['Core', 'Diffused', 'Neuritic', "Unknown"]
 
 
 
-input_path = '/home/vivek/Datasets/mask_rcnn/dataset/train/images'
+input_path = '/home/vivek/Datasets/mask_rcnn/dataset/val/images'
 
 # This will help us create a different color for each class
 COLORS = np.random.uniform(0, 255, size=(len(coco_names), 3))
 
 # model = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True)
-model = torch.load('../../models/mrcnn_model_50.pth')
+model = torch.load('../../models/mrcnn_model_6.pth')
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model.eval().to(device)
 
@@ -158,6 +160,8 @@ i = 0
 for img in images:
 
     # Get the input_tensor
+    print(img)
+    
     image = np.array(Image.open(img))
     input_tensor, image_float_np = prepare_input(image)
 
@@ -165,7 +169,9 @@ for img in images:
     # boxes, classes, labels, indices = predict(input_tensor, model, device, 0.5)
     # image = draw_boxes(boxes, labels, classes, image)
 
-    masks, boxes, labels = get_outputs(input_tensor, model, 0.2)
+    masks, boxes, labels = get_outputs(input_tensor, model, 0.5)
+    
+    print(labels)
     result = draw_segmentation_map(image, masks, boxes, labels)
     # visualize the image
     # cv2.imshow('Segmented image', result)
