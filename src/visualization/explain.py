@@ -20,6 +20,8 @@ from pytorch_grad_cam.ablation_layer import AblationLayerFasterRCNN
 import random
 import glob
 
+THRESHOLD = 0.7
+
 def get_outputs(input_tensor, model, threshold):
     with torch.no_grad():
         # forward pass of the image through the modle
@@ -27,11 +29,13 @@ def get_outputs(input_tensor, model, threshold):
     
     # get all the scores
     scores = list(outputs[0]['scores'].detach().cpu().numpy())
+    print("\n scores", scores)
     # index of those scores which are above a certain threshold
     thresholded_preds_inidices = [scores.index(i) for i in scores if i > threshold]
     thresholded_preds_count = len(thresholded_preds_inidices)
     # get the masks
     masks = (outputs[0]['masks']>0.5).squeeze().detach().cpu().numpy()
+    print("masks", masks)
     # discard masks for objects which are below threshold
     masks = masks[:thresholded_preds_count]
     # get the bounding boxes, in (x1, y1), (x2, y2) format
@@ -39,7 +43,10 @@ def get_outputs(input_tensor, model, threshold):
     # discard bounding boxes below threshold value
     boxes = boxes[:thresholded_preds_count]
     # get the classes labels
-    labels = [coco_names[i-1] for i in outputs[0]['labels']]
+    # print('labels', outputs[0]['labels'])
+    labels = [coco_names[i] for i in outputs[0]['labels']]
+
+    # [1,1,1, 2, 2, 2, 3, 3]
     return masks, boxes, labels
 
 def draw_segmentation_map(image, masks, boxes, labels):
@@ -125,7 +132,7 @@ def prepare_input(image):
 
 
 
-coco_names = ['Core', 'Diffused', 'Neuritic', "Unknown"]
+coco_names = ['Background', 'Core', 'Diffused', 'Neuritic']
 # coco_names = ['Core', 'Neuritic', "Unknown"]
 # coco_names = ['__background__', 'person', 'bicycle', 'car', 'motorcycle', 'airplane', \
 #               'bus', 'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 'N/A', 
@@ -144,13 +151,13 @@ coco_names = ['Core', 'Diffused', 'Neuritic', "Unknown"]
 
 
 
-input_path = '/home/vivek/Datasets/mask_rcnn/dataset/val/images'
+input_path = '/home/vivek/Datasets/mask_rcnn/dataset/train/images'
 
 # This will help us create a different color for each class
 COLORS = np.random.uniform(0, 255, size=(len(coco_names), 3))
 
 # model = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True)
-model = torch.load('../../models/mrcnn_model_6.pth')
+model = torch.load('../../models/mrcnn_model_10.pth')
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model.eval().to(device)
 
@@ -169,9 +176,10 @@ for img in images:
     # boxes, classes, labels, indices = predict(input_tensor, model, device, 0.5)
     # image = draw_boxes(boxes, labels, classes, image)
 
-    masks, boxes, labels = get_outputs(input_tensor, model, 0.5)
+    masks, boxes, labels = get_outputs(input_tensor, model, THRESHOLD)
     
-    print(labels)
+    print("\n masks", masks)
+    print("boxes", boxes)
     result = draw_segmentation_map(image, masks, boxes, labels)
     # visualize the image
     # cv2.imshow('Segmented image', result)

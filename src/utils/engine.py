@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, scaler=None):
+def train_one_epoch(model, optimizer, data_loader, device, epoch, wandb, print_freq, scaler=None):
     model.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter("lr", utils.SmoothedValue(window_size=1, fmt="{value:.6f}"))
@@ -28,27 +28,6 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, sc
         )
 
     for images, targets in metric_logger.log_every(data_loader, print_freq, header):
-        # pdb.set_trace()
-
-        # plt.figure(figsize=(10,10)) # specifying the overall grid size
-        # plt.title('Verify Training Data')
-        # x = images[0]
-        # x = x.detach().cpu()
-        # y = np.asarray(x)
-        # y = y.transpose(1,2,0)
-
-        # x1 = targets[0]['masks']
-        # x1 = x1.detach().cpu()
-        # x1 = x1.numpy()
-        # x1 = x1.transpose(1 ,2, 0)
-
-        # img_array = [y, x1]
-
-        # for i in range(2):
-        #     plt.subplot(1,2,i+1)    # the number of images in the grid is 5*5 (25)
-        #     plt.imshow(img_array[i])
-        # plt.show()
-        
         images = list(image.to(device) for image in images)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
         with torch.cuda.amp.autocast(enabled=scaler is not None):
@@ -80,7 +59,7 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq, sc
 
         metric_logger.update(loss=losses_reduced, **loss_dict_reduced)
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
-
+        
     return metric_logger
 
 

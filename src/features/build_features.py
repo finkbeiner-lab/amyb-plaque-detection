@@ -3,6 +3,7 @@ import os
 import torch
 import numpy as np
 from PIL import Image
+import pdb
 
 
 class AmyBDataset(object):
@@ -51,24 +52,29 @@ class AmyBDataset(object):
 
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
         # there is only one class
-        # labels = torch.ones((num_objs,), dtype=torch.int64)
-        labels = np.zeros(4)
+       
+        # labels = np.zeros(4)
         # print(obj_ids)
 
         # Mapping the Category to one hot vector [0, 1, 0, 0]
-        id = 150
-        for id in obj_ids:
-            if id >=50 and id < 100:
-                labels[0] = 1 #Core
-            elif id >= 100 and id < 150:
-                labels[1] = 1 # Diffused
-            elif id >=150 and id < 200:
-                labels[2] = 1 # Neuritic
+        # id = 150
+        # for id in obj_ids:
+        #     if id >=50 and id < 100:
+        #         labels[0] = 1 #Core
+        #     elif id >= 100 and id < 150:
+        #         labels[1] = 1 # Diffused
+        #     elif id >=150 and id < 200:
+        #         labels[2] = 1 # Neuritic
                 
        
         
-        labels = torch.tensor(labels, dtype=torch.int64)
+        # labels = torch.tensor(labels, dtype=torch.int64)
         # labels = torch.ones((num_objs,), dtype=torch.int64)
+
+        x = [id // 50 for id in obj_ids]
+        labels = torch.tensor(x)
+
+        # labels = torch.ones((obj_ids,), dtype=torch.int64)
 
         masks = torch.as_tensor(masks, dtype=torch.uint8)
 

@@ -14,12 +14,13 @@ from utils import utils
 from features import build_features, transforms as T
 import pdb
 import matplotlib.pyplot as plt
+from visualization.visualize import visualize_train
 
 
 ######## WANDB integration begins (mainly) here
 
 optim_config = dict(
-    lr=0.005,
+    lr=0.001,
     momentum=0.9,
     weight_decay=0.0005,
 )
@@ -28,7 +29,7 @@ lr_config = dict(
     gamma=0.1
 )
 config = dict( # TODO: assert no params are overriden
-    num_epochs=1,
+    num_epochs=10,
     **optim_config,
     **lr_config,
 )
@@ -76,6 +77,7 @@ num_classes = 1 + 3
 dataset = build_features.AmyBDataset('/home/vivek/Datasets/mask_rcnn/dataset/train', get_transform(train=True))
 dataset_test = build_features.AmyBDataset('/home/vivek/Datasets/mask_rcnn/dataset/val', get_transform(train=False))
 
+x = next(iter(dataset))
 
 with wandb.init(project='amyb-plaque-detection', config=config):
 
@@ -98,13 +100,23 @@ with wandb.init(project='amyb-plaque-detection', config=config):
     params = [p for p in model.parameters() if p.requires_grad]
     optimizer = torch.optim.SGD(params, **optim_config)
     # and a learning rate scheduler
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, **lr_config)
+    lr_scheduler = None
+    # torch.optim.lr_scheduler.StepLR(optimizer, **lr_config)
+
+    # Test the train data
+    # img_no = 0
+    # for images, targets in data_loader:
+    #     visualize_train(images, targets, wandb, img_no, True)
+    #     img_no = img_no + 1
+    
+
    
 
     for epoch in range(config['num_epochs']):
-        train_logs = train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq=1)
+
+        train_logs = train_one_epoch(model, optimizer, data_loader, device, epoch, wandb, print_freq=1)
         # update the learning rate
-        lr_scheduler.step()
+        # lr_scheduler.step()
         # evaluate on the test dataset
         # eval_logs, eval_res = evaluate(model, data_loader_test, device=device)
 
@@ -127,7 +139,6 @@ with wandb.init(project='amyb-plaque-detection', config=config):
         d = train_metrics_dict
         keys, vals = tuple(zip(*d.items()))
         unpacked = [dict(zip(keys, v)) for v in list(zip(*vals))] 
-        pdb.set_trace()
 
         
 
