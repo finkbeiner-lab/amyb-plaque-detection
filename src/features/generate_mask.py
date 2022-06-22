@@ -27,12 +27,11 @@ ID_MASK_SHAPE = (224, 224)
 lablel2id = {'Core':'50', 'Diffused':'100',
              'Neuritic':'150', 'Unknown':'250'}
 
-def save_mask(mask, file_name, save_dir, label="mask"):
+def save_mask(mask, file_name, tileX, tileY, save_dir, label="mask"):
     im = Image.fromarray(mask)
-    file_name = file_name.split('.jpg')
+    pdb.set_trace()
 
-   
-    file_name = file_name[0] + "_" + label + ".png"
+    file_name = file_name + "_" + str(tileX)+"x" + "_" + str(tileY) + "y" + "_" + label + ".png"
    
     save_name = os.path.join(save_dir, file_name)
     im.save(save_name)
@@ -44,6 +43,7 @@ def polygon2id(image_shape, mask, ids, coords_x, coords_y):
         vertex_row_coords, vertex_col_coords, image_shape)
     
     # Row and col are flipped
+    pdb.set_trace()
     mask[fill_col_coords, fill_row_coords] = ids
     return mask
 
@@ -104,16 +104,21 @@ def process_json(json_path, save_dir, visualize=False):
 
             region_id = 0
             prev_label = ""
+            i = 0
            
-            for i in range(len(data[ele]['regions'])):
-                coords_x = data[ele]['regions'][i]['shape_attributes']['all_points_x']
-                coords_x = np.array(coords_x)
+            for region in ele['region_attributes']:
+                
+                # Get tileX and tileY
+                tileX = region['tiles'][0]['tileId'][0]
+                tileY = region['tiles'][0]['tileId'][1]
 
-                coords_y = data[ele]['regions'][i]['shape_attributes']['all_points_y']
+                # unpack from [x,y] to [x], [y]
+                coords_x, coords_y = zip(*region['points'])
+                coords_x = np.array(coords_x)
                 coords_y = np.array(coords_y)
 
                 # label
-                label = data[ele]['regions'][i]['region_attributes']['type']
+                label = ele['label']
                 
                 if i == 0:
                     ids = int(lablel2id[label])
@@ -127,7 +132,9 @@ def process_json(json_path, save_dir, visualize=False):
 
                 prev_label = label
 
-            save_mask(id_mask, ele, save_dir)
+                i+=1
+
+            save_mask(id_mask, ele['filename'], tileX, tileY, save_dir)
 
                 
     
