@@ -23,11 +23,11 @@ import pyvips as Vips
 import openslide
 
 # Mask size should be same as image size
-ID_MASK_SHAPE = (224, 224)
+ID_MASK_SHAPE = (1024, 1024)
 
 # Color Coding
-lablel2id = {'Core':'50', 'Diffused':'100',
-             'Neuritic':'150', 'Unknown':'250'}
+lablel2id = {'Core':'250', 'Diffuse':'200',
+             'Neuritic':'150', 'Unknown':'0'}
 
 def save_img(img, file_name, tileX, tileY, save_dir, label="mask"):
     im = Image.fromarray(img)
@@ -64,19 +64,16 @@ def polygon2mask(image_shape, mask, color, coords_x, coords_y):
         The mask that corresponds to the input polygon.
     """
    
-    vertex_row_coords, vertex_col_coords = coords_y, coords_x
-    fill_row_coords, fill_col_coords = draw.polygon(
-        vertex_row_coords, vertex_col_coords, image_shape)
+    vertex_row_coords, vertex_col_coords = coords_x, coords_y
+    fill_row_coords, fill_col_coords = draw.polygon(vertex_row_coords, vertex_col_coords, image_shape)
     
     # Row and col are flipped 
     mask[fill_col_coords, fill_row_coords] = color
+    
     # mask[fill_row_coords, fill_col_coords] = color
     return mask
 
-def cropTiles(tileX, tileY, width, height): {
 
-
-}
 
 def get_vips_info(vips_img):
     # # Get bounds-x and bounds-y offeset
@@ -87,7 +84,7 @@ def get_vips_info(vips_img):
     return vfields
 
 
-def process_json(json_path, imagename,  save_dir, visualize=False):
+def process_json(WSI_path, visualize=False):
     """This function is used to read and process the json files
     and generate save generated masks
     
@@ -100,26 +97,33 @@ def process_json(json_path, imagename,  save_dir, visualize=False):
     
 
     # Mask Folder
-    mask_save_dir = os.path.join(save_dir, "masks")
+    mask_save_dir = os.path.join(WSI_path, "masks")
     if not os.path.exists(mask_save_dir):
         os.makedirs(mask_save_dir)
     
     # Image Folder
-    image_save_dir = os.path.join(save_dir, "images")
+    image_save_dir = os.path.join(WSI_path, "images")
     if not os.path.exists(image_save_dir):
         os.makedirs(image_save_dir)
-
-    # Read the WSI image
-    vips_img = Vips.Image.new_from_file(imagename, level=0)
-    vinfo = get_vips_info(vips_img)
-
     
 
-    json_files = glob.glob(os.path.join(json_path, "*.json"))
-    for json_file in json_files:
+    imagenames = glob.glob(os.path.join(WSI_path, "*.mrxs"))
+    
+    for img in imagenames:
+        # TODO Remove this hardcoding later
+        img = "/home/vivek/Datasets/AmyB/amyb_wsi/XE19-010_1_AmyB_1.mrxs"
+        # Read the WSI image
+        vips_img = Vips.Image.new_from_file(img, level=0)
+        vinfo = get_vips_info(vips_img)
 
-        print("file name : ", json_file)
-        with open(json_file) as f:
+        # Get the corresponding json file
+        
+        json_file_name = os.path.basename(img).split(".mrxs")[0] + ".json"
+        json_file_name = os.path.join(os.path.dirname(img), json_file_name)
+        # json_file_name = os.path.join(os.path.dirname(img), "XE19-010_1_AmyB_1_37894x_177901y_image.png[--series, 0].json")
+
+        print("file name : ", json_file_name)
+        with open(json_file_name) as f:
             data = json.load(f)
 
         for ele in tqdm(data):
@@ -133,7 +137,7 @@ def process_json(json_path, imagename,  save_dir, visualize=False):
             region_id = 0
             prev_label = ""
             i = 0
-           
+        
             for region in ele['region_attributes']:
 
                 
@@ -150,13 +154,19 @@ def process_json(json_path, imagename,  save_dir, visualize=False):
 
                 vips_img = vips_img.crop(tileX, tileY,tileWidth, tileHeight)
                 vips_img = np.ndarray(buffer=vips_img.write_to_memory(), dtype=np.uint8, 
-                                      shape=(vips_img.height, vips_img.width, vips_img.bands))[..., :3]
+                                    shape=(vips_img.height, vips_img.width, vips_img.bands))[..., :3]
 
 
                 # unpack from [x,y] to [x], [y]
                 coords_x, coords_y = zip(*region['points'])
+              
                 coords_x = np.array(coords_x)
+                coords_x = coords_x
+                # Translate the coordinates to fit withing the image crop
+                coords_x = np.mod(coords_x, tileWidth)
                 coords_y = np.array(coords_y)
+                coords_y= coords_y
+                coords_y = np.mod(coords_y, tileHeight)
 
                 # label
                 label = ele['label']
@@ -175,16 +185,14 @@ def process_json(json_path, imagename,  save_dir, visualize=False):
 
                 i+=1
 
-        
-            save_img(vips_img, ele['filename'], tileX, tileY, image_save_dir, "image")
-            save_img(id_mask, ele['filename'], tileX, tileY, mask_save_dir,"mask")
+                save_img(vips_img, ele['filename'], tileX, tileY, image_save_dir, "image")
+                save_img(id_mask, ele['filename'], tileX, tileY, mask_save_dir,"mask")
 
                 
     
-        if visualize:
-            plt.imshow(id_mask)
-            plt.show()
-        # pdb.set_trace()
+            if visualize:
+                plt.imshow(id_mask)
+                plt.show()
 
 
 if __name__ == '__main__':
@@ -192,15 +200,12 @@ if __name__ == '__main__':
     print(result)
 
     parser = argparse.ArgumentParser(description='Generate Mask')
-    parser.add_argument('json_path',
-                        help='Enter the path annotation json file resides')
+
     parser.add_argument('WSI_path',
                         help='Enter the path where WSI resides')
-    parser.add_argument('save_dir',
-                        help='Enter the path where you want to save image masks')
 
     args = parser.parse_args()
 
-    process_json(args.json_path, args.WSI_path, args.save_dir)
+    process_json(args.WSI_path)
 
 
