@@ -42,12 +42,14 @@ def polygon2id(image_shape, mask, ids, coords_x, coords_y):
     vertex_row_coords, vertex_col_coords = coords_y, coords_x
     fill_row_coords, fill_col_coords = draw.polygon(
         vertex_row_coords, vertex_col_coords, image_shape)
+
+    
     
     # Row and col are flipped
     mask[fill_col_coords, fill_row_coords] = ids
     return mask
 
-def polygon2mask(image_shape, mask, color, coords_x, coords_y):
+def polygon2mask1(image_shape, mask, color, coords_x, coords_y):
     """Compute a mask with labels having different colors 
     from polygon.
     Parameters
@@ -108,10 +110,11 @@ def process_json(WSI_path, visualize=False):
     
 
     imagenames = glob.glob(os.path.join(WSI_path, "*.mrxs"))
+
+    # TODO Remove this hardcoding later
+    imagenames = ["/home/vivek/Datasets/AmyB/amyb_wsi/XE19-010_1_AmyB_1.mrxs"]
     
     for img in imagenames:
-        # TODO Remove this hardcoding later
-        img = "/home/vivek/Datasets/AmyB/amyb_wsi/XE19-010_1_AmyB_1.mrxs"
         # Read the WSI image
         vips_img = Vips.Image.new_from_file(img, level=0)
         vinfo = get_vips_info(vips_img)
@@ -140,7 +143,6 @@ def process_json(WSI_path, visualize=False):
         
             for region in ele['region_attributes']:
 
-                
                 # Get tileX and tileY
                 tileX = region['tiles'][0]['tileId'][0]
                 tileY = region['tiles'][0]['tileId'][1]
@@ -152,21 +154,48 @@ def process_json(WSI_path, visualize=False):
                 tileX = (tileX * tileWidth) + int(vinfo['bounds-x'])
                 tileY = (tileY * tileHeight) + int(vinfo['bounds-y'])
 
-                vips_img = vips_img.crop(tileX, tileY,tileWidth, tileHeight)
-                vips_img = np.ndarray(buffer=vips_img.write_to_memory(), dtype=np.uint8, 
-                                    shape=(vips_img.height, vips_img.width, vips_img.bands))[..., :3]
+                if tileX == 38918 and tileY==178925:
+                    pdb.set_trace()
 
+                vips_img_crop = vips_img.crop(tileX, tileY,tileWidth, tileHeight)
+
+                # Region Bounds
+                regX = region["roiBounds"]["XY"][0]
+                regY = region["roiBounds"]["XY"][1]
+                regWidth = region["roiBounds"]["WH"][0]
+                regHeight = region["roiBounds"]["WH"][1]
+
+                # regX = (regX) + int(vinfo['bounds-x'])
+                # regY = (regY) + int(vinfo['bounds-y'])
+
+                region_crop = vips_img.crop(regX, regY, tileWidth, tileHeight)
+                vips_img_crop = np.ndarray(buffer=vips_img_crop.write_to_memory(), dtype=np.uint8, 
+                                    shape=(vips_img_crop.height, vips_img_crop.width, vips_img_crop.bands))[..., :3]
+                # region_img_crop = np.ndarray(buffer=vips_img_crop.write_to_memory(), dtype=np.uint8, 
+                #                 shape=(vips_img_crop.height, vips_img_crop.width, vips_img_crop.bands))[..., :3]
 
                 # unpack from [x,y] to [x], [y]
                 coords_x, coords_y = zip(*region['points'])
               
                 coords_x = np.array(coords_x)
-                coords_x = coords_x
-                # Translate the coordinates to fit withing the image crop
-                coords_x = np.mod(coords_x, tileWidth)
                 coords_y = np.array(coords_y)
-                coords_y= coords_y
+
+                x1 = tileX-6
+                x2 = tileX + tileWidth -6
+                y1 = tileY-12013
+                y2 = tileY + tileHeight - 12013
+
+                if len(coords_x[coords_x > x2]) > 0 or len(coords_y[coords_y > y2]) > 0:
+                # if not (coords_x<=x2).any() or (coords_y<=y2).all():
+                    print('Overlap')
+                    continue
+                
+
+                # Translate the coordinates to fit within the image crop
+                coords_x = np.mod(coords_x, tileWidth)
                 coords_y = np.mod(coords_y, tileHeight)
+
+               
 
                 # label
                 label = ele['label']
@@ -185,11 +214,10 @@ def process_json(WSI_path, visualize=False):
 
                 i+=1
 
-                save_img(vips_img, ele['filename'], tileX, tileY, image_save_dir, "image")
+                save_img(vips_img_crop, ele['filename'], tileX, tileY, image_save_dir, "image")
                 save_img(id_mask, ele['filename'], tileX, tileY, mask_save_dir,"mask")
+                id_mask = np.zeros(ID_MASK_SHAPE, dtype=np.uint8)
 
-                
-    
             if visualize:
                 plt.imshow(id_mask)
                 plt.show()
