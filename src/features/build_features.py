@@ -10,6 +10,7 @@ class AmyBDataset(object):
     def __init__(self, root, transforms):
         self.root = root
         self.transforms = transforms
+        pdb.set_trace()
         # load all image files, sorting them to
         # ensure that they are aligned
         self.imgs = list(sorted(os.listdir(os.path.join(root, "images"))))
@@ -90,10 +91,10 @@ class AmyBDataset(object):
         target["masks"] = masks
         target["image_id"] = image_id
         target["area"] = area
-        target["iscrowd"] = iscrowd
-
+        
         if self.transforms is not None:
-            img, target = self.transforms(img, target)
+            img = self.transforms(img)
+            target = self.transforms(target)
 
         return img, target
 

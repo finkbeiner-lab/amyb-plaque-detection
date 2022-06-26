@@ -26,6 +26,8 @@ def visualize_train(images, targets, wandb, img_no, visualize=False):
         for i in range(2):
             plt.subplot(1,2,i+1)    # the number of images in the grid is 5*5 (25)
             plt.imshow(img_array[i])
+
+        # TODO create train-data
         save_file = "../../reports/figures/train-data/{img_no}.png"
         plt.savefig(save_file.format(img_no=img_no))
         wandb.log({"train/data": wandb.Image(save_file.format(img_no=img_no))})

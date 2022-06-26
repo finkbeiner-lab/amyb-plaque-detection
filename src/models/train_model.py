@@ -61,9 +61,16 @@ def get_transform(train):
     transforms = []
     transforms.append(T.ToTensor())
     if train:
-        transforms.append(T.RandomHorizontalFlip(0.5))
+        transforms.append(T.RandomHorizontalFlip(0.5),
+                          T.GaussianBlur([3,3], sigma=(0.1, 2.0)))
+    
+        # transforms = torchvision.transforms.Compose([
+        # torchvision.transforms.RandomHorizontalFlip(),
+        # torchvision.transforms.RandomVerticalFlip(),
+        # torchvision.transforms.GaussianBlur([3,3], sigma=(0.1, 2.0))
+        # ])
     return T.Compose(transforms)
-
+    # return transforms
 
 # train on the GPU or on the CPU, if a GPU is not available
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -74,20 +81,21 @@ num_classes = 1 + 3
 
 
 
-dataset = build_features.AmyBDataset('/home/vivek/Datasets/mask_rcnn/dataset/train', get_transform(train=True))
-dataset_test = build_features.AmyBDataset('/home/vivek/Datasets/mask_rcnn/dataset/val', get_transform(train=False))
+dataset = build_features.AmyBDataset('/home/vivek/Datasets/AmyB/amyb_wsi/train', get_transform(train=True))
+dataset_test = build_features.AmyBDataset('/home/vivek/Datasets/AmyB/amyb_wsi/val', get_transform(train=False))
 
-x = next(iter(dataset))
+# x = next(iter(dataset))
+# pdb.set_trace()
 
 with wandb.init(project='amyb-plaque-detection', config=config):
 
     # define training and validation data loaders
     data_loader = torch.utils.data.DataLoader(
-        dataset, batch_size=1, shuffle=True, num_workers=4,
+        dataset, batch_size=16, shuffle=True, num_workers=4,
         collate_fn=utils.collate_fn)
 
     data_loader_test = torch.utils.data.DataLoader(
-        dataset_test, batch_size=1, shuffle=False, num_workers=4,
+        dataset_test, batch_size=16, shuffle=False, num_workers=4,
         collate_fn=utils.collate_fn)
 
     # get the model using our helper function
@@ -104,10 +112,10 @@ with wandb.init(project='amyb-plaque-detection', config=config):
     # torch.optim.lr_scheduler.StepLR(optimizer, **lr_config)
 
     # Test the train data
-    # img_no = 0
-    # for images, targets in data_loader:
-    #     visualize_train(images, targets, wandb, img_no, True)
-    #     img_no = img_no + 1
+    img_no = 0
+    for images, targets in data_loader:
+        # visualize_train(images, targets, wandb, img_no, True)
+        img_no = img_no + 1
     
 
    

@@ -33,9 +33,10 @@ class SplitData:
 
     """
 
-    def __init__(self, dataset_base_dir):
+    def __init__(self, dataset_base_dir, data_aug, aug_value):
         self.dataset_base_dir = dataset_base_dir
-        self.data_aug = False
+        self.data_aug = data_aug
+        self.aug_value = aug_value
         self.cores = multiprocessing.cpu_count()
         self.image_input = "images"
         self.label_input = "masks"
@@ -149,6 +150,88 @@ class SplitData:
         print('\nTotal Labels :', len(label_filenames))
         print("\n====================================")
     
+    def get_randimages_dataug(self, total_imgs, image_filenames, label_filenames):
+        '''
+        This Fn generates random files from the original dataset, which will
+        be used to perform data augmentation
+
+        Parameters:
+        image_filenames -- list of filenames of images
+        label_filenames -- list of filenames of labels
+        total_imgs -- how many images needs to be augmented
+
+        Return:
+        list of random image and label files for performing data augmentation
+        '''
+        image_filenames.sort()
+        label_filenames.sort()
+        random_image_file = []
+        random_label_file = []
+
+        for i in trange(total_imgs):
+            random.seed(i)
+            random_image_file.append(random.choice(image_filenames))
+            random.seed(i)
+            random_label_file.append(random.choice(label_filenames))
+
+        return [random_image_file, random_label_file]
+    
+    def upsample_dataset(self, random_filenames, file_type, variations):
+        '''
+        This Fn will upsample the images by performing data augmentation
+
+        DataAugmentation includes vertical and horizontal flips
+
+        Parameters:
+        random_filenames -- the random filenames of the images for performing data augmentation
+        file_type -- if it belongs to images or labels
+        variations -- how many variations you need from each image for
+        generating your data augmented sample
+
+        '''
+        i = 0
+        aug_files = []
+        random.seed(500)
+
+        # Make dir where tha augmented file will reside
+        aug_dir = os.path.join(self.dataset_home, file_type)
+        if not os.path.exists(aug_dir):
+                os.makedirs(aug_dir)
+                print("Augmented Directory '%s' created" %aug_dir)
+
+
+        print("\nData Augmentation in Progress ...")
+        total_imgs = len(random_filenames)
+
+        for i in trange(total_imgs):
+            random_file = random_filenames[i]
+
+            # load the image
+            img = load_img(random_file)
+            data = img_to_array(img)
+            samples = expand_dims(data, 0)
+
+            datagen = ImageDataGenerator(horizontal_flip=True, vertical_flip=True)
+
+            data_it = datagen.flow(samples, batch_size=1, seed=10)
+
+            #To rename the file with prefix A_
+            filename = os.path.basename(random_file)
+            filepath = os.path.dirname(random_file)
+        
+            for j in range(variations):
+                 # generate batch of images
+                batch = data_it.next()
+                # convert to unsigned integers for viewing
+                image = batch[0].astype('uint8')
+                im = Image.fromarray(image)
+                aug_file_name = filepath + "/A_" + str(i) + "_" + str(j) + "_" + filename
+                new_file = os.path.join(self.dataset_home, file_type,
+                                        aug_file_name)
+                im.save(new_file)
+                aug_files.append(new_file)
+
+        return aug_files
 
     def preprocess_dataset(self, image_filenames, label_filenames):
         '''
@@ -163,7 +246,6 @@ class SplitData:
         
        '''
       
-        pdb.set_trace()
         image_filenames.sort()
         label_filenames.sort()
 
@@ -187,6 +269,7 @@ class SplitData:
         
         # self.visualization.check_images(augmented_image_files, 2)
         # self.visualization.check_images(augmented_label_files, 2)
+    
 
 
     
@@ -211,7 +294,7 @@ class SplitData:
 
     
 if __name__ == "__main__":
-    split_data = SplitData("/home/vivek/Datasets/AmyB/amyb_wsi/")
+    split_data = SplitData("/home/vivek/Datasets/AmyB/amyb_wsi/", True, 500)
     split_data.prepare_dataset()
        
     
