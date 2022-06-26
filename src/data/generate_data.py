@@ -26,7 +26,7 @@ import openslide
 ID_MASK_SHAPE = (1024, 1024)
 
 # Color Coding
-lablel2id = {'Core':'250', 'Diffuse':'200',
+lablel2id = {'Core':'50', 'Diffuse':'100',
              'Neuritic':'150', 'Unknown':'0'}
 
 def save_img(img, file_name, tileX, tileY, save_dir, label="mask"):
@@ -113,6 +113,7 @@ def process_json(WSI_path, visualize=False):
 
     # TODO Remove this hardcoding later
     imagenames = ["/home/vivek/Datasets/AmyB/amyb_wsi/XE19-010_1_AmyB_1.mrxs"]
+    plaque_dict = {}
     
     for img in imagenames:
         # Read the WSI image
@@ -120,7 +121,6 @@ def process_json(WSI_path, visualize=False):
         vinfo = get_vips_info(vips_img)
 
         # Get the corresponding json file
-        
         json_file_name = os.path.basename(img).split(".mrxs")[0] + ".json"
         json_file_name = os.path.join(os.path.dirname(img), json_file_name)
         # json_file_name = os.path.join(os.path.dirname(img), "XE19-010_1_AmyB_1_37894x_177901y_image.png[--series, 0].json")
@@ -128,7 +128,7 @@ def process_json(WSI_path, visualize=False):
         print("file name : ", json_file_name)
         with open(json_file_name) as f:
             data = json.load(f)
-
+        
         for ele in tqdm(data):
 
             # Reset ids for each annotation
@@ -140,6 +140,8 @@ def process_json(WSI_path, visualize=False):
             region_id = 0
             prev_label = ""
             i = 0
+
+            plaque_dict[ele['label']] = len(ele['region_attributes'])
         
             for region in ele['region_attributes']:
 
@@ -154,8 +156,8 @@ def process_json(WSI_path, visualize=False):
                 tileX = (tileX * tileWidth) + int(vinfo['bounds-x'])
                 tileY = (tileY * tileHeight) + int(vinfo['bounds-y'])
 
-                if tileX == 38918 and tileY==178925:
-                    pdb.set_trace()
+                # if tileX == 38918 and tileY==178925:
+                #     pdb.set_trace()
 
                 vips_img_crop = vips_img.crop(tileX, tileY,tileWidth, tileHeight)
 
@@ -165,10 +167,7 @@ def process_json(WSI_path, visualize=False):
                 regWidth = region["roiBounds"]["WH"][0]
                 regHeight = region["roiBounds"]["WH"][1]
 
-                # regX = (regX) + int(vinfo['bounds-x'])
-                # regY = (regY) + int(vinfo['bounds-y'])
-
-                region_crop = vips_img.crop(regX, regY, tileWidth, tileHeight)
+                # region_crop = vips_img.crop(regX, regY, tileWidth, tileHeight)
                 vips_img_crop = np.ndarray(buffer=vips_img_crop.write_to_memory(), dtype=np.uint8, 
                                     shape=(vips_img_crop.height, vips_img_crop.width, vips_img_crop.bands))[..., :3]
                 # region_img_crop = np.ndarray(buffer=vips_img_crop.write_to_memory(), dtype=np.uint8, 
@@ -180,13 +179,14 @@ def process_json(WSI_path, visualize=False):
                 coords_x = np.array(coords_x)
                 coords_y = np.array(coords_y)
 
-                x1 = tileX-6
-                x2 = tileX + tileWidth -6
-                y1 = tileY-12013
-                y2 = tileY + tileHeight - 12013
+                x1 = tileX - int(vinfo['bounds-x'])
+                x2 = tileX + tileWidth - int(vinfo['bounds-x'])
+                y1 = tileY - int(vinfo['bounds-y'])
+                y2 = tileY + tileHeight - int(vinfo['bounds-y'])
 
+
+                # Remove overlap annotations
                 if len(coords_x[coords_x > x2]) > 0 or len(coords_y[coords_y > y2]) > 0:
-                # if not (coords_x<=x2).any() or (coords_y<=y2).all():
                     print('Overlap')
                     continue
                 
@@ -221,6 +221,8 @@ def process_json(WSI_path, visualize=False):
             if visualize:
                 plt.imshow(id_mask)
                 plt.show()
+        
+        print(plaque_dict)
 
 
 if __name__ == '__main__':
