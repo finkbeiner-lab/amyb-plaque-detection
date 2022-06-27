@@ -115,7 +115,7 @@ class ExplainPredictions():
             
             # Convert Back
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        return image, segmentation_map
+        return image, result_masks
 
     def prepare_input(self, image):
     
@@ -169,43 +169,47 @@ class ExplainPredictions():
         return image
 
 
-    def quantify_plaques(self):
+    def quantify_plaques(self, df, img_name, result_masks, boxes, labels):
         '''This function will take masks image and generate attributes like plaque
         count, area, eccentricity'''
-        masks_images = glob.glob(os.path.join(self.masks_path, "*.png"))
-        count = 0
-        df = pd.DataFrame()
-        quantify_path = os.path.join(self.result_save_dir, "quantify.csv")
-
-        for img in masks_images:
+        result = []
+        for i in range(len(labels)):
 
             props = {}
             data = {}
-            img_name = os.path.basename(img)
-            print(img_name)
-            
-            # Since the mask might contain some noise and imperfections we try to remove
-            # noise and holes with morphological operations
-            # img = io.imread(image)
-            img = cv2.imread(img, cv2.IMREAD_GRAYSCALE)
-            kernel = np.ones((5,5),np.uint8)
-            img[img < 255] = 0
-            # Closing operation Dilation followed by erosion
-            closing = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel)
-            regions = regionprops(closing)
+            # Here x and y axis are flipped
+            if len(boxes)!= 0:
 
-            for props in regions:
-            
-                data['centroid'] = props.centroid
-                data['eccentricity'] = props.eccentricity
-                data['area'] = props.area
-                data['equivalent_diameter'] = props.equivalent_diameter
-                data['img_name'] = img_name
-                df = df.append(data, ignore_index=True)
-            df.to_csv(quantify_path, index=False)
+                x1 = boxes[i][0][1]
+                x2 =  boxes[i][1][1]
+                y1 = boxes[i][0][0]
+                y2 = boxes[i][1][0]
 
+                cropped_image = result_masks[x1:x2, y1:y2]
 
+                ret, bw_img = cv2.threshold(cropped_image,0,255,cv2.THRESH_BINARY)
 
+                kernel = np.ones((5,5),np.uint8)
+                
+                # Closing operation Dilation followed by erosion
+                closing = cv2.morphologyEx(bw_img, cv2.MORPH_CLOSE, kernel)
+                regions = regionprops(closing)
+
+                for props in regions:
+                    
+                    data['img_name'] = img_name
+                    data['label'] = labels[i]
+                    data['centroid'] = props.centroid
+                    data['eccentricity'] = props.eccentricity
+                    data['area'] = props.area
+                    data['equivalent_diameter'] = props.equivalent_diameter
+                    result.append(data)
+                    
+                    df = df.append(result, ignore_index=True)
+                    print(result)
+
+        return df
+        
     def make_result_dirs(self):
 
         results_path = os.path.join(self.result_save_dir, "results")
@@ -228,6 +232,7 @@ class ExplainPredictions():
         # This will help us create a different color for each class
 
         results_path, masks_path, ablations_path = self.make_result_dirs()
+        quantify_path = os.path.join(self.result_save_dir, "quantify.csv")
         #used downstream by quantify plaques
         self.masks_path = masks_path
 
@@ -240,6 +245,7 @@ class ExplainPredictions():
         images = glob.glob(os.path.join(self.test_input_path, '*.png'))
 
         i = 0
+        df = pd.DataFrame()
         for img in images:
             # Get the input_tensor
             print(img)
@@ -251,11 +257,12 @@ class ExplainPredictions():
             masks, boxes, labels = self.get_outputs(input_tensor, model, self.detection_threshold)
             
             result_img, result_masks = self.draw_segmentation_map(image, masks, boxes, labels)
+
+            df = self.quantify_plaques(df, img_name, result_masks, boxes, labels)
+
             
             mask_img_name = img_name +  "_masks.png"
             mask_save_path = os.path.join(masks_path, mask_img_name)
-
-        
 
             cv2.imwrite(mask_save_path, result_masks)
 
@@ -306,7 +313,8 @@ class ExplainPredictions():
             i = i + 1
             # plt.show()
         
-        self.quantify_plaques()
+        df.to_csv(quantify_path, index=False)
+        
 
 
 if __name__ == "__main__":
