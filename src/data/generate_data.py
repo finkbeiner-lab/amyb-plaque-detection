@@ -3,7 +3,7 @@
 Annotations(polyong cooridnates) --> Image Mask
 Mask Shape is 224 * 224
 
-This script allows the user to generate mask image from 
+This script allows the user to generate mask image from
 the json annotation file for segmentation
 
 """
@@ -33,7 +33,7 @@ def save_img(img, file_name, tileX, tileY, save_dir, label="mask"):
     im = Image.fromarray(img)
 
     file_name = file_name + "_" + str(tileX)+"x" + "_" + str(tileY) + "y" + "_" + label + ".png"
-   
+
     save_name = os.path.join(save_dir, file_name)
     im.save(save_name)
 
@@ -43,14 +43,14 @@ def polygon2id(image_shape, mask, ids, coords_x, coords_y):
     fill_row_coords, fill_col_coords = draw.polygon(
         vertex_row_coords, vertex_col_coords, image_shape)
 
-    
-    
+
+
     # Row and col are flipped
     mask[fill_col_coords, fill_row_coords] = ids
     return mask
 
 def polygon2mask1(image_shape, mask, color, coords_x, coords_y):
-    """Compute a mask with labels having different colors 
+    """Compute a mask with labels having different colors
     from polygon.
     Parameters
     ----------
@@ -65,13 +65,13 @@ def polygon2mask1(image_shape, mask, color, coords_x, coords_y):
     mask : 2-D ndarray of type 'bool'.
         The mask that corresponds to the input polygon.
     """
-   
+
     vertex_row_coords, vertex_col_coords = coords_x, coords_y
     fill_row_coords, fill_col_coords = draw.polygon(vertex_row_coords, vertex_col_coords, image_shape)
-    
-    # Row and col are flipped 
+
+    # Row and col are flipped
     mask[fill_col_coords, fill_row_coords] = color
-    
+
     # mask[fill_row_coords, fill_col_coords] = color
     return mask
 
@@ -82,39 +82,39 @@ def get_vips_info(vips_img):
     vfields = [f.split('.') for f in vips_img.get_fields()]
     vfields = [f for f in vfields if f[0] == 'openslide']
     vfields = dict([('.'.join(k[1:]), vips_img.get('.'.join(k))) for k in vfields])
-    
+
     return vfields
 
 
 def process_json(WSI_path, visualize=False):
     """This function is used to read and process the json files
     and generate save generated masks
-    
+
     Parameters
     -----------
     json_path : path to json file
     save_dir : dir where the generated masks will be saved
     visualize : True , if you want to see the mask generated
     """
-    
+
 
     # Mask Folder
     mask_save_dir = os.path.join(WSI_path, "masks")
     if not os.path.exists(mask_save_dir):
         os.makedirs(mask_save_dir)
-    
+
     # Image Folder
     image_save_dir = os.path.join(WSI_path, "images")
     if not os.path.exists(image_save_dir):
         os.makedirs(image_save_dir)
-    
+
 
     imagenames = glob.glob(os.path.join(WSI_path, "*.mrxs"))
 
     # TODO Remove this hardcoding later
     imagenames = ["/home/vivek/Datasets/AmyB/amyb_wsi/XE19-010_1_AmyB_1.mrxs"]
     plaque_dict = {}
-    
+
     for img in imagenames:
         # Read the WSI image
         vips_img = Vips.Image.new_from_file(img, level=0)
@@ -128,7 +128,7 @@ def process_json(WSI_path, visualize=False):
         print("file name : ", json_file_name)
         with open(json_file_name) as f:
             data = json.load(f)
-        
+
         for ele in tqdm(data):
 
             # Reset ids for each annotation
@@ -142,7 +142,7 @@ def process_json(WSI_path, visualize=False):
             i = 0
 
             plaque_dict[ele['label']] = len(ele['region_attributes'])
-        
+
             for region in ele['region_attributes']:
 
                 # Get tileX and tileY
@@ -168,14 +168,14 @@ def process_json(WSI_path, visualize=False):
                 regHeight = region["roiBounds"]["WH"][1]
 
                 # region_crop = vips_img.crop(regX, regY, tileWidth, tileHeight)
-                vips_img_crop = np.ndarray(buffer=vips_img_crop.write_to_memory(), dtype=np.uint8, 
+                vips_img_crop = np.ndarray(buffer=vips_img_crop.write_to_memory(), dtype=np.uint8,
                                     shape=(vips_img_crop.height, vips_img_crop.width, vips_img_crop.bands))[..., :3]
-                # region_img_crop = np.ndarray(buffer=vips_img_crop.write_to_memory(), dtype=np.uint8, 
+                # region_img_crop = np.ndarray(buffer=vips_img_crop.write_to_memory(), dtype=np.uint8,
                 #                 shape=(vips_img_crop.height, vips_img_crop.width, vips_img_crop.bands))[..., :3]
 
                 # unpack from [x,y] to [x], [y]
                 coords_x, coords_y = zip(*region['points'])
-              
+
                 coords_x = np.array(coords_x)
                 coords_y = np.array(coords_y)
 
@@ -189,17 +189,17 @@ def process_json(WSI_path, visualize=False):
                 if len(coords_x[coords_x > x2]) > 0 or len(coords_y[coords_y > y2]) > 0:
                     print('Overlap')
                     continue
-                
+
 
                 # Translate the coordinates to fit within the image crop
                 coords_x = np.mod(coords_x, tileWidth)
                 coords_y = np.mod(coords_y, tileHeight)
 
-               
+
 
                 # label
                 label = ele['label']
-                
+
                 if i == 0:
                     ids = int(lablel2id[label])
                 elif label == prev_label:
@@ -221,8 +221,27 @@ def process_json(WSI_path, visualize=False):
             if visualize:
                 plt.imshow(id_mask)
                 plt.show()
-        
+
         print(plaque_dict)
+
+
+def merge_json(json_files, json_output_file=None):
+    """
+    merge_json: a method to return the combined json of a list of json files
+
+    json_files: list[str]: a list of json filenames to scan
+    json_output_file: str = None: the (optional) file to dump the json to
+    raises: IO errors
+    return: str: raw json output
+    """
+
+    json_objs = [json.load(open(f, 'r')) for f in json_files]
+    json_list = list()
+    for json_obj in json_objs:
+        json_list += json_obj
+    if json_output_file is not None:
+        json.dump(json_list, open(json_output_file, 'w'))
+    return json.dumps(json_list)
 
 
 if __name__ == '__main__':
@@ -237,5 +256,3 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     process_json(args.WSI_path)
-
-
