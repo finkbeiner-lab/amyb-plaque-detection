@@ -33,6 +33,7 @@ class ExplainPredictions():
         self.test_input_path = test_input_path
         self.detection_threshold = detection_threshold
         self.class_names = ['Unknown', 'Core', 'Diffuse', 'Neuritic']
+        self.class_to_colors = {'Core': (255, 0, 0), 'Neuritic' : (0, 0, 255), 'Diffuse': (0,255,0)}
         self.result_save_dir= "../../reports/figures/"
         self.colors = np.random.uniform(0, 255, size=(len(self.class_names), 3))
         self.masks_path = ""
@@ -61,6 +62,7 @@ class ExplainPredictions():
         # get the classes labels
         # print('labels', outputs[0]['labels'])
         labels = [self.class_names[i] for i in outputs[0]['labels']]
+        labels = labels[:thresholded_preds_count]
 
         # [1,1,1, 2, 2, 2, 3, 3]
         return masks, boxes, labels
@@ -82,13 +84,12 @@ class ExplainPredictions():
             # apply a randon color mask to each object
             rect_color = (0,0,0)
             color = self.colors[random.randrange(0, len(self.colors))]
-            
-            # red_map[masks[i] == 1], green_map[masks[i] == 1], blue_map[masks[i] == 1]  = color
+            red_map[masks[i] == 1], green_map[masks[i] == 1], blue_map[masks[i] == 1]  = self.class_to_colors[labels[i]]
             result_masks[masks[i] == 1] = 255
             # combine all the masks into a single image
             # change the format of mask to W,H, C
 
-            # segmentation_map = np.stack([red_map, green_map, blue_map], axis=2)
+            segmentation_map = np.stack([red_map, green_map, blue_map], axis=2)
             #convert the original PIL image into NumPy format
             image = np.array(image)
             # convert from RGB to OpenCV BGR format
@@ -114,7 +115,7 @@ class ExplainPredictions():
             
             # Convert Back
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        return image, result_masks
+        return image, segmentation_map
 
     def prepare_input(self, image):
     
@@ -182,7 +183,7 @@ class ExplainPredictions():
             data = {}
             img_name = os.path.basename(img)
             print(img_name)
-
+            
             # Since the mask might contain some noise and imperfections we try to remove
             # noise and holes with morphological operations
             # img = io.imread(image)
@@ -201,7 +202,6 @@ class ExplainPredictions():
                 data['equivalent_diameter'] = props.equivalent_diameter
                 data['img_name'] = img_name
                 df = df.append(data, ignore_index=True)
-                print(data)
             df.to_csv(quantify_path, index=False)
 
 
