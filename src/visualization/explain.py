@@ -24,11 +24,13 @@ import glob
 
 class ExplainPredictions():
 
-    def __init__(self, model_input_path, test_input_path, detection_threshold, ):
+    def __init__(self, model_input_path, test_input_path, detection_threshold):
         self.model_input_path = model_input_path
         self.test_input_path = test_input_path
         self.detection_threshold = detection_threshold
         self.class_names = ['Unknown', 'Core', 'Diffuse', 'Neuritic']
+        self.result_save_path = "../../reports/figures/result_{no:}.png"
+        self.colors = np.random.uniform(0, 255, size=(len(self.class_names), 3))
 
 
     def get_outputs(self, input_tensor, model, threshold):
@@ -53,7 +55,7 @@ class ExplainPredictions():
         boxes = boxes[:thresholded_preds_count]
         # get the classes labels
         # print('labels', outputs[0]['labels'])
-        labels = [coco_names[i] for i in outputs[0]['labels']]
+        labels = [self.class_names[i] for i in outputs[0]['labels']]
 
         # [1,1,1, 2, 2, 2, 3, 3]
         return masks, boxes, labels
@@ -71,7 +73,7 @@ class ExplainPredictions():
             
             # apply a randon color mask to each object
             rect_color = (0,0,0)
-            color = COLORS[random.randrange(0, len(COLORS))]
+            color = self.colors[random.randrange(0, len(self.colors))]
             red_map[masks[i] == 1], green_map[masks[i] == 1], blue_map[masks[i] == 1]  = color
             # combine all the masks into a single image
             # change the format of mask to W,H, C
@@ -120,87 +122,110 @@ class ExplainPredictions():
         input_tensor = input_tensor.unsqueeze(0)
 
         return input_tensor, image_float_np
-
-
-
-
-# This will help us create a different color for each class
-COLORS = np.random.uniform(0, 255, size=(len(coco_names), 3))
-
-# model = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True)
-model = torch.load('../../models/mrcnn_model_50.pth')
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model.eval().to(device)
-
-
-images = glob.glob(os.path.join(input_path, '*.png'))
-i = 0
-for img in images:
-
-    # Get the input_tensor
-    print(img)
-    
-    image = np.array(Image.open(img))
-    input_tensor, image_float_np = prepare_input(image)
-
-    # Run the model and display the detections
-    #  boxes, classes, labels, indices = predict(input_tensor, model, device, 0.5)
-    # image = draw_boxes(boxes, labels, classes, image)
-
-    masks, boxes, labels = get_outputs(input_tensor, model, THRESHOLD)
-    
-    # print("\n masks", masks)
-    # print("boxes", boxes)
-    # result = draw_boxes(labels, coco_names, boxes, labels)
-    result_img, result_masks = draw_segmentation_map(image, masks, boxes, labels)
-
-    # visualize the image
-    # cv2.imshow('Segmented image', result)
-    save_path = "../../reports/figures/result_{no:}.png"
-
-    plt.figure(figsize=(10,10))
-    plt.title("Model Prediction")
-   
-    img_array = [result_img, result_masks]
-
-    for j in range(2):
-        plt.subplot(1, 2, j+1)
-        plt.imshow(img_array[j])
-
-    plt.savefig(save_path.format(no=i))
-    
-    # plt.show()
-
-    # cv2.imwrite(save_path.format(no=i), cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
     
     
-    boxes, classes, labels, indices = predict(input_tensor, model, device, 0.7)
-    target_layers = [model.backbone]
-    targets = [FasterRCNNBoxScoreTarget(labels=labels, bounding_boxes=boxes)]
-   
+    def predict(self, input_tensor, model, device, detection_threshold):
+        outputs = model(input_tensor)
+        # i- 1 zero indexing - the model outputs a non zero indexing format ( 1, 2, 3)
+        pred_classes = [self.class_names[i] for i in outputs[0]['labels'].cpu().numpy()]
+        pred_labels = outputs[0]['labels'].cpu().numpy()
+        pred_scores = outputs[0]['scores'].detach().cpu().numpy()
+        pred_bboxes = outputs[0]['boxes'].detach().cpu().numpy()
+        
+        boxes, classes, labels, indices = [], [], [], []
+        for index in range(len(pred_scores)):
+            if pred_scores[index] >= detection_threshold:
+                boxes.append(pred_bboxes[index].astype(np.int32))
+                classes.append(pred_classes[index])
+                labels.append(pred_labels[index])
+                indices.append(index)
+        boxes = np.int32(boxes)
+        return boxes, classes, labels, indices
 
-    cam = AblationCAM(model,
-                target_layers, 
-                use_cuda=torch.cuda.is_available(), 
-                reshape_transform=fasterrcnn_reshape_transform,
-                ablation_layer=AblationLayerFasterRCNN())
 
-    grayscale_cam = cam(input_tensor, targets=targets)
-    # Take the first image in the batch:
-    grayscale_cam = grayscale_cam[0, :]
-    cam_image = show_cam_on_image(image_float_np, grayscale_cam, use_rgb=True)
-    # And lets draw the boxes again:
-    image_with_bounding_boxes = draw_boxes(boxes, labels, classes, cam_image)
+    def draw_boxes(self, boxes, labels, classes, image):
+        for i, box in enumerate(boxes):
+            color = self.colors[labels[i]]
+            cv2.rectangle(
+                image,
+                (int(box[0]), int(box[1])),
+                (int(box[2]), int(box[3])),
+                color, 2
+            )
+            cv2.putText(image, classes[i], (int(box[0]), int(box[1] + 30)),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 1,
+                        lineType=cv2.LINE_AA)
+        return image
 
-    plt.imshow(image_with_bounding_boxes)
-    save_path_ablation = "../../reports/figures/ablation_cam_{no:}.png"
-    plt.savefig(save_path_ablation.format(no=i))
-    i = i + 1
-    # # plt.show()
+    def generate_results(self):
+        # This will help us create a different color for each class
+       
+
+        # Load Trained Model
+        model = torch.load(self.model_input_path)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        model.eval().to(device)
+
+        images = glob.glob(os.path.join(self.test_input_path, '*.png'))
+
+        i = 0
+        for img in images:
+            # Get the input_tensor
+            print(img)
+            
+            image = np.array(Image.open(img))
+            input_tensor, image_float_np = self.prepare_input(image)
+            masks, boxes, labels = self.get_outputs(input_tensor, model, self.detection_threshold)
+            
+            result_img, result_masks = self.draw_segmentation_map(image, masks, boxes, labels)
+
+
+            # Plot the result and save
+            plt.figure(figsize=(10,10))
+            plt.title("Model Prediction")
+        
+            img_array = [result_img, result_masks]
+
+            for j in range(2):
+                plt.subplot(1, 2, j+1)
+                plt.imshow(img_array[j])
+
+            plt.savefig(self.result_save_path.format(no=i))
+            
+            # plt.show()
+
+
+            # Ablation CAM
+            boxes, classes, labels, indices = self.predict(input_tensor, model, device, self.detection_threshold)
+            target_layers = [model.backbone]
+            targets = [FasterRCNNBoxScoreTarget(labels=labels, bounding_boxes=boxes)]
+        
+
+            cam = AblationCAM(model,
+                        target_layers, 
+                        use_cuda=torch.cuda.is_available(), 
+                        reshape_transform=fasterrcnn_reshape_transform,
+                        ablation_layer=AblationLayerFasterRCNN())
+
+            grayscale_cam = cam(input_tensor, targets=targets)
+            # Take the first image in the batch:
+            grayscale_cam = grayscale_cam[0, :]
+            cam_image = show_cam_on_image(image_float_np, grayscale_cam, use_rgb=True)
+            # And lets draw the boxes again:
+            image_with_bounding_boxes = self.draw_boxes(boxes, labels, classes, cam_image)
+
+            plt.imshow(image_with_bounding_boxes)
+            save_path_ablation = "../../reports/figures/ablation_cam_{no:}.png"
+            plt.savefig(save_path_ablation.format(no=i))
+            i = i + 1
+            # plt.show()
+
 
 if __name__ == "__main__":
 
     input_path = '/home/vivek/Datasets/AmyB/amyb_wsi/test/images'
-    explain = ExplainPredictions(test_input_path=input_path, detection_threshold=0.75,)
+    model_input_path = '../../models/mrcnn_model_50.pth'
+    explain = ExplainPredictions(model_input_path = model_input_path, test_input_path=input_path, detection_threshold=0.75)
+    explain.generate_results()
 
 
