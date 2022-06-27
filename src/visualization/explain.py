@@ -50,6 +50,8 @@ class ExplainPredictions():
         # index of those scores which are above a certain threshold
         thresholded_preds_inidices = [scores.index(i) for i in scores if i > threshold]
         thresholded_preds_count = len(thresholded_preds_inidices)
+
+        scores = scores[:thresholded_preds_count]
         # get the masks
         masks = (outputs[0]['masks']>0.5).squeeze().detach().cpu().numpy()
         # print("masks", masks)
@@ -65,7 +67,7 @@ class ExplainPredictions():
         labels = labels[:thresholded_preds_count]
 
         # [1,1,1, 2, 2, 2, 3, 3]
-        return masks, boxes, labels
+        return masks, boxes, labels, scores
 
     def draw_segmentation_map(self, image, masks, boxes, labels):
         alpha = 1 
@@ -169,7 +171,7 @@ class ExplainPredictions():
         return image
 
 
-    def quantify_plaques(self, df, img_name, result_masks, boxes, labels):
+    def quantify_plaques(self, df, img_name, result_masks, boxes, labels, scores):
         '''This function will take masks image and generate attributes like plaque
         count, area, eccentricity'''
         result = []
@@ -199,6 +201,7 @@ class ExplainPredictions():
                     
                     data['img_name'] = img_name
                     data['label'] = labels[i]
+                    data['confidence'] = scores[i]
                     data['centroid'] = props.centroid
                     data['eccentricity'] = props.eccentricity
                     data['area'] = props.area
@@ -254,11 +257,11 @@ class ExplainPredictions():
             
             image = np.array(Image.open(img))
             input_tensor, image_float_np = self.prepare_input(image)
-            masks, boxes, labels = self.get_outputs(input_tensor, model, self.detection_threshold)
+            masks, boxes, labels, scores = self.get_outputs(input_tensor, model, self.detection_threshold)
             
             result_img, result_masks = self.draw_segmentation_map(image, masks, boxes, labels)
 
-            df = self.quantify_plaques(df, img_name, result_masks, boxes, labels)
+            df = self.quantify_plaques(df, img_name, result_masks, boxes, labels, scores)
 
             
             mask_img_name = img_name +  "_masks.png"
