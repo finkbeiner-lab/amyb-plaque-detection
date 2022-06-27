@@ -1,3 +1,4 @@
+from genericpath import exists
 import pdb
 from pickletools import uint8
 from turtle import pd
@@ -20,6 +21,9 @@ from pytorch_grad_cam.utils.reshape_transforms import fasterrcnn_reshape_transfo
 from pytorch_grad_cam.ablation_layer import AblationLayerFasterRCNN
 import random
 import glob
+from skimage.measure import label, regionprops, regionprops_table
+from skimage import data, filters, measure, morphology
+import pandas as pd
 
 
 class ExplainPredictions():
@@ -29,8 +33,10 @@ class ExplainPredictions():
         self.test_input_path = test_input_path
         self.detection_threshold = detection_threshold
         self.class_names = ['Unknown', 'Core', 'Diffuse', 'Neuritic']
-        self.result_save_path = "../../reports/figures/result_{no:}.png"
+        self.class_to_colors = {'Core': (255, 0, 0), 'Neuritic' : (0, 0, 255), 'Diffuse': (0,255,0)}
+        self.result_save_dir= "../../reports/figures/"
         self.colors = np.random.uniform(0, 255, size=(len(self.class_names), 3))
+        self.masks_path = ""
 
 
     def get_outputs(self, input_tensor, model, threshold):
@@ -56,6 +62,7 @@ class ExplainPredictions():
         # get the classes labels
         # print('labels', outputs[0]['labels'])
         labels = [self.class_names[i] for i in outputs[0]['labels']]
+        labels = labels[:thresholded_preds_count]
 
         # [1,1,1, 2, 2, 2, 3, 3]
         return masks, boxes, labels
@@ -65,8 +72,11 @@ class ExplainPredictions():
         beta = 0.6 # transparency for the segmentation map
         gamma = 0 # scalar added to each 
         segmentation_map = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint8)
+        result_masks = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint8)
     
         for i in range(len(masks)):
+
+            # TODO fix the color segmentation masks
             red_map = np.zeros_like(masks[i]).astype(np.uint8)
             green_map = np.zeros_like(masks[i]).astype(np.uint8)
             blue_map = np.zeros_like(masks[i]).astype(np.uint8)
@@ -74,7 +84,8 @@ class ExplainPredictions():
             # apply a randon color mask to each object
             rect_color = (0,0,0)
             color = self.colors[random.randrange(0, len(self.colors))]
-            red_map[masks[i] == 1], green_map[masks[i] == 1], blue_map[masks[i] == 1]  = color
+            red_map[masks[i] == 1], green_map[masks[i] == 1], blue_map[masks[i] == 1]  = self.class_to_colors[labels[i]]
+            result_masks[masks[i] == 1] = 255
             # combine all the masks into a single image
             # change the format of mask to W,H, C
 
@@ -104,7 +115,7 @@ class ExplainPredictions():
             
             # Convert Back
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        return image, segmentation_map
+        return image, result_masks
 
     def prepare_input(self, image):
     
@@ -157,9 +168,74 @@ class ExplainPredictions():
                         lineType=cv2.LINE_AA)
         return image
 
-    def generate_results(self):
+
+    def quantify_plaques(self, df, img_name, result_masks, boxes, labels):
+        '''This function will take masks image and generate attributes like plaque
+        count, area, eccentricity'''
+        result = []
+        for i in range(len(labels)):
+
+            props = {}
+            data = {}
+            # Here x and y axis are flipped
+            if len(boxes)!= 0:
+
+                x1 = boxes[i][0][1]
+                x2 =  boxes[i][1][1]
+                y1 = boxes[i][0][0]
+                y2 = boxes[i][1][0]
+
+                cropped_image = result_masks[x1:x2, y1:y2]
+
+                ret, bw_img = cv2.threshold(cropped_image,0,255,cv2.THRESH_BINARY)
+
+                kernel = np.ones((5,5),np.uint8)
+                
+                # Closing operation Dilation followed by erosion
+                closing = cv2.morphologyEx(bw_img, cv2.MORPH_CLOSE, kernel)
+                regions = regionprops(closing)
+
+                for props in regions:
+                    
+                    data['img_name'] = img_name
+                    data['label'] = labels[i]
+                    data['centroid'] = props.centroid
+                    data['eccentricity'] = props.eccentricity
+                    data['area'] = props.area
+                    data['equivalent_diameter'] = props.equivalent_diameter
+                    result.append(data)
+                    
+                    df = df.append(result, ignore_index=True)
+                    print(result)
+
+        return df
+        
+    def make_result_dirs(self):
+
+        results_path = os.path.join(self.result_save_dir, "results")
+        if not os.path.exists(results_path):
+            os.makedirs(results_path)
+        
+        masks_path = os.path.join(self.result_save_dir, "masks")
+        if not os.path.exists(masks_path):
+            os.makedirs(masks_path)
+        
+        ablations_path = os.path.join(self.result_save_dir, "ablations")
+        if not os.path.exists(ablations_path):
+            os.makedirs(ablations_path)
+        
+        return results_path, masks_path, ablations_path
+
+
+
+    def generate_results(self, ablation_cam=False):
         # This will help us create a different color for each class
-       
+
+        results_path, masks_path, ablations_path = self.make_result_dirs()
+        quantify_path = os.path.join(self.result_save_dir, "quantify.csv")
+        #used downstream by quantify plaques
+        self.masks_path = masks_path
+
 
         # Load Trained Model
         model = torch.load(self.model_input_path)
@@ -169,9 +245,12 @@ class ExplainPredictions():
         images = glob.glob(os.path.join(self.test_input_path, '*.png'))
 
         i = 0
+        df = pd.DataFrame()
         for img in images:
             # Get the input_tensor
             print(img)
+
+            img_name = os.path.basename(img).split('.')[0]
             
             image = np.array(Image.open(img))
             input_tensor, image_float_np = self.prepare_input(image)
@@ -179,6 +258,13 @@ class ExplainPredictions():
             
             result_img, result_masks = self.draw_segmentation_map(image, masks, boxes, labels)
 
+            df = self.quantify_plaques(df, img_name, result_masks, boxes, labels)
+
+            
+            mask_img_name = img_name +  "_masks.png"
+            mask_save_path = os.path.join(masks_path, mask_img_name)
+
+            cv2.imwrite(mask_save_path, result_masks)
 
             # Plot the result and save
             plt.figure(figsize=(10,10))
@@ -189,36 +275,46 @@ class ExplainPredictions():
             for j in range(2):
                 plt.subplot(1, 2, j+1)
                 plt.imshow(img_array[j])
+            
 
-            plt.savefig(self.result_save_path.format(no=i))
+            result_img_name = img_name +  "_result.png"
+            
+            result_save_path = os.path.join(results_path, result_img_name)
+            plt.savefig(result_save_path)
             
             # plt.show()
 
 
-            # Ablation CAM
-            boxes, classes, labels, indices = self.predict(input_tensor, model, device, self.detection_threshold)
-            target_layers = [model.backbone]
-            targets = [FasterRCNNBoxScoreTarget(labels=labels, bounding_boxes=boxes)]
-        
+            if ablation_cam:
+                # Ablation CAM
+                boxes, classes, labels, indices = self.predict(input_tensor, model, device, self.detection_threshold)
+                target_layers = [model.backbone]
+                targets = [FasterRCNNBoxScoreTarget(labels=labels, bounding_boxes=boxes)]
+            
 
-            cam = AblationCAM(model,
-                        target_layers, 
-                        use_cuda=torch.cuda.is_available(), 
-                        reshape_transform=fasterrcnn_reshape_transform,
-                        ablation_layer=AblationLayerFasterRCNN())
+                cam = AblationCAM(model,
+                            target_layers, 
+                            use_cuda=torch.cuda.is_available(), 
+                            reshape_transform=fasterrcnn_reshape_transform,
+                            ablation_layer=AblationLayerFasterRCNN())
 
-            grayscale_cam = cam(input_tensor, targets=targets)
-            # Take the first image in the batch:
-            grayscale_cam = grayscale_cam[0, :]
-            cam_image = show_cam_on_image(image_float_np, grayscale_cam, use_rgb=True)
-            # And lets draw the boxes again:
-            image_with_bounding_boxes = self.draw_boxes(boxes, labels, classes, cam_image)
+                grayscale_cam = cam(input_tensor, targets=targets)
+                # Take the first image in the batch:
+                grayscale_cam = grayscale_cam[0, :]
+                cam_image = show_cam_on_image(image_float_np, grayscale_cam, use_rgb=True)
+                # And lets draw the boxes again:
+                image_with_bounding_boxes = self.draw_boxes(boxes, labels, classes, cam_image)
 
-            plt.imshow(image_with_bounding_boxes)
-            save_path_ablation = "../../reports/figures/ablation_cam_{no:}.png"
-            plt.savefig(save_path_ablation.format(no=i))
+                plt.imshow(image_with_bounding_boxes)
+
+                ablation_img_name = img_name +  "_ablation_cam.png"
+                save_path_ablation = os.path.join(ablations_path, ablation_img_name)
+                plt.savefig(save_path_ablation)
             i = i + 1
             # plt.show()
+        
+        df.to_csv(quantify_path, index=False)
+        
 
 
 if __name__ == "__main__":
@@ -226,6 +322,6 @@ if __name__ == "__main__":
     input_path = '/home/vivek/Datasets/AmyB/amyb_wsi/test/images'
     model_input_path = '../../models/mrcnn_model_50.pth'
     explain = ExplainPredictions(model_input_path = model_input_path, test_input_path=input_path, detection_threshold=0.75)
-    explain.generate_results()
+    explain.generate_results(ablation_cam=False)
 
 
