@@ -187,7 +187,6 @@ class ExplainPredictions():
             # noise and holes with morphological operations
             # img = io.imread(image)
             img = cv2.imread(img, cv2.IMREAD_GRAYSCALE)
-            pdb.set_trace()
             kernel = np.ones((5,5),np.uint8)
             img[img < 255] = 0
             # Closing operation Dilation followed by erosion
@@ -244,19 +243,21 @@ class ExplainPredictions():
         for img in images:
             # Get the input_tensor
             print(img)
+
+            img_name = os.path.basename(img).split('.')[0]
             
             image = np.array(Image.open(img))
             input_tensor, image_float_np = self.prepare_input(image)
             masks, boxes, labels = self.get_outputs(input_tensor, model, self.detection_threshold)
             
             result_img, result_masks = self.draw_segmentation_map(image, masks, boxes, labels)
-            pdb.set_trace()
             
-            mask_save_path = os.path.join(masks_path, "masks_{no}.png")
+            mask_img_name = img_name +  "_masks.png"
+            mask_save_path = os.path.join(masks_path, mask_img_name)
 
         
 
-            cv2.imwrite(mask_save_path.format(no=i), result_masks)
+            cv2.imwrite(mask_save_path, result_masks)
 
             # Plot the result and save
             plt.figure(figsize=(10,10))
@@ -268,8 +269,11 @@ class ExplainPredictions():
                 plt.subplot(1, 2, j+1)
                 plt.imshow(img_array[j])
             
-            result_save_path = os.path.join(results_path, "result_{no:}.png")
-            plt.savefig(result_save_path.format(no=i))
+
+            result_img_name = img_name +  "_result.png"
+            
+            result_save_path = os.path.join(results_path, result_img_name)
+            plt.savefig(result_save_path)
             
             # plt.show()
 
@@ -296,8 +300,9 @@ class ExplainPredictions():
 
                 plt.imshow(image_with_bounding_boxes)
 
-                save_path_ablation = os.path.join(ablations_path, "ablation_cam_{no:}.png")
-                plt.savefig(save_path_ablation.format(no=i))
+                ablation_img_name = img_name +  "_ablation_cam.png"
+                save_path_ablation = os.path.join(ablations_path, ablation_img_name)
+                plt.savefig(save_path_ablation)
             i = i + 1
             # plt.show()
         
