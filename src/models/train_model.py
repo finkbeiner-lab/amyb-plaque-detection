@@ -15,6 +15,8 @@ from features import build_features, transforms as T
 import pdb
 import matplotlib.pyplot as plt
 from visualization.visualize import visualize_train
+from visualization.explain import ExplainPredictions
+import albumentations as A
 
 
 ######## WANDB integration begins (mainly) here
@@ -29,7 +31,7 @@ lr_config = dict(
     gamma=0.1
 )
 config = dict( # TODO: assert no params are overriden
-    num_epochs=10,
+    num_epochs=1,
     **optim_config,
     **lr_config,
 )
@@ -61,8 +63,11 @@ def get_transform(train):
     transforms = []
     transforms.append(T.ToTensor())
     if train:
-        transforms.append(T.RandomHorizontalFlip(0.5),
-                          T.GaussianBlur([3,3], sigma=(0.1, 2.0)))
+        transforms.append(T.RandomHorizontalFlip(0.5))
+        transforms.append(T.RandomPhotometricDistort())
+        # transforms = A.Compose([A.RandomCrop(width=256, height=256),
+        #                        A.HorizontalFlip(p=0.5),
+        #                        A.RandomBrightnessContrast(p=0.2)])
     
         # transforms = torchvision.transforms.Compose([
         # torchvision.transforms.RandomHorizontalFlip(),
@@ -87,7 +92,7 @@ dataset_test = build_features.AmyBDataset('/home/vivek/Datasets/AmyB/amyb_wsi/va
 # x = next(iter(dataset))
 # pdb.set_trace()
 
-with wandb.init(project='amyb-plaque-detection', config=config):
+with wandb.init(project="nps-ad", entity="hellovivek", config=config):
 
     # define training and validation data loaders
     data_loader = torch.utils.data.DataLoader(
@@ -161,8 +166,18 @@ with wandb.init(project='amyb-plaque-detection', config=config):
             
         # wandb.log(train_metrics_dict)
 
-    model_save_name = "../../models/mrcnn_model_{epoch:}.pth"
+    model_save_name = "../../models/mrcnn_model_{epoch}.pth"
     torch.save(model, model_save_name.format(epoch=config['num_epochs']))
 
-    print("The Model is Trained!")
+    print("\n =================The Model is Trained!====================")
+
+    print("-----------------Visualizing Model predictions----------------")
+
+    input_path = '/home/vivek/Datasets/AmyB/amyb_wsi/test/images'
+    model_input_path = '../models/mcrnn_model_{epoch}.pth'
+
+    explain = ExplainPredictions(model_input_path = model_save_name.format(epoch=config['num_epochs']), test_input_path=input_path, 
+                                 detection_threshold=0.75, wandb=wandb)
+    explain.generate_results(ablation_cam=False)
+
     wandb.finish()

@@ -28,15 +28,18 @@ import pandas as pd
 
 class ExplainPredictions():
 
-    def __init__(self, model_input_path, test_input_path, detection_threshold):
+    def __init__(self, model_input_path, test_input_path, detection_threshold, wandb):
         self.model_input_path = model_input_path
         self.test_input_path = test_input_path
         self.detection_threshold = detection_threshold
+        self.wandb = wandb
         self.class_names = ['Unknown', 'Core', 'Diffuse', 'Neuritic']
         self.class_to_colors = {'Core': (255, 0, 0), 'Neuritic' : (0, 0, 255), 'Diffuse': (0,255,0)}
         self.result_save_dir= "../../reports/figures/"
         self.colors = np.random.uniform(0, 255, size=(len(self.class_names), 3))
         self.masks_path = ""
+        self.column_names = ["image_name", "label", "confidence", "centroid", "eccentricity", "area", "equivalent_diameter"]
+      
 
 
     def get_outputs(self, input_tensor, model, threshold):
@@ -46,7 +49,7 @@ class ExplainPredictions():
         
         # get all the scores
         scores = list(outputs[0]['scores'].detach().cpu().numpy())
-        print("\n scores", max(scores))
+        # print("\n scores", max(scores))
         # index of those scores which are above a certain threshold
         thresholded_preds_inidices = [scores.index(i) for i in scores if i > threshold]
         thresholded_preds_count = len(thresholded_preds_inidices)
@@ -75,7 +78,7 @@ class ExplainPredictions():
         gamma = 0 # scalar added to each 
         segmentation_map = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint8)
         result_masks = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint8)
-    
+
         for i in range(len(masks)):
 
             # TODO fix the color segmentation masks
@@ -171,10 +174,11 @@ class ExplainPredictions():
         return image
 
 
-    def quantify_plaques(self, df, img_name, result_masks, boxes, labels, scores):
+    def quantify_plaques(self, df, wandb_data_table,  img_name, result_masks, boxes, labels, scores):
         '''This function will take masks image and generate attributes like plaque
         count, area, eccentricity'''
         result = []
+        
         for i in range(len(labels)):
 
             props = {}
@@ -209,9 +213,11 @@ class ExplainPredictions():
                     result.append(data)
                     
                     df = df.append(result, ignore_index=True)
+                    wandb_data_table = wandb_data_table.add_data(img_name, labels[i], scores[i], props.centroid, props.eccentricity, props.area, props.equivalent_diamter) 
+                    
                     print(result)
 
-        return df
+        return df, wandb_data_table
         
     def make_result_dirs(self):
 
@@ -249,6 +255,8 @@ class ExplainPredictions():
 
         i = 0
         df = pd.DataFrame()
+        wandb_data_table = self.wandb.Table(columns=self.column_names)
+
         for img in images:
             # Get the input_tensor
             print(img)
@@ -261,7 +269,7 @@ class ExplainPredictions():
             
             result_img, result_masks = self.draw_segmentation_map(image, masks, boxes, labels)
 
-            df = self.quantify_plaques(df, img_name, result_masks, boxes, labels, scores)
+            df, wandb_data_table = self.quantify_plaques(df, wandb_data_table, img_name, result_masks, boxes, labels, scores)
 
             
             mask_img_name = img_name +  "_masks.png"
@@ -317,6 +325,7 @@ class ExplainPredictions():
             # plt.show()
         
         df.to_csv(quantify_path, index=False)
+        self.wandb.log({'quantifications': wandb_data_table})
         
 
 
