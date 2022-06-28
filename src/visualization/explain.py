@@ -195,7 +195,8 @@ class ExplainPredictions():
     def quantify_plaques(self, df, wandb_result, img_name, result_img, result_masks, boxes, labels, scores):
         '''This function will take masks image and generate attributes like plaque
         count, area, eccentricity'''
-  
+
+        csv_result = []
         
         for i in range(len(labels)):
 
@@ -212,10 +213,6 @@ class ExplainPredictions():
                 cropped_img = result_img[x1:x2, y1:y2]
                 cropped_img_mask = result_masks[x1:x2, y1:y2]
 
-                # if cropped_img is None or cropped_img_mask is None:
-                #     print("Image is Empty")
-                #     continue
-
                 ret, bw_img = cv2.threshold(cropped_img_mask,0,255,cv2.THRESH_BINARY)
 
                 kernel = np.ones((5,5),np.uint8)
@@ -225,23 +222,13 @@ class ExplainPredictions():
                 regions = regionprops(closing)
 
                 for props in regions:
-                    
-                    data['img_name'] = img_name
-                    data['label'] = labels[i]
-                    data['confidence'] = scores[i]
-                    data['centroid'] = props.centroid
-                    data['eccentricity'] = props.eccentricity
-                    data['area'] = props.area
-                    data['equivalent_diameter'] = props.equivalent_diameter
+                    data_record = pd.DataFrame.from_records([{ 'image_name': img_name, 'label': labels[i] , 'confidence': scores[i], 
+                                                               'centroid': props.centroid, 'eccentricity': props.eccentricity, 
+                                                               'area': props.area, 'equivalent_diameter': props.equivalent_diameter}])
                     wandb_result.append([img_name, self.wandb.Image(cropped_img), self.wandb.Image(cropped_img_mask), labels[i], scores[i], props.centroid, props.eccentricity, props.area, props.equivalent_diameter])
-                    
-                    df = df.append(wandb_result, ignore_index=True)
-                    # test_table.add_data(img_name, self.wandb.Image(cropped_img), self.wandb.Image(cropped_img_mask), labels[i], scores[i], props.centroid, props.eccentricity, props.area, props.equivalent_diameter) 
-                    
-                    # wandb_data_table.add_data(img_name, self.wandb.Image(cropped_img), self.wandb.Image(cropped_img_mask), labels[i], scores[i], props.centroid, props.eccentricity, props.area, props.equivalent_diameter) 
 
-                    
-                    # print(result)
+                    df = pd.concat([df, data_record], ignore_index=True)
+                   
         
         return df, wandb_result
         

@@ -174,11 +174,11 @@ with wandb.init(project="nps-ad", entity="hellovivek", config=config):
 
     print("-----------------Visualizing Model predictions----------------")
 
-    # input_path = '/home/vivek/Datasets/AmyB/amyb_wsi/test/images'
-    # model_input_path = '../models/mcrnn_model_{epoch}.pth'
+    input_path = '/home/vivek/Datasets/AmyB/amyb_wsi/test/images'
+    model_input_path = '../models/mcrnn_model_{epoch}.pth'
 
-    # explain = ExplainPredictions(model_input_path = model_save_name.format(epoch=config['num_epochs']), test_input_path=input_path, 
-    #                              detection_threshold=0.45, wandb=wandb)
-    # explain.generate_results(ablation_cam=False)
+    explain = ExplainPredictions(model_input_path = model_save_name.format(epoch=config['num_epochs']), test_input_path=input_path, 
+                                 detection_threshold=0.75, wandb=wandb)
+    explain.generate_results(ablation_cam=False)
 
     wandb.finish()
