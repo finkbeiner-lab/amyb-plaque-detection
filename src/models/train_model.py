@@ -31,10 +31,11 @@ lr_config = dict(
     gamma=0.1
 )
 config = dict( # TODO: assert no params are overriden
-    num_epochs=10,
+    num_epochs=50,
     batch_size= 16, 
     **optim_config,
     **lr_config,
+    detection_threshold=0.75,
 )
 
 
@@ -94,6 +95,9 @@ dataset_test = build_features.AmyBDataset('/home/vivek/Datasets/AmyB/amyb_wsi/va
 # pdb.set_trace()
 
 with wandb.init(project="nps-ad", entity="hellovivek", config=config):
+
+    # Get the Id
+    print("\n =======Wandb Run Id========", wandb.util.generate_id())
 
     # define training and validation data loaders
     data_loader = torch.utils.data.DataLoader(
@@ -178,7 +182,7 @@ with wandb.init(project="nps-ad", entity="hellovivek", config=config):
     model_input_path = '../models/mcrnn_model_{epoch}.pth'
 
     explain = ExplainPredictions(model_input_path = model_save_name.format(epoch=config['num_epochs']), test_input_path=input_path, 
-                                 detection_threshold=0.75, wandb=wandb)
+                                 detection_threshold=config['detection_threshold'], wandb=wandb)
     explain.generate_results(ablation_cam=False)
 
     wandb.finish()
