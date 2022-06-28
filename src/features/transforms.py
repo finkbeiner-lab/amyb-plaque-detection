@@ -273,7 +273,8 @@ class RandomPhotometricDistort(nn.Module):
                 image = self._contrast(image)
 
         if r[6] < self.p:
-            channels, _, _ = F.get_dimensions(image)
+            channels = 3
+            # F.get_dimensions(image)
             permutation = torch.randperm(channels)
 
             is_pil = F._is_pil_image(image)

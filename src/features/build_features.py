@@ -1,4 +1,5 @@
 import os
+from matplotlib import image
 
 import torch
 import numpy as np
@@ -10,7 +11,6 @@ class AmyBDataset(object):
     def __init__(self, root, transforms):
         self.root = root
         self.transforms = transforms
-        pdb.set_trace()
         # load all image files, sorting them to
         # ensure that they are aligned
         self.imgs = list(sorted(os.listdir(os.path.join(root, "images"))))
@@ -52,34 +52,16 @@ class AmyBDataset(object):
             boxes.append([xmin, ymin, xmax, ymax])
 
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
-        # there is only one class
-       
-        # labels = np.zeros(4)
-        # print(obj_ids)
-
-        # Mapping the Category to one hot vector [0, 1, 0, 0]
-        # id = 150
-        # for id in obj_ids:
-        #     if id >=50 and id < 100:
-        #         labels[0] = 1 #Core
-        #     elif id >= 100 and id < 150:
-        #         labels[1] = 1 # Diffused
-        #     elif id >=150 and id < 200:
-        #         labels[2] = 1 # Neuritic
-                
-       
-        
+      
         # labels = torch.tensor(labels, dtype=torch.int64)
         # labels = torch.ones((num_objs,), dtype=torch.int64)
 
         x = [id // 50 for id in obj_ids]
         labels = torch.tensor(x)
 
-        # labels = torch.ones((obj_ids,), dtype=torch.int64)
-
+    
         masks = torch.as_tensor(masks, dtype=torch.uint8)
 
-        
         image_id = torch.tensor([idx])
         area = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])
         # suppose all instances are not crowd
@@ -93,8 +75,7 @@ class AmyBDataset(object):
         target["area"] = area
         
         if self.transforms is not None:
-            img = self.transforms(img)
-            target = self.transforms(target)
+            img, target = self.transforms(img, target)
 
         return img, target
 
