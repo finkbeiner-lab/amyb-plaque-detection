@@ -24,6 +24,7 @@ import glob
 from skimage.measure import label, regionprops, regionprops_table
 from skimage import data, filters, measure, morphology
 import pandas as pd
+import wandb
 
 
 class ExplainPredictions():
@@ -38,7 +39,7 @@ class ExplainPredictions():
         self.result_save_dir= "../../reports/figures/"
         self.colors = np.random.uniform(0, 255, size=(len(self.class_names), 3))
         self.masks_path = ""
-        self.column_names = ["image_name", "label", "confidence", "centroid", "eccentricity", "area", "equivalent_diameter"]
+        self.column_names = ["image_name", "region", "region_mask", "label", "confidence", "centroid", "eccentricity", "area", "equivalent_diameter"]
       
 
 
@@ -173,52 +174,6 @@ class ExplainPredictions():
                         lineType=cv2.LINE_AA)
         return image
 
-
-    def quantify_plaques(self, df, wandb_data_table,  img_name, result_masks, boxes, labels, scores):
-        '''This function will take masks image and generate attributes like plaque
-        count, area, eccentricity'''
-        result = []
-        
-        for i in range(len(labels)):
-
-            props = {}
-            data = {}
-            # Here x and y axis are flipped
-            if len(boxes)!= 0:
-
-                x1 = boxes[i][0][1]
-                x2 =  boxes[i][1][1]
-                y1 = boxes[i][0][0]
-                y2 = boxes[i][1][0]
-
-                cropped_image = result_masks[x1:x2, y1:y2]
-
-                ret, bw_img = cv2.threshold(cropped_image,0,255,cv2.THRESH_BINARY)
-
-                kernel = np.ones((5,5),np.uint8)
-                
-                # Closing operation Dilation followed by erosion
-                closing = cv2.morphologyEx(bw_img, cv2.MORPH_CLOSE, kernel)
-                regions = regionprops(closing)
-
-                for props in regions:
-                    
-                    data['img_name'] = img_name
-                    data['label'] = labels[i]
-                    data['confidence'] = scores[i]
-                    data['centroid'] = props.centroid
-                    data['eccentricity'] = props.eccentricity
-                    data['area'] = props.area
-                    data['equivalent_diameter'] = props.equivalent_diameter
-                    result.append(data)
-                    
-                    df = df.append(result, ignore_index=True)
-                    wandb_data_table = wandb_data_table.add_data(img_name, labels[i], scores[i], props.centroid, props.eccentricity, props.area, props.equivalent_diamter) 
-                    
-                    print(result)
-
-        return df, wandb_data_table
-        
     def make_result_dirs(self):
 
         results_path = os.path.join(self.result_save_dir, "results")
@@ -236,6 +191,60 @@ class ExplainPredictions():
         return results_path, masks_path, ablations_path
 
 
+
+    def quantify_plaques(self, df, wandb_result, img_name, result_img, result_masks, boxes, labels, scores):
+        '''This function will take masks image and generate attributes like plaque
+        count, area, eccentricity'''
+  
+        
+        for i in range(len(labels)):
+
+            props = {}
+            data = {}
+            # Here x and y axis are flipped
+            if len(boxes)!= 0:
+
+                x1 = boxes[i][0][1] - 50
+                x2 =  boxes[i][1][1] + 50
+                y1 = boxes[i][0][0] - 50
+                y2 = boxes[i][1][0] + 50
+
+                cropped_img = result_img[x1:x2, y1:y2]
+                cropped_img_mask = result_masks[x1:x2, y1:y2]
+
+                # if cropped_img is None or cropped_img_mask is None:
+                #     print("Image is Empty")
+                #     continue
+
+                ret, bw_img = cv2.threshold(cropped_img_mask,0,255,cv2.THRESH_BINARY)
+
+                kernel = np.ones((5,5),np.uint8)
+                
+                # Closing operation Dilation followed by erosion
+                closing = cv2.morphologyEx(bw_img, cv2.MORPH_CLOSE, kernel)
+                regions = regionprops(closing)
+
+                for props in regions:
+                    
+                    data['img_name'] = img_name
+                    data['label'] = labels[i]
+                    data['confidence'] = scores[i]
+                    data['centroid'] = props.centroid
+                    data['eccentricity'] = props.eccentricity
+                    data['area'] = props.area
+                    data['equivalent_diameter'] = props.equivalent_diameter
+                    wandb_result.append([img_name, self.wandb.Image(cropped_img), self.wandb.Image(cropped_img_mask), labels[i], scores[i], props.centroid, props.eccentricity, props.area, props.equivalent_diameter])
+                    
+                    df = df.append(wandb_result, ignore_index=True)
+                    # test_table.add_data(img_name, self.wandb.Image(cropped_img), self.wandb.Image(cropped_img_mask), labels[i], scores[i], props.centroid, props.eccentricity, props.area, props.equivalent_diameter) 
+                    
+                    # wandb_data_table.add_data(img_name, self.wandb.Image(cropped_img), self.wandb.Image(cropped_img_mask), labels[i], scores[i], props.centroid, props.eccentricity, props.area, props.equivalent_diameter) 
+
+                    
+                    # print(result)
+        
+        return df, wandb_result
+        
 
     def generate_results(self, ablation_cam=False):
         # This will help us create a different color for each class
@@ -255,8 +264,8 @@ class ExplainPredictions():
 
         i = 0
         df = pd.DataFrame()
-        wandb_data_table = self.wandb.Table(columns=self.column_names)
-
+        wandb_result = []
+       
         for img in images:
             # Get the input_tensor
             print(img)
@@ -269,8 +278,7 @@ class ExplainPredictions():
             
             result_img, result_masks = self.draw_segmentation_map(image, masks, boxes, labels)
 
-            df, wandb_data_table = self.quantify_plaques(df, wandb_data_table, img_name, result_masks, boxes, labels, scores)
-
+            df, wandb_result = self.quantify_plaques(df, wandb_result, img_name, result_img, result_masks, boxes, labels, scores)
             
             mask_img_name = img_name +  "_masks.png"
             mask_save_path = os.path.join(masks_path, mask_img_name)
@@ -294,8 +302,6 @@ class ExplainPredictions():
             plt.savefig(result_save_path)
             
             # plt.show()
-
-
             if ablation_cam:
                 # Ablation CAM
                 boxes, classes, labels, indices = self.predict(input_tensor, model, device, self.detection_threshold)
@@ -318,22 +324,25 @@ class ExplainPredictions():
 
                 plt.imshow(image_with_bounding_boxes)
 
-                ablation_img_name = img_name +  "_ablation_cam.png"
+                ablation_img_name = img_name +  "_abl11AMation_cam.png"
                 save_path_ablation = os.path.join(ablations_path, ablation_img_name)
                 plt.savefig(save_path_ablation)
             i = i + 1
             # plt.show()
         
         df.to_csv(quantify_path, index=False)
-        self.wandb.log({'quantifications': wandb_data_table})
+        test_table = self.wandb.Table(data=wandb_result, columns=self.column_names)
+        self.wandb.log({'quantifications': test_table})
         
 
 
 if __name__ == "__main__":
 
     input_path = '/home/vivek/Datasets/AmyB/amyb_wsi/test/images'
-    model_input_path = '../../models/mrcnn_model_50.pth'
-    explain = ExplainPredictions(model_input_path = model_input_path, test_input_path=input_path, detection_threshold=0.75)
-    explain.generate_results(ablation_cam=False)
+    model_input_path = '../../models/mrcnn_model_10.pth'
+    with wandb.init(project="nps-ad", entity="hellovivek"):
+        explain = ExplainPredictions(model_input_path = model_input_path, test_input_path=input_path, 
+                                     detection_threshold=0.5, wandb=wandb)
+        explain.generate_results(ablation_cam=False)
 
 

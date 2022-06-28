@@ -31,7 +31,8 @@ lr_config = dict(
     gamma=0.1
 )
 config = dict( # TODO: assert no params are overriden
-    num_epochs=1,
+    num_epochs=10,
+    batch_size= 16, 
     **optim_config,
     **lr_config,
 )
@@ -64,7 +65,7 @@ def get_transform(train):
     transforms.append(T.ToTensor())
     if train:
         transforms.append(T.RandomHorizontalFlip(0.5))
-        transforms.append(T.RandomPhotometricDistort())
+        # transforms.append(T.RandomPhotometricDistort())
         # transforms = A.Compose([A.RandomCrop(width=256, height=256),
         #                        A.HorizontalFlip(p=0.5),
         #                        A.RandomBrightnessContrast(p=0.2)])
@@ -96,11 +97,11 @@ with wandb.init(project="nps-ad", entity="hellovivek", config=config):
 
     # define training and validation data loaders
     data_loader = torch.utils.data.DataLoader(
-        dataset, batch_size=16, shuffle=True, num_workers=4,
+        dataset, batch_size=config['batch_size'], shuffle=True, num_workers=4,
         collate_fn=utils.collate_fn)
 
     data_loader_test = torch.utils.data.DataLoader(
-        dataset_test, batch_size=16, shuffle=False, num_workers=4,
+        dataset_test, batch_size=config['batch_size'], shuffle=False, num_workers=4,
         collate_fn=utils.collate_fn)
 
     # get the model using our helper function
@@ -173,11 +174,11 @@ with wandb.init(project="nps-ad", entity="hellovivek", config=config):
 
     print("-----------------Visualizing Model predictions----------------")
 
-    input_path = '/home/vivek/Datasets/AmyB/amyb_wsi/test/images'
-    model_input_path = '../models/mcrnn_model_{epoch}.pth'
+    # input_path = '/home/vivek/Datasets/AmyB/amyb_wsi/test/images'
+    # model_input_path = '../models/mcrnn_model_{epoch}.pth'
 
-    explain = ExplainPredictions(model_input_path = model_save_name.format(epoch=config['num_epochs']), test_input_path=input_path, 
-                                 detection_threshold=0.75, wandb=wandb)
-    explain.generate_results(ablation_cam=False)
+    # explain = ExplainPredictions(model_input_path = model_save_name.format(epoch=config['num_epochs']), test_input_path=input_path, 
+    #                              detection_threshold=0.45, wandb=wandb)
+    # explain.generate_results(ablation_cam=False)
 
     wandb.finish()
