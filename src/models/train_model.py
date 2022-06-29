@@ -67,6 +67,8 @@ def get_transform(train):
     if train:
         transforms.append(T.RandomHorizontalFlip(0.5))
         # transforms.append(T.RandomPhotometricDistort())
+        # transforms.append(T.RandomZoomOut())
+        # transforms.append(T.RandomIoUCrop())
         # transforms = A.Compose([A.RandomCrop(width=256, height=256),
         #                        A.HorizontalFlip(p=0.5),
         #                        A.RandomBrightnessContrast(p=0.2)])
