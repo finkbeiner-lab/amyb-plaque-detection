@@ -184,8 +184,7 @@ for (entry in tileClassesByClass) {
 def tilePlane = ImagePlane.getPlane(0, 0)
 def tileAnnotations = tileClassesByTile.collectEntries({k, v -> [k, createTileObject(createTileROI(tileSize, *k, tilePlane), v)]})
 tileAnnotations = tileAnnotations.collect({k, v -> v})
-//rootObject.addPathObjects(tileAnnotations)
-tileAnnotations.each{QPEx.addObject(it)}
+hierarchy.addPathObjects(tileAnnotations)
 
 //def tileROIs = tileClassesByClass.collectEntries(k, v -> [k, createTileROI()])
 
