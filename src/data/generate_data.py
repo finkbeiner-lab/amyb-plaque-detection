@@ -23,6 +23,7 @@ import pyvips as Vips
 import openslide
 
 # Mask size should be same as image size
+# TODO Remove hardcoding
 ID_MASK_SHAPE = (1024, 1024)
 
 # Color Coding
@@ -42,8 +43,6 @@ def polygon2id(image_shape, mask, ids, coords_x, coords_y):
     vertex_row_coords, vertex_col_coords = coords_y, coords_x
     fill_row_coords, fill_col_coords = draw.polygon(
         vertex_row_coords, vertex_col_coords, image_shape)
-
-
 
     # Row and col are flipped
     mask[fill_col_coords, fill_row_coords] = ids
@@ -123,8 +122,11 @@ def process_json(WSI_path, visualize=False):
         # Get the corresponding json file
         json_file_name = os.path.basename(img).split(".mrxs")[0] + ".json"
         json_file_name = os.path.join(os.path.dirname(img), json_file_name)
+        json_file_list = [json_file_name, "/home/vivek/Datasets/AmyB/amyb_wsi/XE19-010_1_AmyB_1_1.json"]
+        merge_json(json_file_list, "/home/vivek/Datasets/AmyB/amyb_wsi/test.json")
         # json_file_name = os.path.join(os.path.dirname(img), "XE19-010_1_AmyB_1_37894x_177901y_image.png[--series, 0].json")
 
+        json_file_name = "/home/vivek/Datasets/AmyB/amyb_wsi/test.json"
         print("file name : ", json_file_name)
         with open(json_file_name) as f:
             data = json.load(f)
@@ -229,19 +231,15 @@ def merge_json(json_files, json_output_file=None):
     """
     merge_json: a method to return the combined json of a list of json files
 
-    json_files: list[str]: a list of json filenames to scan
-    json_output_file: str = None: the (optional) file to dump the json to
-    raises: IO errors
-    return: str: raw json output
     """
+    result = list()
+    for f1 in json_files:
+        with open(f1, 'r') as infile:
+            result.extend(json.load(infile))
 
-    json_objs = [json.load(open(f, 'r')) for f in json_files]
-    json_list = list()
-    for json_obj in json_objs:
-        json_list += json_obj
-    if json_output_file is not None:
-        json.dump(json_list, open(json_output_file, 'w'))
-    return json.dumps(json_list)
+    with open(json_output_file, 'w') as output_file:
+        json.dump(result, output_file)
+
 
 
 if __name__ == '__main__':
