@@ -294,7 +294,8 @@ class SplitData:
 
     
 if __name__ == "__main__":
-    split_data = SplitData("/home/vivek/Datasets/AmyB/amyb_wsi/", True, 500)
+    #TODO Fix data aug - Not Running
+    split_data = SplitData("/home/vivek/Datasets/AmyB/amyb_wsi/", False, 500)
     split_data.prepare_dataset()
        
     

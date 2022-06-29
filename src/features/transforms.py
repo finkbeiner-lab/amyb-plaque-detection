@@ -110,7 +110,7 @@ class RandomIoUCrop(nn.Module):
             elif image.ndimension() == 2:
                 image = image.unsqueeze(0)
 
-        _, orig_h, orig_w = F.get_dimensions(image)
+        orig_h, orig_w = 1024, 1024
 
         while True:
             # sample an option
@@ -195,7 +195,7 @@ class RandomZoomOut(nn.Module):
         if torch.rand(1) >= self.p:
             return image, target
 
-        _, orig_h, orig_w = F.get_dimensions(image)
+        orig_h, orig_w = 1024, 1024
 
         r = self.side_range[0] + torch.rand(1) * (self.side_range[1] - self.side_range[0])
         canvas_width = int(orig_w * r)
