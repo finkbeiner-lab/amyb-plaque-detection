@@ -19,11 +19,8 @@ import pdb
 import skimage.io as io
 from src.utils import vips_utils
 import matplotlib.pyplot as plt
-import shutil
 from skimage.io import imread, imsave
-import shutil
-import natsort
-import openslide
+
 from threading import Thread
 
 
@@ -53,7 +50,7 @@ class GenerateTestData:
             
         return points
     
-    def process(self, x, y, vips_orig_img, savesubdir, orig_w, orig_h):
+    def crop_process(self, x, y, vips_orig_img, savesubdir, orig_w, orig_h):
         print(f"processing {x, y}")
 
         savecroppath = os.path.join(savesubdir, f'{self.file_name}_x_{x}_y_{y}.png')
@@ -72,12 +69,11 @@ class GenerateTestData:
         savesubdir = os.path.join(self.save_dir, self.file_name)
         if not os.path.exists(savesubdir):
             os.makedirs(savesubdir, exist_ok=False)
-        pdb.set_trace()
-        
+
+        # Multithreading the tiling process        
         for i, (x, y) in enumerate(points):
-            t = Thread(target=self.process, args=(x,y,vips_orig_img, savesubdir, orig_w, orig_h))
+            t = Thread(target=self.crop_process, args=(x,y,vips_orig_img, savesubdir, orig_w, orig_h))
             t.start()
-           
 
         # print(f'Saved crops to {savesubdir}')
 
@@ -111,32 +107,23 @@ class GenerateTestData:
         
         return vfields
            
-    def rename_files(self):
-        '''
-        This function will renmae the files to x_y.jpg from 0_row_col.jpg format
 
-        '''
-        folders = glob.glob(os.path.join(self.save_dir, '*'))
-        for folder in tqdm(folders):
-            # TODO check if this is the right way
-            tiled_images = glob.glob(os.path.join(folder, '*'))
-            tiled_images = natsort.natsorted(tiled_images)
+    def del_white_imgs(self, tile_img, intensity_threshold, del_img_count) :
+        print("\n tile : ", tile_img)
+        x = io.imread(tile_img)
 
-            for tile_img in tiled_images:
-    
-                if len(tile_img) == 0:
-                    continue
+        dark_pixels = np.count_nonzero(x < int(intensity_threshold))
 
-                dirname, fname = os.path.split(tile_img)
-                newdir_name = os.path.join(dirname, "Tiles")
+        light_pixels = np.count_nonzero(x > int(intensity_threshold))
+        
 
-                if not os.path.exists(newdir_name):
-                    os.makedirs(newdir_name)
-
-                # os.rename(tile_img, replace_string)
-                destination_name = os.path.join(newdir_name, fname)
-                shutil.move(tile_img, destination_name)
-            # os.rmdir(dirname)
+        # 1024 * 1024 *3 / 96 percent white
+        if light_pixels > 3019898:
+            print(light_pixels)
+            os.remove(tile_img)
+            del_img_count = del_img_count + 1
+                    
+        print("Total deleted img tiles : ",  del_img_count)
 
     def stage1_filter(self):
         '''
@@ -157,27 +144,16 @@ class GenerateTestData:
         del_img_count = 0
         intensity_threshold = 220
         tiled_folders = glob.glob(os.path.join(self.save_dir, "*"))
+        pdb.set_trace()
         
+        # Multi
         for tile_folder in tiled_folders:
             tiled_images = glob.glob(os.path.join(tile_folder, "*.png"))
             for tile_img in tiled_images:
-                print("\n tile : ", tile_img)
+                t = Thread(target=self.del_white_imgs, args=(tile_img, intensity_threshold, del_img_count))
+                t.start()
 
                 
-                x = io.imread(tile_img)
-
-                dark_pixels = np.count_nonzero(x < int(intensity_threshold))
-
-                light_pixels = np.count_nonzero(x > int(intensity_threshold))
-                
-
-                # 1024 * 1024 *3 / 96 percent white
-                if light_pixels > 3019898:
-                    print(light_pixels)
-                    os.remove(tile_img)
-                    del_img_count = del_img_count + 1
-                            
-                print("Total deleted img tiles : ",  del_img_count)
     
     def tile_WSI(self):
 
@@ -203,38 +179,22 @@ class GenerateTestData:
             
             vips_img = vips_img.crop(0, 1520,  5578,  13176-1700)
             vinfo = self.getVipsInfo(vips_img_orig)
-            print(vinfo)
-            # vips_orig_array = np.ndarray(buffer=vips_img_orig.write_to_memory(), dtype=np.uint8, shape=(vips_img_orig.height, vips_img_orig.width, vips_img_orig.bands))
-            # vips_orig_array = vips_orig_array[:,:,:3]
-
-
-            # vips_img.crop(500, 0,  vinfo['level[4].width'],  vinfo['level[4].height'])
+           
             vips_array = np.ndarray(buffer=vips_img.write_to_memory(), dtype=np.uint8, shape=(vips_img.height, vips_img.width, vips_img.bands))
             vips_array = vips_array[:,:,:3]
 
             gray = cv2.cvtColor(vips_array, cv2.COLOR_RGB2GRAY)
             gray = cv2.GaussianBlur(gray, (5, 5), 0)
-
-    
             thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV+ cv2.THRESH_OTSU)
-            # plt.imshow(thresh[1])
-            # plt.show()
 
-            
             cnt, downscaled_w, downscaled_h = self.getContour(thresh, vips_array,plot_countor=False)
 
             points = self.get_points_in_contour(cnt, downscaled_w, downscaled_h)
-            slide = openslide.OpenSlide(imagename)
             
-            orig_w, orig_h = slide.dimensions
-            # print(orig_w)
-            # print(orig_h)
-            # print(vinfo['level[0].width'])
-            # print(vinfo['level[0].height'])
-
-            #CROP
-            self.crop_slide(vips_img_orig, slide,  points, orig_w, orig_h)
-            self.rename_files()
+            orig_w, orig_h = vinfo['level[0].width'], vinfo['level[0].height']
+      
+            # CROP
+            # self.crop_slide(vips_img_orig, slide,  points, orig_w, orig_h)
             self.stage1_filter()
            
 if __name__ == '__main__':
@@ -252,8 +212,7 @@ if __name__ == '__main__':
                             downscale_factor=16, tile_size=1024)
     generate_test_data.tile_WSI()
     
-    # rename_files(tiled_path=args.save_dir)
-    # stage1_filter(tiled_path=args.save_dir)
+    generate_test_data.stage1_filter(tiled_path=args.save_dir)
     
 
 
