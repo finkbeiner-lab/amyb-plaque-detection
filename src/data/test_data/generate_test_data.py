@@ -24,6 +24,7 @@ from skimage.io import imread, imsave
 import shutil
 import natsort
 import openslide
+from threading import Thread
 
 
 __author__ = 'Vivek Gopal Ramaswamy'
@@ -51,6 +52,18 @@ class GenerateTestData:
                     points.append((x * self.downscale_factor, y * self.downscale_factor)) # points time scale factor print(f'Collected {len(self.points)} points') return self.points 
             
         return points
+    
+    def process(self, x, y, vips_orig_img, savesubdir, orig_w, orig_h):
+        print(f"processing {x, y}")
+
+        savecroppath = os.path.join(savesubdir, f'{self.file_name}_x_{x}_y_{y}.png')
+        # row is y, col is x
+        print(savecroppath)
+        if y + self.tilesize < orig_h and x + self.tilesize < orig_w:
+            # TODO change to vips cropping
+            crop = vips_orig_img.crop(x, y, 1024, 1024)
+            crop.write_to_file(savecroppath)
+
 
     def crop_slide(self, vips_orig_img, slide, points, orig_w, orig_h):
 
@@ -59,23 +72,15 @@ class GenerateTestData:
         savesubdir = os.path.join(self.save_dir, self.file_name)
         if not os.path.exists(savesubdir):
             os.makedirs(savesubdir, exist_ok=False)
+        pdb.set_trace()
+        
         for i, (x, y) in enumerate(points):
-            savecroppath = os.path.join(savesubdir, f'{self.file_name}_x_{x}_y_{y}.png')
-            savecroppath1 = os.path.join(savesubdir, f'{self.file_name}_x_{x}_y_{y}_vips.png')
-            # row is y, col is x
-            print(savecroppath)
-            if y + self.tilesize < orig_h and x + self.tilesize < orig_w:
-                # TODO change to vips cropping
-                crop = vips_orig_img.crop(x, y, 1024, 1024)
-                # extrema = crop.getextrema()
+            t = Thread(target=self.process, args=(x,y,vips_orig_img, savesubdir, orig_w, orig_h))
+            t.start()
+           
 
-                # #Check if the image is transparent
-                # if extrema[3][0] < 255:
-                #     continue
-                
-                # crop.save(savecroppath)
-                crop.write_to_file(savecroppath1)
-        print(f'Saved crops to {savesubdir}')
+        # print(f'Saved crops to {savesubdir}')
+
     def getContour(self, thresh, vips_array, plot_countor=False):
         contours, hierarchy = cv2.findContours(thresh[1], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         cnt = max(contours, key=cv2.contourArea)
