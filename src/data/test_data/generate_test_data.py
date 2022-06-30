@@ -21,6 +21,8 @@ from src.utils import vips_utils
 import matplotlib.pyplot as plt
 from skimage.io import imread, imsave
 
+import time
+
 from threading import Thread
 
 
@@ -50,32 +52,45 @@ class GenerateTestData:
             
         return points
     
-    def crop_process(self, x, y, vips_orig_img, savesubdir, orig_w, orig_h):
-        print(f"processing {x, y}")
-
+    def crop_process(self, i, x, y, vips_orig_img, savesubdir, orig_w, orig_h):
+        
+        print("Thread Started.", i)
+      
         savecroppath = os.path.join(savesubdir, f'{self.file_name}_x_{x}_y_{y}.png')
+
         # row is y, col is x
-        print(savecroppath)
         if y + self.tilesize < orig_h and x + self.tilesize < orig_w:
             # TODO change to vips cropping
             crop = vips_orig_img.crop(x, y, 1024, 1024)
             crop.write_to_file(savecroppath)
 
+        print("Thread Stopped ", i)
 
-    def crop_slide(self, vips_orig_img, slide, points, orig_w, orig_h):
+
+    def crop_slide(self, vips_orig_img, points, orig_w, orig_h):
 
         """Crop slide from points with cropsize"""
-        # name = file.split('/')[-1].split('.')[0]
         savesubdir = os.path.join(self.save_dir, self.file_name)
         if not os.path.exists(savesubdir):
             os.makedirs(savesubdir, exist_ok=False)
+        
 
-        # Multithreading the tiling process        
+        # Multithreading the tiling process 
+        list_threads = []       
         for i, (x, y) in enumerate(points):
-            t = Thread(target=self.crop_process, args=(x,y,vips_orig_img, savesubdir, orig_w, orig_h))
+            t = Thread(target=self.crop_process, args=(i, x, y, vips_orig_img, savesubdir, orig_w, orig_h))
+            list_threads.append(t)
             t.start()
+           
 
-        # print(f'Saved crops to {savesubdir}')
+        # Wait for all the threads to complete
+        # [t.join() for t in list_threads]
+        # for i, t in enumerate(list_threads):
+        #     print("Waiting for Thread ", i)
+        #     t.join()
+        #     print("Thread Done", i)
+       
+
 
     def getContour(self, thresh, vips_array, plot_countor=False):
         contours, hierarchy = cv2.findContours(thresh[1], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -87,10 +102,10 @@ class GenerateTestData:
         
 
         # TODO: remove the debug comments
-        print(x)
-        print(y)
-        print(x+downscaled_w)
-        print(y+downscaled_h)
+        # print(x)
+        # print(y)
+        # print(x+downscaled_w)
+        # print(y+downscaled_h)
 
         if plot_countor:
             plt.imshow(vips_array)
@@ -108,8 +123,8 @@ class GenerateTestData:
         return vfields
            
 
-    def del_white_imgs(self, tile_img, intensity_threshold, del_img_count) :
-        print("\n tile : ", tile_img)
+    def del_white_imgs(self, i, tile_img, intensity_threshold, del_img_count) :
+        print("white_imgs thread started : ", i)
         x = io.imread(tile_img)
 
         dark_pixels = np.count_nonzero(x < int(intensity_threshold))
@@ -119,11 +134,10 @@ class GenerateTestData:
 
         # 1024 * 1024 *3 / 96 percent white
         if light_pixels > 3019898:
-            print(light_pixels)
             os.remove(tile_img)
             del_img_count = del_img_count + 1
                     
-        print("Total deleted img tiles : ",  del_img_count)
+        # print("Total deleted img tiles : ",  del_img_count)
 
     def stage1_filter(self):
         '''
@@ -144,17 +158,15 @@ class GenerateTestData:
         del_img_count = 0
         intensity_threshold = 220
         tiled_folders = glob.glob(os.path.join(self.save_dir, "*"))
-        pdb.set_trace()
         
         # Multi
         for tile_folder in tiled_folders:
             tiled_images = glob.glob(os.path.join(tile_folder, "*.png"))
-            for tile_img in tiled_images:
-                t = Thread(target=self.del_white_imgs, args=(tile_img, intensity_threshold, del_img_count))
+            for i, tile_img in enumerate(tiled_images):
+                t = Thread(target=self.del_white_imgs, args=(i, tile_img, intensity_threshold, del_img_count))
                 t.start()
 
                 
-    
     def tile_WSI(self):
 
         if not os.path.exists(self.save_dir):
@@ -166,20 +178,21 @@ class GenerateTestData:
         imagenames = ["/home/vivek/Datasets/AmyB/amyb_wsi/XE19-010_1_AmyB_1.mrxs"]
         for imagename in tqdm(imagenames):
 
+            # print(imagename)
+
             # Get file_name Ex:'XE19-010_1_AmyB_1'
             file_name = imagename.split('.')
             file_name = file_name[0].split("/")[-1]
             self.file_name = file_name
-            file_name = file_name + "/Tiles"
-            file_name = os.path.join(self.save_dir, file_name)
 
             # Test
             vips_img = Vips.Image.new_from_file(imagename, level=self.slide_level)
             vips_img_orig = Vips.Image.new_from_file(imagename, level=0)
-            
-            vips_img = vips_img.crop(0, 1520,  5578,  13176-1700)
             vinfo = self.getVipsInfo(vips_img_orig)
+            orig_w, orig_h = int(vinfo['level[0].width']), int(vinfo['level[0].height'])
            
+            vips_img = vips_img.crop(0, 1520,  5578,  13176-1700)
+            
             vips_array = np.ndarray(buffer=vips_img.write_to_memory(), dtype=np.uint8, shape=(vips_img.height, vips_img.width, vips_img.bands))
             vips_array = vips_array[:,:,:3]
 
@@ -191,14 +204,18 @@ class GenerateTestData:
 
             points = self.get_points_in_contour(cnt, downscaled_w, downscaled_h)
             
-            orig_w, orig_h = vinfo['level[0].width'], vinfo['level[0].height']
-      
+           
             # CROP
-            # self.crop_slide(vips_img_orig, slide,  points, orig_w, orig_h)
-            self.stage1_filter()
+            self.crop_slide(vips_img_orig, points, orig_w, orig_h)
+        
+        # Sleep for 180 seconds before next thread is started
+        print('Start waiting')
+        time.sleep(200)
+        print("==========+Wait Over")
+        self.stage1_filter()
            
 if __name__ == '__main__':
-    result = pyfiglet.figlet_format("Image Tiling", font="slant")
+    result = pyfiglet.figlet_format("Generate Data", font="slant")
     print(result)
     parser = argparse.ArgumentParser(description='Image Tiling for Model Prediction')
     parser.add_argument('wsi_home_dir',
@@ -210,9 +227,8 @@ if __name__ == '__main__':
     
     generate_test_data = GenerateTestData(wsi_home_dir=args.wsi_home_dir, save_dir=args.save_dir, slide_level=4, 
                             downscale_factor=16, tile_size=1024)
+
     generate_test_data.tile_WSI()
-    
-    generate_test_data.stage1_filter(tiled_path=args.save_dir)
     
 
 
