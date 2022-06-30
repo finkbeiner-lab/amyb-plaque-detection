@@ -54,7 +54,7 @@ class GenerateTestData:
     
     def crop_process(self, i, x, y, vips_orig_img, savesubdir, orig_w, orig_h):
         
-        print("Thread Started.", i)
+        print("Crop slide thread Started.", i)
       
         savecroppath = os.path.join(savesubdir, f'{self.file_name}_x_{x}_y_{y}.png')
 
