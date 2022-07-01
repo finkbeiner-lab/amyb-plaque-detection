@@ -224,7 +224,6 @@ if __name__ == '__main__':
                             help='Enter the path where you want the tiled image to reside')
     args = parser.parse_args()
 
-    
     generate_test_data = GenerateTestData(wsi_home_dir=args.wsi_home_dir, save_dir=args.save_dir, slide_level=4, 
                             downscale_factor=16, tile_size=1024)
 
