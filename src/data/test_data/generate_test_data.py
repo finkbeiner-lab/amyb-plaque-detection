@@ -24,6 +24,8 @@ from skimage.io import imread, imsave
 import time
 
 from threading import Thread
+from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED
+
 
 
 __author__ = 'Vivek Gopal Ramaswamy'
@@ -40,6 +42,8 @@ class GenerateTestData:
         self.downscale_factor = 16
         self.tilesize = tile_size
         self.file_name = ""
+        # set max thread workers to be 1000
+        self.workers = 1000
 
     def get_points_in_contour(self, contour, downscaled_w ,downscaled_h, stride=64):
         # 1024/16 = 64  Stride calculation
@@ -66,6 +70,8 @@ class GenerateTestData:
 
         print("Thread Stopped ", i)
 
+    def test_square(self, x):
+        return (x*x)
 
     def crop_slide(self, vips_orig_img, points, orig_w, orig_h):
 
@@ -73,14 +79,14 @@ class GenerateTestData:
         savesubdir = os.path.join(self.save_dir, self.file_name)
         if not os.path.exists(savesubdir):
             os.makedirs(savesubdir, exist_ok=False)
-        
 
-        # Multithreading the tiling process 
-        list_threads = []       
-        for i, (x, y) in enumerate(points):
-            t = Thread(target=self.crop_process, args=(i, x, y, vips_orig_img, savesubdir, orig_w, orig_h))
-            list_threads.append(t)
-            t.start()
+
+        
+        exe = ThreadPoolExecutor(max_workers=self.workers)
+        futures = [exe.submit(self.crop_process, i, x, y, vips_orig_img, savesubdir, orig_w, orig_h) for i, (x, y) in enumerate(points)]
+        done, not_done = wait(futures, return_when=ALL_COMPLETED)
+        exe.shutdown()
+        
            
     def getContour(self, thresh, vips_array, plot_countor=False):
         contours, hierarchy = cv2.findContours(thresh[1], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -152,9 +158,10 @@ class GenerateTestData:
         # Multi
         for tile_folder in tiled_folders:
             tiled_images = glob.glob(os.path.join(tile_folder, "*.png"))
-            for i, tile_img in enumerate(tiled_images):
-                t = Thread(target=self.del_white_imgs, args=(i, tile_img, intensity_threshold, del_img_count))
-                t.start()
+            exe = ThreadPoolExecutor(max_workers=self.workers)
+            futures = [exe.submit(self.del_white_imgs, i, tile_img, intensity_threshold, del_img_count) for i, tile_img in enumerate(tiled_images)]
+            done, not_done = wait(futures, return_when=ALL_COMPLETED)
+            exe.shutdown()
 
                 
     def tile_WSI(self):
@@ -200,7 +207,7 @@ class GenerateTestData:
         
         # Sleep for 180 seconds before next thread is started
         print('Start waiting')
-        time.sleep(200)
+        time.sleep(5)
         print("==========+Wait Over")
         self.stage1_filter()
            

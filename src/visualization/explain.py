@@ -46,7 +46,6 @@ class ExplainPredictions():
         self.class_to_colors = {'Core': (255, 0, 0), 'Neuritic' : (0, 0, 255), 'Diffuse': (0,255,0)}
         self.result_save_dir= "../../reports/figures/"
         self.colors = np.random.uniform(0, 255, size=(len(self.class_names), 3))
-        self.masks_path = ""
         self.column_names = ["image_name", "region", "region_mask", "label", "confidence", "centroid", "eccentricity", "area", "equivalent_diameter"]
       
     def get_outputs(self, input_tensor, model, threshold):
@@ -178,21 +177,25 @@ class ExplainPredictions():
                         lineType=cv2.LINE_AA)
         return image
 
-    def make_result_dirs(self):
+    def make_result_dirs(self, folder_name):
 
-        results_path = os.path.join(self.result_save_dir, "results")
+        save_path = os.path.join(self.result_save_dir, folder_name)
+        results_path = os.path.join(save_path, "results")
         if not os.path.exists(results_path):
             os.makedirs(results_path)
         
-        masks_path = os.path.join(self.result_save_dir, "masks")
+        masks_path = os.path.join(save_path, "masks")
         if not os.path.exists(masks_path):
             os.makedirs(masks_path)
         
-        ablations_path = os.path.join(self.result_save_dir, "ablations")
+        ablations_path = os.path.join(save_path, "ablations")
         if not os.path.exists(ablations_path):
             os.makedirs(ablations_path)
         
-        return results_path, masks_path, ablations_path
+        csv_name = folder_name + "_quantify.csv"
+        quantify_path = os.path.join(save_path, csv_name)
+        
+        return results_path, masks_path, ablations_path, quantify_path
 
     def quantify_plaques(self, df, wandb_result, img_name, result_img, result_masks, boxes, labels, scores):
         '''This function will take masks image and generate attributes like plaque
@@ -254,13 +257,7 @@ class ExplainPredictions():
         
     def generate_results(self):
         # This will help us create a different color for each class
-
-        results_path, masks_path, ablations_path = self.make_result_dirs()
-        quantify_path = os.path.join(self.result_save_dir, "quantify.csv")
-        #used downstream by quantify plaques
-        self.masks_path = masks_path
-
-        # Load Trained Model
+        # Load Trained 
         model = torch.load(self.model_input_path)
     
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -270,6 +267,10 @@ class ExplainPredictions():
         
         # Test images from each WSI folder
         for test_folder in tqdm(test_folders):
+            
+
+            folder_name = os.path.basename(test_folder)
+            results_path, masks_path, ablations_path, quantify_path = self.make_result_dirs(folder_name)
             images = glob.glob(os.path.join(test_folder, '*.png'))
 
             i = 0
