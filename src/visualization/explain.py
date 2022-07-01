@@ -200,11 +200,16 @@ class ExplainPredictions():
 
         csv_result = []
         
+        
+        
         for i in range(len(labels)):
 
             props = {}
             data = {}
             # Here x and y axis are flipped
+            total_core_plaques = 0
+            total_neuritic_plaques = 0
+            total_diffused_plaques = 0
 
             if len(boxes)!= 0:
 
@@ -226,7 +231,16 @@ class ExplainPredictions():
                 regions = regionprops(closing)
 
                 for props in regions:
-                    data_record = pd.DataFrame.from_records([{ 'image_name': img_name, 'label': labels[i] , 'confidence': scores[i], 
+
+                    if labels[i] == "Core":
+                        total_core_plaques+=1
+                    elif labels[i] == "Neuritic":
+                        total_neuritic_plaques+=1
+                    elif labels[i] == "Diffuse":
+                        total_diffused_plaques+=1
+                    
+                    data_record = pd.DataFrame.from_records([{ 'image_name': img_name, 'label': labels[i] , 'confidence': scores[i],
+                                                               'core': total_core_plaques, 'neuritic': total_neuritic_plaques, 'diffuse': total_diffused_plaques,
                                                                'centroid': props.centroid, 'eccentricity': props.eccentricity, 
                                                                'area': props.area, 'equivalent_diameter': props.equivalent_diameter}])
                     wandb_result.append([img_name, self.wandb.Image(cropped_img), self.wandb.Image(cropped_img_mask), labels[i], scores[i], 
@@ -237,16 +251,6 @@ class ExplainPredictions():
         
         return df, wandb_result
 
-  
-       
-        
-
-        
-    
-    def f(x, w, z):
-        print("f")
-        for i in x:
-            print(i)
         
     def generate_results(self):
         # This will help us create a different color for each class
@@ -271,6 +275,10 @@ class ExplainPredictions():
             i = 0
             df = pd.DataFrame()
             wandb_result = []
+            total_core_plaques = 0
+            total_neuritic_plaques = 0
+            total_diffused_plaques = 0
+
         
             for img in tqdm(images):
                 img_name = os.path.basename(img).split('.')[0]
@@ -343,15 +351,15 @@ class ExplainPredictions():
             self.wandb.log({'quantifications': test_table})
           
                 
-
-
-            
         
 if __name__ == "__main__":
 
     
     input_path = '/home/vivek/Datasets/AmyB/amyb_wsi/test/images'
     model_input_path = '../../models/mrcnn_model_15.pth'
+
+    # Use the Run ID from train_model.py here if you want to add some visualizations after training has been done
+    
     with wandb.init(project="nps-ad", id = "17vl5roa", entity="hellovivek", resume="allow"):
         explain = ExplainPredictions(model_input_path = model_input_path, test_input_path=input_path, 
                                      detection_threshold=0.5, wandb=wandb, save_result=False)

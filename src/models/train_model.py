@@ -170,6 +170,7 @@ if __name__ == "main":
 
         print("-----------------Visualizing Model predictions----------------")
 
+        # TODO Testing is done on Individual WSI Folders
         input_path = '/home/vivek/Datasets/AmyB/amyb_wsi/test-data/'
         model_input_path = '../models/mcrnn_model_{epoch}.pth'
 
