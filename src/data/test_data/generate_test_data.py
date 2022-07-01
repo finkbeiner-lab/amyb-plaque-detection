@@ -1,6 +1,6 @@
 import sys
 #TODO change hardcoding
-sys.path.insert(1, '/home/vivek/Projects/amyb-plaque-detection')
+sys.path.append('../../../')
 from concurrent.futures import process
 import os
 import glob
@@ -82,16 +82,6 @@ class GenerateTestData:
             list_threads.append(t)
             t.start()
            
-
-        # Wait for all the threads to complete
-        # [t.join() for t in list_threads]
-        # for i, t in enumerate(list_threads):
-        #     print("Waiting for Thread ", i)
-        #     t.join()
-        #     print("Thread Done", i)
-       
-
-
     def getContour(self, thresh, vips_array, plot_countor=False):
         contours, hierarchy = cv2.findContours(thresh[1], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         cnt = max(contours, key=cv2.contourArea)

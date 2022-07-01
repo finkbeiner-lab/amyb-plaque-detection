@@ -21,7 +21,7 @@ import random
 import time
 import matplotlib.pyplot as plt
 import multiprocessing
-from pathos.multiprocessing import ProcessingPool as Pool
+from multiprocessing import Pool
 import shutil
 
 __author__ = 'Vivek Gopal Ramaswamy'

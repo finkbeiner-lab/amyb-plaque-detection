@@ -76,8 +76,7 @@ def get_transform(train):
         # ])
     return T.Compose(transforms)
     # return transforms
-
-
+    
 if __name__ == "main":
 
     # train on the GPU or on the CPU, if a GPU is not available
