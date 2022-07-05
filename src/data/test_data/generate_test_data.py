@@ -17,14 +17,15 @@ import pyfiglet
 import argparse
 import pdb
 import skimage.io as io
-from src.utils import vips_utils
+from src.utils import vips_utils, normalize
 import matplotlib.pyplot as plt
 from skimage.io import imread, imsave
 
 import time
-
+from timeit import default_timer as timer
 from threading import Thread
 from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED
+import subprocess
 
 
 
@@ -35,15 +36,23 @@ class GenerateTestData:
     This is a class for preprocessing the WSI.
 
     """
-    def __init__(self, wsi_home_dir, save_dir, slide_level, downscale_factor, tile_size):
+    def __init__(self, wsi_home_dir, save_dir, ref_slide_path, slide_level, downscale_factor, tile_size):
         self.wsi_home_dir = wsi_home_dir
         self.save_dir = save_dir
+        self.ref_slide_path = ref_slide_path
         self.slide_level = slide_level
-        self.downscale_factor = 16
+        self.downscale_factor = downscale_factor
         self.tilesize = tile_size
         self.file_name = ""
         # set max thread workers to be 1000
-        self.workers = 1000
+        self.workers = 500
+    
+    def normalization(self):
+        print("Init Normalization")
+        ref_image = Vips.Image.new_from_file(self.ref_slide_path, level=self.slide_level)
+        normalizer = normalize.Reinhard()
+        normalizer.fit(ref_image)
+        return normalizer
 
     def get_points_in_contour(self, contour, downscaled_w ,downscaled_h, stride=64):
         # 1024/16 = 64  Stride calculation
@@ -89,7 +98,7 @@ class GenerateTestData:
         
            
     def getContour(self, thresh, vips_array, plot_countor=False):
-        contours, hierarchy = cv2.findContours(thresh[1], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours, hierarchy = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         cnt = max(contours, key=cv2.contourArea)
         
         # TODO find good name for downscaled_h
@@ -135,7 +144,7 @@ class GenerateTestData:
                     
         # print("Total deleted img tiles : ",  del_img_count)
 
-    def stage1_filter(self):
+    def stage1_filter(self, img_name):
         '''
         This function will filter out the tiles based on the ratio of
         dark pixels to light pixels.
@@ -153,7 +162,7 @@ class GenerateTestData:
 
         del_img_count = 0
         intensity_threshold = 220
-        tiled_folders = glob.glob(os.path.join(self.save_dir, "*"))
+        tiled_folders = glob.glob(os.path.join(self.save_dir, img_name))
         
         # Multi
         for tile_folder in tiled_folders:
@@ -168,36 +177,72 @@ class GenerateTestData:
 
         if not os.path.exists(self.save_dir):
                 os.makedirs(self.save_dir)
+        
+        threshold_dir = os.path.join(self.save_dir, "threshold")
+
+        if not os.path.exists(threshold_dir):
+                os.makedirs(threshold_dir)
+
+        start = timer()
+        # Normalization
+        normalizer = self.normalization()
+        end = timer()
+        print("Time Taken for Ref Normalization (minutes): ", (end - start) /60) # Time in seconds, e.g. 5.38091952400282
 
          # TODO Remove this hardcoding later
-        
         imagenames = sorted(glob.glob(os.path.join(self.wsi_home_dir, '*.mrxs')))
-        imagenames = ["/home/vivek/Datasets/AmyB/amyb_wsi/XE19-010_1_AmyB_1.mrxs"]
+        # imagenames = ["/home/vivek/Datasets/AmyB/amyb_wsi/XE19-010_1_AmyB_1.mrxs"]
+        # imagenames = ["/mnt/new-nas/work/data/npsad_data/vivek/amy-def-vivek/XE14-004_1_AmyB_1.mrxs"]
+        plt.figure(figsize=(10,10))
+        plt.title("Threholding")
+
+        imagenames = imagenames[25:]
         for imagename in tqdm(imagenames):
 
-            # print(imagename)
+            print(imagename)
 
             # Get file_name Ex:'XE19-010_1_AmyB_1'
             file_name = imagename.split('.')
             file_name = file_name[0].split("/")[-1]
             self.file_name = file_name
 
-            # Test
+            # # Test
             vips_img = Vips.Image.new_from_file(imagename, level=self.slide_level)
+            start = timer()
+            vips_norm = normalizer.transform(vips_img)
+            end = timer()
+            print("Time Taken for Normalization: ", (end - start)/60)
+
             vips_img_orig = Vips.Image.new_from_file(imagename, level=0)
             vinfo = self.getVipsInfo(vips_img_orig)
             orig_w, orig_h = int(vinfo['level[0].width']), int(vinfo['level[0].height'])
            
-            vips_img = vips_img.crop(0, 1520,  5578,  13176-1700)
+            vips_img = vips_norm.crop(0, 1520,  5578,  13176-1700)
             
             vips_array = np.ndarray(buffer=vips_img.write_to_memory(), dtype=np.uint8, shape=(vips_img.height, vips_img.width, vips_img.bands))
             vips_array = vips_array[:,:,:3]
 
             gray = cv2.cvtColor(vips_array, cv2.COLOR_RGB2GRAY)
             gray = cv2.GaussianBlur(gray, (5, 5), 0)
+            
             thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV+ cv2.THRESH_OTSU)
 
-            cnt, downscaled_w, downscaled_h = self.getContour(thresh, vips_array,plot_countor=False)
+            # Dialtion to fill holes
+            thresh_dilation = 0
+            for k in range(0, 3):
+                thresh_dilation = cv2.dilate(thresh[1], None, iterations=k + 1)
+            result_img = [vips_array, thresh_dilation]
+
+            for j in range(2):
+                plt.subplot(1, 2, j+1)
+                plt.imshow(result_img[j])
+            save_img =  file_name + ".png"
+            plt.savefig(os.path.join(threshold_dir, save_img))
+            
+            # plt.show()
+
+
+            cnt, downscaled_w, downscaled_h = self.getContour(thresh_dilation, vips_array,plot_countor=False)
 
             points = self.get_points_in_contour(cnt, downscaled_w, downscaled_h)
             
@@ -205,11 +250,13 @@ class GenerateTestData:
             # CROP
             self.crop_slide(vips_img_orig, points, orig_w, orig_h)
         
-        # Sleep for 180 seconds before next thread is started
-        print('Start waiting')
-        time.sleep(5)
-        print("==========+Wait Over")
-        self.stage1_filter()
+            # Sleep for 180 seconds before next thread is started
+            print('Start waiting')
+            time.sleep(15)
+            print("==========+Wait Over")
+            # self.stage1_filter(file_name)
+            src = os.path.join(self.save_dir, file_name)
+            # subprocess.Popen(["./move.sh", src, "/mnt/new-nas/work/data/npsad_data/vivek/test-data"])
            
 if __name__ == '__main__':
     result = pyfiglet.figlet_format("Generate Data", font="slant")
@@ -219,10 +266,14 @@ if __name__ == '__main__':
                             help='Enter the path where the Test WSI images reside')
     parser.add_argument('save_dir',
                             help='Enter the path where you want the tiled image to reside')
+
+    parser.add_argument('ref_slide_path',
+                            help='Enter the path to the reference image for normalization ')
     args = parser.parse_args()
 
-    generate_test_data = GenerateTestData(wsi_home_dir=args.wsi_home_dir, save_dir=args.save_dir, slide_level=4, 
-                            downscale_factor=16, tile_size=1024)
+    generate_test_data = GenerateTestData(wsi_home_dir=args.wsi_home_dir, save_dir=args.save_dir, 
+                                          ref_slide_path=args.ref_slide_path, slide_level=4, 
+                                          downscale_factor=16, tile_size=1024)
 
     generate_test_data.tile_WSI()
     
