@@ -9,7 +9,7 @@ import re
 from turtle import pd
 from cv2 import THRESH_BINARY_INV, THRESH_OTSU
 import numpy as np
-from requests import delete
+#from requests import delete
 import cv2
 import pyvips as Vips
 from tqdm import tqdm
@@ -45,7 +45,7 @@ class GenerateTestData:
         self.tilesize = tile_size
         self.file_name = ""
         # set max thread workers to be 1000
-        self.workers = 500
+        self.workers = 30
     
     def normalization(self):
         print("Init Normalization")
@@ -196,7 +196,7 @@ class GenerateTestData:
         plt.figure(figsize=(10,10))
         plt.title("Threholding")
 
-        imagenames = imagenames[25:]
+        imagenames = imagenames[26:]
         for imagename in tqdm(imagenames):
 
             print(imagename)
@@ -252,7 +252,7 @@ class GenerateTestData:
         
             # Sleep for 180 seconds before next thread is started
             print('Start waiting')
-            time.sleep(15)
+            time.sleep(20)
             print("==========+Wait Over")
             # self.stage1_filter(file_name)
             src = os.path.join(self.save_dir, file_name)
