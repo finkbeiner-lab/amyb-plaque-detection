@@ -3,13 +3,14 @@ import sys
 sys.path.append('../../../')
 from concurrent.futures import process
 import os
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
 import glob
 from posixpath import dirname
 import re
 from turtle import pd
 from cv2 import THRESH_BINARY_INV, THRESH_OTSU
 import numpy as np
-from requests import delete
+# from requests import delete
 import cv2
 import pyvips as Vips
 from tqdm import tqdm
@@ -196,7 +197,7 @@ class GenerateTestData:
         plt.figure(figsize=(10,10))
         plt.title("Threholding")
 
-        imagenames = imagenames[25:]
+        imagenames = imagenames[66:]
         for imagename in tqdm(imagenames):
 
             print(imagename)
