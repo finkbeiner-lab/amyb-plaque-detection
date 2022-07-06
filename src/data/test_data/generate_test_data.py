@@ -43,6 +43,7 @@ class GenerateTestData:
         self.ref_slide_path = ref_slide_path
         self.slide_level = slide_level
         self.downscale_factor = downscale_factor
+        
         self.tilesize = tile_size
         self.file_name = ""
         # set max thread workers to be 1000
