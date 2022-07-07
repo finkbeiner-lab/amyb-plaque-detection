@@ -64,23 +64,23 @@ def tileWSI(base_dir, save_dir, slide_level=4, tile_size=1024):
         pdb.set_trace()
 
 
-        def getROI(x, y, w, h, ds=(2 ** slide_level)):
-            return [[x // ds, y // ds], [(x + w) // ds, (y + h) // ds]]
-
-        img_height, img_width = tuple(map(lambda k: img_vips.get(k), 'height width'.split()))
-        img_tiles = [getROI(*(i, j), *([tile_size] * 2)) for i in range(0, img_width, tile_size) for j in range(0, img_height, tile_size)]
-        img_tiles = [tile for tile in img_tiles if True]
-
-        pdb.set_trace()
-
-        keep_tiles = list()
-        for xi, yi in img_tiles:
-            xii, yii = [_ + tile_size for _ in (xi, yi)]
-            xi //= img_scale
-            yi //= img_scale
-            xii //= img_scale
-            yii //= img_scale
-            print(xi, yi, xii, yii)
+        # def getROI(x, y, w, h, ds=(2 ** slide_level)):
+        #     return [[x // ds, y // ds], [(x + w) // ds, (y + h) // ds]]
+        #
+        # img_height, img_width = tuple(map(lambda k: img_vips.get(k), 'height width'.split()))
+        # img_tiles = [getROI(*(i, j), *([tile_size] * 2)) for i in range(0, img_width, tile_size) for j in range(0, img_height, tile_size)]
+        # img_tiles = [tile for tile in img_tiles if True]
+        #
+        # pdb.set_trace()
+        #
+        # keep_tiles = list()
+        # for xi, yi in img_tiles:
+        #     xii, yii = [_ + tile_size for _ in (xi, yi)]
+        #     xi //= img_scale
+        #     yi //= img_scale
+        #     xii //= img_scale
+        #     yii //= img_scale
+        #     print(xi, yi, xii, yii)
 
 
 
