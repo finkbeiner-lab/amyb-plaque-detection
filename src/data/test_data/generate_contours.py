@@ -49,12 +49,70 @@ def tileWSI(base_dir, save_dir, slide_level=4, tile_size=1024):
             if get_resp('Done selecting contours (y/n): '):
                 break
 
+
+
+        # group_fn = lambda n, a: list(zip(*tuple([a[i:len(a) + 1 + i - n] for i in range(n)])))
+
+
         files_to_contours[file_name] = selected_contours
         print(f'Selected {len(selected_contours)} contour(s) from file {file_name}')
+        factor = 2 ** slide_level
+        f_min, f_max = np.amin, np.amax
 
         fill = np.zeros(img_arr_gray.shape, img_arr_gray.dtype)
         cv2.drawContours(fill, selected_contours, -1, 255, -1)
-        fill_roi = np.array([[f(a) for a in fill.nonzero()] for f in (np.amin, np.amax)])
+        fill_roi = np.array([[f(a) for f in [f_min, f_max]] for a in fill.nonzero()]) * factor
+        fill_roi[:, 1] += np.array([tile_size - 1] * 2)
+        fill_roi //= tile_size
+
+        _fill = np.zeros(img_arr_gray.shape, img_arr_gray.dtype)
+
+        tile_points = [np.arange(*a) for a in fill_roi]
+        tile_rois = [np.array([[i, j] for i, j in zip(a[:-1], a[1:])]) for a in tile_points]
+        tile_rois = [(a * tile_size) // factor for a in tile_rois]
+        tiles = dict([((i, j), fill[x1:x2, y1:y2]) for i, (x1, x2) in enumerate(tile_rois[0]) for j, (y1, y2) in enumerate(tile_rois[1])])
+        tiles_nonzero = [k for k, v in tiles.items() if v.sum() > 0]
+        for k, v in tiles.items():
+            if v.sum() > 0:
+                coords = np.array([a[i] for i, a in zip(k, tile_rois)])
+                _fill[coords[0][0]:coords[0][1], coords[1][0]:coords[1][1]] = np.zeros(coords[1] - coords[0])
+                # print(coords)
+
+        # tile_rois = [np.concatenate([a[:-1], a[1:]], axis=0)]
+        # tile_rois = lambda i, j: np.array([tile_points[0][i:i + 2], tile_points[1][j:j + 2]])
+        # _tile_rois = []
+        # _tile_rois = np.array([group_fn(2, a) for a in tile_points])
+        # tile_map = dict([((i, j), (tile_rois(i, j) * tile_size) // factor) for i in range(len(tile_points[0]) - 1) for j in range(len(tile_points[1]) - 1)])
+        # tile_map = dict([(k, fill[v[0, 0]:v[0, 1], v[1, 0]:v[1, 1]]) for k, v in tile_map.items()])
+        # tile_nonzero = [k for k, v in tile_map.items() if v.sum() > 0]
+
+
+        # tile_dict = [((tile_points[0][i], tile_points[1][j]), fill[]) for i in range(len(tile_points[0])) for j in range(len(tile_points[1]))]
+        # tile_dict = [((xk, yk), [list(xv), list(yv)]) for xk, xv in zip(tile_points[0], tile_coords[0]) for yk, yv in zip(tile_points[1], tile_coords[1])]
+        # tile_dict = [ for i, j in ]
+        # tile_sum_dict = [(k, fill[v[0]]) for k, v in tile_dict]
+
+
+        # tile_coords = [(a * tile_size) // factor for a in tile_points]
+        # tile_grid = [ for xi in tile_points[0]]
+        # tile_dict = dict([((xi, xj), fill[xi:xj, yi:yj].sum()) for xi, xj in zip(tile_coords[0][:-1], tile_coords[0][1:]) for yi, yj in zip(tile_coords[1][:-1], tile_coords[1][1:])])
+        # tile_nonzero =
+
+
+        pdb.set_trace()
+
+
+
+        fill_roi = np.array([[f(a) for a in fill.nonzero()] for f in (np.amin, np.amax)]) * factor
+        fill_roi[1] += np.array([tile_size - 1] * 2)
+        fill_roi //= tile_size
+
+        coords_roi = fill_roi * factor
+        coords_roi[1] += np.array([tile_size - 1] * 2)
+        coords_roi //= tile_size
+        coords_x, coords_y = (*coords_roi.transpose((1, 0)),)
+
+
         # fill_roi = np.ndarray([[f(a) for a in fill.nonzero()] for f in (np.min, np.max)])
 
 
