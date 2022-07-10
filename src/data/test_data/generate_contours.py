@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import os
 import glob
 import numpy as np
@@ -8,7 +9,7 @@ import tqdm
 import pdb
 
 
-def thresh_contours(x):
+def get_mask_contours(x):
     """
     Args:
         x: np.ndarray
@@ -32,8 +33,38 @@ def thresh_contours(x):
 
     return thresh, mask, list(map(lambda t: t[0], sorted([(contour, cv2.contourArea(contour)) for contour in contours], key=lambda t: -t[1])))
 
+def getROI(arr, roi):
+    assert roi.shape == (2,) * 2 and (roi[:, 1] - roi[:, 0] > 0).all()
+    return arr.copy()[roi[0, 0]:roi[0, 1], roi[1, 0]:roi[1, 1], ...]
 
-def tileWSI(base_dir, save_dir, slide_level=4, tile_size=1024):
+def setROI(arr, sub_arr, roi):
+    assert roi.shape == (2,) * 2 and (roi[:, 1] - roi[:, 0] > 0).all()
+    assert not (sub_arr.shape[:2] - (roi[:, 1] - roi[:, 0])).any()
+    arr = arr.copy()
+    arr[roi[0, 0]:roi[0, 1], roi[1, 0]:roi[1, 1], ...] = sub_arr
+    return arr
+
+def blank_uint8(x, shape):
+    return np.ones(shape, dtype=np.uint8) * np.array(x).astype(np.uint8)
+
+def roi_to_tile_roi(roi, tile_size):
+    assert roi.shape == (2,) * 2 and (roi[:, 1] - roi[:, 0] > 0).all()
+    roi = roi.copy()
+    roi[:, 1] += np.array([tile_size - 1] * 2)
+    roi //= tile_size
+    return roi
+
+
+
+def roi_to_tiles(roi, tile_size, ratio=1):
+    tile_roi = roi_to_tile_roi(roi * ratio, tile_size)
+    tiles = [(i, j) for i in range(*tile_roi[0]) for j in range(*tile_roi[1])]
+    tile_rois = np.array([[list(range(k, k + 2)) for k in item] for item in tiles])
+    return tile_roi, tiles, tile_rois
+
+
+
+def tileWSI(base_dir, save_dir, slide_level=4, tile_size=1024, top_n=1):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
 
@@ -47,7 +78,6 @@ def tileWSI(base_dir, save_dir, slide_level=4, tile_size=1024):
 
 
     for file_name in tqdm.tqdm(file_names[:1]):
-        img_name = '.'.join(os.path.split(file_name)[-1].split('.'))
         img_vips, img_vips_ds = [pyvips.Image.new_from_file(file_name, level=level) for level in (0, slide_level,)]
         img_arr = np.ndarray(
             buffer=img_vips_ds.write_to_memory(),
@@ -56,48 +86,67 @@ def tileWSI(base_dir, save_dir, slide_level=4, tile_size=1024):
         )[..., :3]
         img_arr_gray = cv2.cvtColor(img_arr.copy(), cv2.COLOR_RGB2GRAY)
 
-        thresh, mask, contours = thresh_contours(img_arr_gray)
+        _, _, contours = get_mask_contours(img_arr_gray)
 
-        selected_contours = list()
-        print('Showing contours for selection (in reverse order of area): ')
+        # selected_contours = list()
+        # print('Showing contours for selection (in reverse order of area): ')
+        #
+        contours = contours[:top_n]
+        for contour in contours:
+            arr = np.zeros(img_arr_gray.shape, img_arr_gray.dtype)
+            cv2.drawContours(arr, [contour], -1, 255, -1)
 
-        for i, contour in enumerate(contours):
-            fill = np.zeros(img_arr_gray.shape, img_arr_gray.dtype)
-            cv2.drawContours(fill, [contour], -1, 255, -1)
+            Image.fromarray(arr).show()
 
-            Image.fromarray(fill).show()
-
-            if get_resp('Select this contour (y/n): '):
-                selected_contours.append(contour)
-            if get_resp('Done selecting contours (y/n): '):
-                break
+        #     if get_resp('Select this contour (y/n): '):
+        #         selected_contours.append(contour)
+        #     if get_resp('Done selecting contours (y/n): '):
+        #         break
 
 
-        files_to_contours[file_name] = selected_contours
-        print(f'Selected {len(selected_contours)} contour(s) from file {file_name}')
+        print(f'Selected {len(contours)} contour(s) from file {file_name}')
+
+
         factor = 2 ** slide_level
 
-        fill_1, fill_2, fill_3 = [np.zeros(img_arr_gray.shape, img_arr_gray.dtype) for _ in range(3)]
+        # Instantiate numpy arrays to draw the slide's ROI mask, ROI bbox, and tiled ROIs.
+        fill_mask, fill_roi, fill_tiles = [np.zeros(img_arr_gray.shape, img_arr_gray.dtype) for _ in range(3)]
 
-        cv2.drawContours(fill_1, selected_contours, -1, 255, -1)
-        fill_roi = np.array([[f(a) for f in [np.amin, np.amax]] for a in fill_1.nonzero()])
-        grid_roi = fill_roi.copy() * factor
-        grid_roi[:, 1] += np.array([tile_size - 1] * 2)
-        grid_roi //= tile_size
+        # Draw ROI mask
+        cv2.drawContours(fill_mask, contours, -1, 255, -1)
 
-        tile_points = [np.arange(*a) for a in grid_roi]
-        tile_rois = [np.array([[i, j] for i, j in zip(a[:-1], a[1:])]) for a in tile_points]
-        tile_rois = [(a * tile_size) // factor for a in tile_rois]
-        tiles = dict([((i, j), fill[x1:x2, y1:y2]) for i, (x1, x2) in enumerate(tile_rois[0]) for j, (y1, y2) in enumerate(tile_rois[1])])
-        tiles_nonzero = [k for k, v in tiles.items() if v.sum() > 0]
+        # Compute ROI bbox from ROI mask
+        mask_roi = np.array([[f(a) for f in [np.amin, np.amax]] for a in fill_mask.nonzero()])
+
+        # Draw ROI bbox
+        # fill_roi = setROI(fill_roi, np.ones(mask_roi[:, 1] - mask_roi[:, 0]) * 255, mask_roi)
+        fill_roi[mask_roi[0, 0]:mask_roi[0, 1], mask_roi[1, 0]:mask_roi[1, 1]] = np.ones(mask_roi[:, 1] - mask_roi[:, 0]) * 255
+
+        # Compute tiles' ROI (from upsampled coordinates); broadcast to per-tile ROIs; rescale for downsampled tiles
+        tile_roi, tiles, tile_rois = roi_to_tiles(mask_roi, tile_size, ratio=factor)
+        tile_rois *= tile_size
+        tile_rois_ds = tile_rois // factor
+        tile_map = [(k, v) for k, v in zip(tiles, tile_rois_ds)]
+        tile_map = [(k, getROI(fill_mask, v)) for k, v in tile_map]
+
+        # tile_roi = roi_to_tile_roi(mask_roi * factor, tile_size)
+        # tile_rois = dict([((i, j), np.array([[k, k + 1] for k in (i, j)]) * tile_size) for i in range(*tile_roi[0]) for j in range(*tile_roi[1])])
+        # tile_rois_ds = dict([(k, v // factor) for k, v in tile_rois.items()])
+        # tile_map = dict([(k, fill_mask[v[0, 0]:v[0, 1], v[1, 0]:v[1, 1]]) for k, v in tile_rois_ds.items()])
+
+        # tile_rois = [(a * tile_size) // factor for a in tile_points]
+        # tiles = dict([((i, j), fill_mask[x1:x2, y1:y2]) for i, (x1, x2) in enumerate(tile_rois[0]) for j, (y1, y2) in enumerate(tile_rois[1])])
+
+        # Filter for nonzero tiles
+        tiles_nonzero = [k for k, v in tile_map if v.sum() > 0]
 
         for k in tiles_nonzero:
-            coords = np.array([a[i] for i, a in zip(k, tile_rois)])
-            fill_2[coords[0, 0]:coords[0, 1], coords[1, 0]:coords[1, 1]] = np.ones(coords[:, 1] - coords[:, 0]) * 255
+            coords = tile_rois_ds[k]
+            # fill_tiles = setROI(fill_tiles, np.ones(coords[:, 1] - coords[:, 0]) * 255, coords)
+            fill_tiles[coords[0, 0]:coords[0, 1], coords[1, 0]:coords[1, 1]] = np.ones(coords[:, 1] - coords[:, 0]) * 255
 
-        fill_3[fill_roi[0, 0]:fill_roi[0, 1], fill_roi[1, 0]:fill_roi[1, 1]] = np.ones(fill_roi[:, 1] - fill_roi[:, 0]) * 255
 
-        fill = np.concatenate([a[..., None] for a in [fill_1, fill_2, fill_3]], axis=-1)
+        fill = np.concatenate([a[..., None] for a in [fill_mask, fill_tiles, fill_roi]], axis=-1)
 
         Image.fromarray(fill).show()
 
@@ -141,7 +190,12 @@ def tileWSI(base_dir, save_dir, slide_level=4, tile_size=1024):
         #     yii //= img_scale
         #     print(xi, yi, xii, yii)
 
-
+        # def tile_roi_to_points(roi):
+        #     assert roi.shape == (2,) * 2 and (roi[:, 1] - roi[:, 0] > 0).all()
+        #     roi = roi.copy()
+        #     roi[:, 1] += np.array([1] * 2)
+        #     points = [np.concatenate([t[..., None] for t in [a[:-1], a[1:]]], axis=1) for a in [np.arange(*a) for a in roi]]
+        #     return points
 
 
 
