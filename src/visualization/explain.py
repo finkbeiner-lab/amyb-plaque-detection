@@ -327,11 +327,10 @@ class ExplainPredictions():
                     cv2.imwrite(mask_save_path, result_masks)
 
                     # Plot detections
-                    plt.imshow(result_img)
                     detection_img_name = img_name + "_detection.png"
                     detection_save_path = os.path.join(detections_path, detection_img_name)
-                    plt.savefig(detection_save_path)
-                    plt.close()
+                    bgr_img = cv2.cvtColor(result_img, cv2.COLOR_RGB2BGR)
+                    cv2.imwrite(detection_save_path, bgr_img)
 
                     # Plot Results
                     plt.figure(figsize=(10,10))
