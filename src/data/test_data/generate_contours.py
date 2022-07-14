@@ -31,7 +31,7 @@ def get_mask_contours(x):
     thresh, mask = cv2.threshold(x, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_TRIANGLE)
     contours, _ = cv2.findContours(mask.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
-    return thresh, mask, list(map(lambda t: t[0], sorted([(contour, cv2.contourArea(contour)) for contour in contours], key=lambda t: -t[1])))
+    return int(thresh), mask, list(map(lambda t: t[0], sorted([(contour, cv2.contourArea(contour)) for contour in contours], key=lambda t: -t[1])))
 
 def getROI(arr, roi):
     """
@@ -95,11 +95,12 @@ def get_slide_tiles(slide_vips, slide_level, tile_size, tile_cond=None, interact
         tile_cond: a boolean-returning callable which filters the tiles in the slide masks' ROI into background and foreground
         interactive: allow users to interactively select the most accurate slide contour masks
         top_n: only keep top_n of the contour masks (precedes interactive selection)
-        visualize: return additionally  (note: the function only incurs visualize overhead if the visualize option is selected)
+        visualize: return additional visualizations (note: the function only incurs visualization overhead if this option is selected)
     Returns:
         selected_tiles: a numpy array of shape (N, 2) listing the selected tiles ([x, y] -> [[x * tile_size, (x + 1) * tile_size], [y * tile_size, (y + 1) * tile_size]])
         selected_rois: a numpy array of shape (N, 2, 2) listing the ROIs of the selected tiles wrt. the original slide in [[x1, x2], [y1, y2]] format
-        visuals: a binary (0/255) RGB array showing the overlaps of the main slide masks, the slide masks' ROI, and the selected tiles
+        thresh: the threshold value used by get_mask_contours to find the contour masks
+        visuals: an optional binary (0/255) RGB array showing the overlaps of the main slide masks, the slide masks' ROI, and the selected tiles
     """
     if tile_cond is None:
         tile_cond = lambda a, r: getROI(a, r).sum() > 0
@@ -108,7 +109,8 @@ def get_slide_tiles(slide_vips, slide_level, tile_size, tile_cond=None, interact
     slide_arr = cv2.cvtColor(slide_arr, cv2.COLOR_RGB2GRAY)
     shape, dtype, fill, ratio = slide_arr.shape, slide_arr.dtype, 255, 2 ** slide_level
 
-    _, _, contours = get_mask_contours(slide_arr)
+    thresh, _, contours = get_mask_contours(slide_arr)
+    print(f'Total of {len(contours)} contours found at threshold value {thresh}.')
     contours = contours[:top_n]
     selected_contours = list()
     if interactive:
@@ -141,7 +143,7 @@ def get_slide_tiles(slide_vips, slide_level, tile_size, tile_cond=None, interact
         fill_tiles = visualize_rois(selected_rois // ratio, fill, shape, dtype)
         visuals = np.concatenate([a[..., None] for a in [fill_mask, fill_roi, fill_tiles]], axis=-1)
 
-    return selected_tiles, selected_rois, visuals
+    return selected_tiles, selected_rois, thresh, visuals
 
 
 
@@ -164,13 +166,13 @@ def process_slides(base_dir, save_dir, slide_level=4, tile_size=1024):
         img_name = '.'.join(img_name.split('.')[:-1])
         img_vips, img_vips_ds = [pyvips.Image.new_from_file(file_name, level=level) for level in (0, slide_level,)]
 
-        tiles, _, visuals = get_slide_tiles(img_vips_ds, slide_level, tile_size, interactive=True, visualize=True, top_n=3)
+        tiles, _, thresh, visuals = get_slide_tiles(img_vips_ds, slide_level, tile_size, interactive=True, visualize=True, top_n=3)
 
         tile_selection = '\n'.join([','.join(map(str, t)) for t in tiles])
         with open(os.path.join(save_dir, f'{img_name}_tiles.txt'), 'w') as fh:
             fh.write(tile_selection)
 
-        Image.fromarray(visuals).save(os.path.join(save_dir, f'{img_name}_visuals.png'))
+        Image.fromarray(visuals).save(os.path.join(save_dir, f'{img_name}_visuals_{thresh}.png'))
 
 
 
