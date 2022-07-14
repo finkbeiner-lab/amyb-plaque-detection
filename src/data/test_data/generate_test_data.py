@@ -45,7 +45,7 @@ class GenerateTestData:
         self.tilesize = tile_size
         self.file_name = ""
         # set max thread workers to be 1000
-        self.workers = 500
+        self.workers = 1000
     
     def normalization(self):
         print("Init Normalization")
@@ -88,7 +88,6 @@ class GenerateTestData:
         savesubdir = os.path.join(self.save_dir, self.file_name)
         if not os.path.exists(savesubdir):
             os.makedirs(savesubdir, exist_ok=False)
-
 
         
         exe = ThreadPoolExecutor(max_workers=self.workers)
@@ -189,14 +188,10 @@ class GenerateTestData:
         end = timer()
         print("Time Taken for Ref Normalization (minutes): ", (end - start) /60) # Time in seconds, e.g. 5.38091952400282
 
-         # TODO Remove this hardcoding later
         imagenames = sorted(glob.glob(os.path.join(self.wsi_home_dir, '*.mrxs')))
-        # imagenames = ["/home/vivek/Datasets/AmyB/amyb_wsi/XE19-010_1_AmyB_1.mrxs"]
-        # imagenames = ["/mnt/new-nas/work/data/npsad_data/vivek/amy-def-vivek/XE14-004_1_AmyB_1.mrxs"]
         plt.figure(figsize=(10,10))
         plt.title("Threholding")
 
-        imagenames = imagenames[25:]
         for imagename in tqdm(imagenames):
 
             print(imagename)
@@ -239,9 +234,6 @@ class GenerateTestData:
             save_img =  file_name + ".png"
             plt.savefig(os.path.join(threshold_dir, save_img))
             
-            # plt.show()
-
-
             cnt, downscaled_w, downscaled_h = self.getContour(thresh_dilation, vips_array,plot_countor=False)
 
             points = self.get_points_in_contour(cnt, downscaled_w, downscaled_h)
@@ -254,9 +246,8 @@ class GenerateTestData:
             print('Start waiting')
             time.sleep(15)
             print("==========+Wait Over")
-            # self.stage1_filter(file_name)
+            self.stage1_filter(file_name)
             src = os.path.join(self.save_dir, file_name)
-            # subprocess.Popen(["./move.sh", src, "/mnt/new-nas/work/data/npsad_data/vivek/test-data"])
            
 if __name__ == '__main__':
     result = pyfiglet.figlet_format("Generate Data", font="slant")
