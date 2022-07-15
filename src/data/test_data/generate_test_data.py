@@ -13,7 +13,7 @@ import numpy as np
 import cv2
 import pyvips as Vips
 from tqdm import tqdm
-# import pyfiglet
+import pyfiglet
 import argparse
 import pdb
 import skimage.io as io
@@ -197,6 +197,7 @@ class GenerateTestData:
             print(imagename)
 
             # Get file_name Ex:'XE19-010_1_AmyB_1'
+            file_name = imagename.split('.')
             file_name = file_name[0].split("/")[-1]
             self.file_name = file_name
 
@@ -253,8 +254,8 @@ class GenerateTestData:
             src = os.path.join(self.save_dir, file_name)
            
 if __name__ == '__main__':
-    # result = pyfiglet.figlet_format("Generate Data", font="slant")
-    # print(result)
+    result = pyfiglet.figlet_format("Generate Data", font="slant")
+    print(result)
 
     parser = argparse.ArgumentParser(description='Image Tiling for Model Prediction')
     parser.add_argument('base_dir',
@@ -269,9 +270,5 @@ if __name__ == '__main__':
     generate_test_data = GenerateTestData(wsi_home_dir=args.wsi_home_dir, save_dir=args.save_dir, 
                                           ref_slide_path=args.ref_slide_path, slide_level=4, 
                                           downscale_factor=16, tile_size=1024)
-
-    paths = [f'/gladstone/finkbeiner/steve/work/data/npsad_data/gennadi/single_{i}' for i in 'slide output'.split()]
-    generate_test_data = GenerateTestData(base_dir=paths[0], save_dir=paths[1], slide_level=4, tile_size=1024)
-
 
     generate_test_data.tile_WSI()
