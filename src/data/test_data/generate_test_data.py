@@ -9,7 +9,7 @@ import re
 from turtle import pd
 from cv2 import THRESH_BINARY_INV, THRESH_OTSU
 import numpy as np
-# from requests import delete
+from requests import delete
 import cv2
 import pyvips as Vips
 from tqdm import tqdm
@@ -57,22 +57,22 @@ class GenerateTestData:
     def get_points_in_contour(self, contour, downscaled_w ,downscaled_h, stride=64):
         # 1024/16 = 64  Stride calculation
         points = []
-        for x in range(0, downscaled_w, stride):
-            for y in range(0, downscaled_h, stride):
-                inside = cv2.pointPolygonTest(contour, (x, y), False)
-                if inside >= 0:
-                    points.append((x * self.downscale_factor, y * self.downscale_factor)) # points time scale factor print(f'Collected {len(self.points)} points') return self.points
-
+        for x in range(0, downscaled_w, stride): 
+            for y in range(0, downscaled_h, stride): 
+                inside = cv2.pointPolygonTest(contour, (x, y), False) 
+                if inside >= 0: 
+                    points.append((x * self.downscale_factor, y * self.downscale_factor)) # points time scale factor print(f'Collected {len(self.points)} points') return self.points 
+            
         return points
-
+    
     def crop_process(self, i, x, y, vips_orig_img, savesubdir, orig_w, orig_h):
-
+        
         print("Crop slide thread Started.", i)
-
+      
         savecroppath = os.path.join(savesubdir, f'{self.file_name}_x_{x}_y_{y}.png')
 
         # row is y, col is x
-        if y + self.tile_size < orig_h and x + self.tile_size < orig_w:
+        if y + self.tilesize < orig_h and x + self.tilesize < orig_w:
             # TODO change to vips cropping
             crop = vips_orig_img.crop(x, y, 1024, 1024)
             crop.write_to_file(savecroppath)
@@ -103,7 +103,7 @@ class GenerateTestData:
         # TODO find good name for downscaled_h
         x,y,downscaled_w,downscaled_h = cv2.boundingRect(cnt)
         vips_array = cv2.rectangle(vips_array.copy(),(x, y),(x + downscaled_w,y + downscaled_h),(0,255,0),20)
-
+        
 
         # TODO: remove the debug comments
         # print(x)
@@ -115,17 +115,17 @@ class GenerateTestData:
             plt.imshow(vips_array)
             plt.savefig('test.tif')
             plt.show()
-
+        
         return cnt, downscaled_w, downscaled_h
-
+    
     def getVipsInfo(self, vips_img):
         # # Get bounds-x and bounds-y offeset
         vfields = [f.split('.') for f in vips_img.get_fields()]
         vfields = [f for f in vfields if f[0] == 'openslide']
         vfields = dict([('.'.join(k[1:]), vips_img.get('.'.join(k))) for k in vfields])
-
+        
         return vfields
-
+           
 
     def del_white_imgs(self, i, tile_img, intensity_threshold, del_img_count) :
         print("white_imgs thread started : ", i)
@@ -134,13 +134,13 @@ class GenerateTestData:
         dark_pixels = np.count_nonzero(x < int(intensity_threshold))
 
         light_pixels = np.count_nonzero(x > int(intensity_threshold))
-
+        
 
         # 1024 * 1024 *3 / 96 percent white
         if light_pixels > 3019898:
             os.remove(tile_img)
             del_img_count = del_img_count + 1
-
+                    
         # print("Total deleted img tiles : ",  del_img_count)
 
     def stage1_filter(self, img_name):
@@ -171,7 +171,7 @@ class GenerateTestData:
             done, not_done = wait(futures, return_when=ALL_COMPLETED)
             exe.shutdown()
 
-
+                
     def tile_WSI(self):
 
         if not os.path.exists(self.save_dir):
@@ -217,11 +217,6 @@ class GenerateTestData:
             vips_array = np.ndarray(buffer=vips_img.write_to_memory(), dtype=np.uint8, shape=(vips_img.height, vips_img.width, vips_img.bands))
             vips_array = vips_array[:,:,:3]
 
-
-            # gray = cv2.cvtColor(vips_array, cv2.COLOR_RGB2GRAY)
-            # gray = cv2.GaussianBlur(gray, (5, 5), 0)
-            # thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV+ cv2.THRESH_OTSU)
-
             gray = cv2.cvtColor(vips_array, cv2.COLOR_RGB2GRAY)
             gray = cv2.GaussianBlur(gray, (5, 5), 0)
             
@@ -242,7 +237,8 @@ class GenerateTestData:
             cnt, downscaled_w, downscaled_h = self.getContour(thresh_dilation, vips_array,plot_countor=False)
 
             points = self.get_points_in_contour(cnt, downscaled_w, downscaled_h)
-
+            
+           
             # CROP
             self.crop_slide(vips_img_orig, points, orig_w, orig_h)
         
@@ -256,9 +252,8 @@ class GenerateTestData:
 if __name__ == '__main__':
     result = pyfiglet.figlet_format("Generate Data", font="slant")
     print(result)
-
     parser = argparse.ArgumentParser(description='Image Tiling for Model Prediction')
-    parser.add_argument('base_dir',
+    parser.add_argument('wsi_home_dir',
                             help='Enter the path where the Test WSI images reside')
     parser.add_argument('save_dir',
                             help='Enter the path where you want the tiled image to reside')
@@ -272,3 +267,8 @@ if __name__ == '__main__':
                                           downscale_factor=16, tile_size=1024)
 
     generate_test_data.tile_WSI()
+    
+
+
+    
+    
