@@ -17,13 +17,16 @@ from tqdm import tqdm
 import argparse
 import pdb
 import skimage.io as io
-# from utils import vips_utils
+from src.utils import vips_utils, normalize
 import matplotlib.pyplot as plt
 from skimage.io import imread, imsave
 
 import time
-
+from timeit import default_timer as timer
 from threading import Thread
+from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED
+import subprocess
+
 
 
 __author__ = 'Vivek Gopal Ramaswamy'
@@ -33,13 +36,23 @@ class GenerateTestData:
     This is a class for preprocessing the WSI.
 
     """
-    def __init__(self, base_dir, save_dir, tile_size=1024, slide_level=4):
-        self.base_dir = base_dir
+    def __init__(self, wsi_home_dir, save_dir, ref_slide_path, slide_level, downscale_factor, tile_size):
+        self.wsi_home_dir = wsi_home_dir
         self.save_dir = save_dir
-        self.tile_size = tile_size
+        self.ref_slide_path = ref_slide_path
         self.slide_level = slide_level
-        self.downscale_factor = 2 ** slide_level
-        # self.file_name = ""
+        self.downscale_factor = downscale_factor
+        self.tilesize = tile_size
+        self.file_name = ""
+        # set max thread workers to be 1000
+        self.workers = 1000
+    
+    def normalization(self):
+        print("Init Normalization")
+        ref_image = Vips.Image.new_from_file(self.ref_slide_path, level=self.slide_level)
+        normalizer = normalize.Reinhard()
+        normalizer.fit(ref_image)
+        return normalizer
 
     def get_points_in_contour(self, contour, downscaled_w ,downscaled_h, stride=64):
         # 1024/16 = 64  Stride calculation
@@ -66,6 +79,8 @@ class GenerateTestData:
 
         print("Thread Stopped ", i)
 
+    def test_square(self, x):
+        return (x*x)
 
     def crop_slide(self, vips_orig_img, points, orig_w, orig_h):
 
@@ -74,34 +89,17 @@ class GenerateTestData:
         if not os.path.exists(savesubdir):
             os.makedirs(savesubdir, exist_ok=False)
 
-
-        # Multithreading the tiling process
-        list_threads = []
-        for i, (x, y) in enumerate(points):
-            t = Thread(target=self.crop_process, args=(i, x, y, vips_orig_img, savesubdir, orig_w, orig_h))
-            list_threads.append(t)
-            t.start()
-
+        
+        exe = ThreadPoolExecutor(max_workers=self.workers)
+        futures = [exe.submit(self.crop_process, i, x, y, vips_orig_img, savesubdir, orig_w, orig_h) for i, (x, y) in enumerate(points)]
+        done, not_done = wait(futures, return_when=ALL_COMPLETED)
+        exe.shutdown()
+        
+           
     def getContour(self, thresh, vips_array, plot_countor=False):
-        contours, hierarchy = cv2.findContours(thresh[1], cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        pdb.set_trace()
-
-        cnts = sorted([(cv2.contourArea(contour), contour) for contour in contours], key=lambda t: t[0])
-
-        for cnt in cnts[::-1]:
-            pdb.set_trace()
-            frame = np.zeros(vips_array.shape[:-1])
-            frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2BGR)
-            cv2.drawContours(frame, cnt, -1, (255, 0, 0), -1)
-
-        if False:
-            gray = cv2.cvtColor(vips_array, cv2.COLOR_BGR2GRAY)
-            edged = cv2.Canny(gray, 30, 200)
-            contours, hierarchy = cv2.findContours(edged.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-
-        # cnt = max(contours, key=cv2.contourArea)
-
+        contours, hierarchy = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cnt = max(contours, key=cv2.contourArea)
+        
         # TODO find good name for downscaled_h
         x,y,downscaled_w,downscaled_h = cv2.boundingRect(cnt)
         vips_array = cv2.rectangle(vips_array.copy(),(x, y),(x + downscaled_w,y + downscaled_h),(0,255,0),20)
@@ -145,7 +143,7 @@ class GenerateTestData:
 
         # print("Total deleted img tiles : ",  del_img_count)
 
-    def stage1_filter(self):
+    def stage1_filter(self, img_name):
         '''
         This function will filter out the tiles based on the ratio of
         dark pixels to light pixels.
@@ -163,49 +161,58 @@ class GenerateTestData:
 
         del_img_count = 0
         intensity_threshold = 220
-        tiled_folders = glob.glob(os.path.join(self.save_dir, "*"))
-
+        tiled_folders = glob.glob(os.path.join(self.save_dir, img_name))
+        
         # Multi
         for tile_folder in tiled_folders:
             tiled_images = glob.glob(os.path.join(tile_folder, "*.png"))
-            for i, tile_img in enumerate(tiled_images):
-                t = Thread(target=self.del_white_imgs, args=(i, tile_img, intensity_threshold, del_img_count))
-                t.start()
+            exe = ThreadPoolExecutor(max_workers=self.workers)
+            futures = [exe.submit(self.del_white_imgs, i, tile_img, intensity_threshold, del_img_count) for i, tile_img in enumerate(tiled_images)]
+            done, not_done = wait(futures, return_when=ALL_COMPLETED)
+            exe.shutdown()
 
 
     def tile_WSI(self):
 
         if not os.path.exists(self.save_dir):
-            os.makedirs(self.save_dir)
+                os.makedirs(self.save_dir)
+        
+        threshold_dir = os.path.join(self.save_dir, "threshold")
 
-         # TODO Remove this hardcoding later
+        if not os.path.exists(threshold_dir):
+                os.makedirs(threshold_dir)
 
-        file_names = sorted(glob.glob(os.path.join(self.base_dir, '*.mrxs')))
-        file_names = [os.path.join(self.base_dir, '../amy-def/XE19-010_1_AmyB_1.mrxs')]
-        # image_names = ["/home/vivek/Datasets/AmyB/amyb_wsi/XE19-010_1_AmyB_1.mrxs"]
+        start = timer()
+        # Normalization
+        normalizer = self.normalization()
+        end = timer()
+        print("Time Taken for Ref Normalization (minutes): ", (end - start) /60) # Time in seconds, e.g. 5.38091952400282
 
-        for file_name in tqdm(file_names):
+        imagenames = sorted(glob.glob(os.path.join(self.wsi_home_dir, '*.mrxs')))
+        plt.figure(figsize=(10,10))
+        plt.title("Threholding")
 
-            # print(imagename)
+        for imagename in tqdm(imagenames):
+
+            print(imagename)
 
             # Get file_name Ex:'XE19-010_1_AmyB_1'
-            image_name = '.'.join(os.path.split(file_name)[-1].split('.'))
-            # file_name = file_name[0].split("/")[-1]
-            # self.file_name = file_name
+            file_name = file_name[0].split("/")[-1]
+            self.file_name = file_name
 
-            # Test
-            vips_image, vips_thumbnail = [Vips.Image.new_from_file(file_name, level=level) for level in (0, self.slide_level)]
-            # vips_img = Vips.Image.new_from_file(file_name, level=self.slide_level)
-            # vips_img_orig = Vips.Image.new_from_file(imagename, level=0)
-            vinfo = self.getVipsInfo(vips_image)
+            # # Test
+            vips_img = Vips.Image.new_from_file(imagename, level=self.slide_level)
+            start = timer()
+            vips_norm = normalizer.transform(vips_img)
+            end = timer()
+            print("Time Taken for Normalization: ", (end - start)/60)
+
+            vips_img_orig = Vips.Image.new_from_file(imagename, level=0)
+            vinfo = self.getVipsInfo(vips_img_orig)
             orig_w, orig_h = int(vinfo['level[0].width']), int(vinfo['level[0].height'])
-
-            # pdb.set_trace()
-            vips_img = vips_thumbnail
-            vips_img_orig = vips_image
-
-            # vips_img = vips_img.crop(0, 1520,  5578,  13176-1700)
-
+           
+            vips_img = vips_norm.crop(0, 1520,  5578,  13176-1700)
+            
             vips_array = np.ndarray(buffer=vips_img.write_to_memory(), dtype=np.uint8, shape=(vips_img.height, vips_img.width, vips_img.bands))
             vips_array = vips_array[:,:,:3]
 
@@ -215,29 +222,36 @@ class GenerateTestData:
             # thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV+ cv2.THRESH_OTSU)
 
             gray = cv2.cvtColor(vips_array, cv2.COLOR_RGB2GRAY)
-            thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_TRIANGLE)
-            contours, hierarchy = cv2.findContours(thresh[1], cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE) # cv2.RETR_LIST
-            # contours =
+            gray = cv2.GaussianBlur(gray, (5, 5), 0)
+            
+            thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV+ cv2.THRESH_OTSU)
 
-            pdb.set_trace()
+            # Dialtion to fill holes
+            thresh_dilation = 0
+            for k in range(0, 3):
+                thresh_dilation = cv2.dilate(thresh[1], None, iterations=k + 1)
+            result_img = [vips_array, thresh_dilation]
 
-            cnt, downscaled_w, downscaled_h = self.getContour(thresh, vips_array,plot_countor=False)
+            for j in range(2):
+                plt.subplot(1, 2, j+1)
+                plt.imshow(result_img[j])
+            save_img =  file_name + ".png"
+            plt.savefig(os.path.join(threshold_dir, save_img))
+            
+            cnt, downscaled_w, downscaled_h = self.getContour(thresh_dilation, vips_array,plot_countor=False)
 
             points = self.get_points_in_contour(cnt, downscaled_w, downscaled_h)
 
-            pdb.set_trace()
-
-
-
             # CROP
-            # self.crop_slide(vips_img_orig, points, orig_w, orig_h)
-
-        # Sleep for 180 seconds before next thread is started
-        print('Start waiting')
-        time.sleep(200)
-        print("==========+Wait Over")
-        self.stage1_filter()
-
+            self.crop_slide(vips_img_orig, points, orig_w, orig_h)
+        
+            # Sleep for 180 seconds before next thread is started
+            print('Start waiting')
+            time.sleep(15)
+            print("==========+Wait Over")
+            self.stage1_filter(file_name)
+            src = os.path.join(self.save_dir, file_name)
+           
 if __name__ == '__main__':
     # result = pyfiglet.figlet_format("Generate Data", font="slant")
     # print(result)
@@ -247,8 +261,14 @@ if __name__ == '__main__':
                             help='Enter the path where the Test WSI images reside')
     parser.add_argument('save_dir',
                             help='Enter the path where you want the tiled image to reside')
-    # args = parser.parse_args()
-    # generate_test_data = GenerateTestData(base_dir=args.base_dir, save_dir=args.save_dir, slide_level=4, tile_size=1024)
+
+    parser.add_argument('ref_slide_path',
+                            help='Enter the path to the reference image for normalization ')
+    args = parser.parse_args()
+
+    generate_test_data = GenerateTestData(wsi_home_dir=args.wsi_home_dir, save_dir=args.save_dir, 
+                                          ref_slide_path=args.ref_slide_path, slide_level=4, 
+                                          downscale_factor=16, tile_size=1024)
 
     paths = [f'/gladstone/finkbeiner/steve/work/data/npsad_data/gennadi/single_{i}' for i in 'slide output'.split()]
     generate_test_data = GenerateTestData(base_dir=paths[0], save_dir=paths[1], slide_level=4, tile_size=1024)

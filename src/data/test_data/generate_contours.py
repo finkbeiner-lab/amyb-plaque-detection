@@ -113,6 +113,7 @@ def get_slide_tiles(slide_vips, slide_level, tile_size, tile_cond=None, interact
     print(f'Total of {len(contours)} contours found at threshold value {thresh}.')
     contours = contours[:top_n]
     selected_contours = list()
+    
     if interactive:
         print(f'Select from among {len(contours)} contours.')
         for contour in contours:
@@ -173,11 +174,6 @@ def process_slides(base_dir, save_dir, slide_level=4, tile_size=1024):
             fh.write(tile_selection)
 
         Image.fromarray(visuals).save(os.path.join(save_dir, f'{img_name}_visuals_{thresh}.png'))
-
-
-
-
-
 
 
 

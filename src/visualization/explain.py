@@ -46,7 +46,6 @@ class ExplainPredictions():
         self.class_to_colors = {'Core': (255, 0, 0), 'Neuritic' : (0, 0, 255), 'Diffuse': (0,255,0)}
         self.result_save_dir= "../../reports/figures/"
         self.colors = np.random.uniform(0, 255, size=(len(self.class_names), 3))
-        self.masks_path = ""
         self.column_names = ["image_name", "region", "region_mask", "label", "confidence", "centroid", "eccentricity", "area", "equivalent_diameter"]
       
     def get_outputs(self, input_tensor, model, threshold):
@@ -178,21 +177,29 @@ class ExplainPredictions():
                         lineType=cv2.LINE_AA)
         return image
 
-    def make_result_dirs(self):
+    def make_result_dirs(self, folder_name):
 
-        results_path = os.path.join(self.result_save_dir, "results")
+        save_path = os.path.join(self.result_save_dir, folder_name)
+        results_path = os.path.join(save_path, "results")
         if not os.path.exists(results_path):
             os.makedirs(results_path)
         
-        masks_path = os.path.join(self.result_save_dir, "masks")
+        detections_path = os.path.join(save_path, "detections")
+        if not os.path.exists(detections_path):
+            os.makedirs(detections_path)
+        
+        masks_path = os.path.join(save_path, "masks")
         if not os.path.exists(masks_path):
             os.makedirs(masks_path)
         
-        ablations_path = os.path.join(self.result_save_dir, "ablations")
+        ablations_path = os.path.join(save_path, "ablations")
         if not os.path.exists(ablations_path):
             os.makedirs(ablations_path)
         
-        return results_path, masks_path, ablations_path
+        csv_name = folder_name + "_quantify.csv"
+        quantify_path = os.path.join(save_path, csv_name)
+        
+        return results_path, masks_path, detections_path, ablations_path, quantify_path
 
     def quantify_plaques(self, df, wandb_result, img_name, result_img, result_masks, boxes, labels, scores):
         '''This function will take masks image and generate attributes like plaque
@@ -254,13 +261,7 @@ class ExplainPredictions():
         
     def generate_results(self):
         # This will help us create a different color for each class
-
-        results_path, masks_path, ablations_path = self.make_result_dirs()
-        quantify_path = os.path.join(self.result_save_dir, "quantify.csv")
-        #used downstream by quantify plaques
-        self.masks_path = masks_path
-
-        # Load Trained Model
+        # Load Trained 
         model = torch.load(self.model_input_path)
     
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -269,7 +270,29 @@ class ExplainPredictions():
         test_folders = glob.glob(os.path.join(self.test_input_path, "*"))
         
         # Test images from each WSI folder
+
+        not_process = ['XE10-006_1_AmyB_1', 'XE11-018_1_AmyB_1', 'XE14-004_1_AmyB_1', 'XE16-053_7_AmyB_1', 'XE17-059_1_AmyB_1', 'XE16-014_1_AmyB_1', 'XE10-033_1_AmyB_1', 'XE09-056_1_AmyB_1', 'XE08-010_1_AmyB_1', 'XE15-012_7_AmyB_1', 'XE10-005_1_AmyB_1', 'XE16-021_7_AmyB_1', 'XE10-026_1_AmyB_1', 
+        'XE10-020_1_AmyB_1', 'XE10-019_1_AmyB_1', 'XE07-049_1_AmyB_1', 'XE16-023_7_AmyB_1', 'XE14-004_6_AmyB_1', 'XE09-041_1_AmyB_1', 'XE16-033_1_AmyB_1', 'XE10-042_1_AmyB_1', 'XE13-003_1_AmyB_1', 'XE16-002_7_AmyB_1', 'XE13-018_1_AmyB_1', 'XE12-036_1_AmyB_1', 'XE10-046_1_AmyB_1', 'XE12-015_1_AmyB_1',
+        'XE11-028_6_AmyB_1', 'XE17-029_7_AmyB_1', 'XE15-007_7_AmyB_1', 'XE17-013_1_AmyB_1', 'XE19-010_1_AmyB_1', 'XE07-060_1_AmyB_1', 'XE12-013_1_AmyB_1', 'XE11-027_1_AmyB_1', 'XE17-022_7_AmyB_1', 'XE12-010_1_AmyB_1', 'XE12-011_1_AmyB_1', 'XE17-048_1_AmyB_1', 'XE08-017_1_AmyB_1', 'XE12-009_1_AmyB_1', 
+        'XE11-039_1_AmyB_1', 'XE16-027_1_AmyB_1', 'XE13-017_1_AmyB_1', 'XE12-007_1_AmyB_1', 'XE09-049_1_AmyB_1', 'XE09-035_1_AmyB_1', 'XE19-037_1_AmyB_1', 'XE12-012_1_AmyB_1', 'XE15-007_1_AmyB_1', 'XE10-045_1_AmyB_1', 'XE10-053_1_AmyB_1', 'XE12-042_1_AmyB_1', 'XE07-048_1_AmyB_1', 'XE10-009_1_AmyB_1', 
+        'XE08-015_1_AmyB_1', 'XE17-065_1_AmyB_1', 'XE08-033_1_AmyB_1', 'XE07-067_1_AmyB_1', 'XE07-047_1_AmyB_1', 'XE08-047_1_AmyB_1', 'XE11-025_1_AmyB_1', 'XE18-004_7_AmyB_1', 'XE14-051_1_AmyB_1', 'XE18-045_1_AmyB_1', 'XE18-004_6_AmyB_1', 'XE14-037_1_AmyB_1', 'XE11-008_1_AmyB_1', 'XE08-018_1_AmyB_1', 
+        'XE10-021_1_AmyB_1', 'XE15-039_1_AmyB_1', 'XE16-053_1_AmyB_1', 'XE09-006_1_AmyB_1', 'XE15-012_1_AmyB_1', 'XE08-016_1_AmyB_1', 'XE16-002_1_AmyB_1', 'XE10-030_1_AmyB_1', 'XE07-064_1_AmyB_1', 'XE17-039_1_AmyB_1', 'XE14-033_1_AmyB_1', 
+        'XE09-013_1_AmyB_1', 'XE15-051_1_AmyB_1', 'XE09-063_1_AmyB_1', 'XE16-033_7_AmyB_1', 'XE09-028_1_AmyB_1', 'XE07-057_1_AmyB_1', 'XE16-023_1_AmyB_1', 'XE16-021_1_AmyB_1', 'XE07-056_1_AmyB_1', 'XE14-047_1_AmyB_1', 'XE16-027_7_AmyB_1', 'XE11-029_1_AmyB_1', 'XE17-048_7_AmyB_1', 'XE10-018_1_AmyB_1']
+
+
+        test_folders = sorted(test_folders)
+      
         for test_folder in tqdm(test_folders):
+
+            print("\n", test_folder)
+
+            # if os.path.basename(test_folder) in not_process:
+            #     print("\n ====folder skip ===", test_folder)
+            #     continue
+            
+
+            folder_name = os.path.basename(test_folder)
+            results_path, masks_path, detections_path, ablations_path, quantify_path = self.make_result_dirs(folder_name)
             images = glob.glob(os.path.join(test_folder, '*.png'))
 
             i = 0
@@ -279,8 +302,8 @@ class ExplainPredictions():
             total_neuritic_plaques = 0
             total_diffused_plaques = 0
 
-        
             for img in tqdm(images):
+                result_img = 0
                 img_name = os.path.basename(img).split('.')[0]
         
                 image = np.array(Image.open(img))
@@ -300,9 +323,16 @@ class ExplainPredictions():
                     mask_img_name = img_name +  "_masks.png"
                     mask_save_path = os.path.join(masks_path, mask_img_name)
 
+                    # Plot masks
                     cv2.imwrite(mask_save_path, result_masks)
 
-                    # Plot the result and save
+                    # Plot detections
+                    detection_img_name = img_name + "_detection.png"
+                    detection_save_path = os.path.join(detections_path, detection_img_name)
+                    bgr_img = cv2.cvtColor(result_img, cv2.COLOR_RGB2BGR)
+                    cv2.imwrite(detection_save_path, bgr_img)
+
+                    # Plot Results
                     plt.figure(figsize=(10,10))
                     plt.title("Model Prediction")
 
@@ -315,7 +345,8 @@ class ExplainPredictions():
                     result_img_name = img_name +  "_result.png"
                     result_save_path = os.path.join(results_path, result_img_name)
                     plt.savefig(result_save_path)
-                
+                    plt.close()
+
                 # plt.show()
                 if self.ablation_cam:
                     # Ablation CAM
@@ -337,7 +368,14 @@ class ExplainPredictions():
                     # And lets draw the boxes again:
                     image_with_bounding_boxes = self.draw_boxes(boxes, labels, classes, cam_image)
 
-                    plt.imshow(image_with_bounding_boxes)
+                    # plt.imshow(image_with_bounding_boxes)
+                    plt.figure(figsize=(10,10))
+                    plt.title("Ablation Cam")
+                    ablation_list = [grayscale_cam, image_with_bounding_boxes]
+                    for k in range(2):
+                        plt.subplot(1, 2, k+1)
+                        plt.imshow(ablation_list[k])
+
 
                     if self.save_result:
                         ablation_img_name = img_name +  "_ablation_cam.png"
@@ -348,19 +386,20 @@ class ExplainPredictions():
 
             df.to_csv(quantify_path, index=False)
             test_table = self.wandb.Table(data=wandb_result, columns=self.column_names)
-            self.wandb.log({'quantifications': test_table})
+            # self.wandb.log({'quantifications': test_table})
           
                 
         
 if __name__ == "__main__":
 
     
-    input_path = '/home/vivek/Datasets/AmyB/amyb_wsi/test/images'
+    input_path = '/home/vivek/Datasets/AmyB/amyb_wsi/test-data/'
     model_input_path = '../../models/mrcnn_model_15.pth'
 
     # Use the Run ID from train_model.py here if you want to add some visualizations after training has been done
+    # with wandb.init(project="nps-ad", id = "17vl5roa", entity="hellovivek", resume="allow"):
     
-    with wandb.init(project="nps-ad", id = "17vl5roa", entity="hellovivek", resume="allow"):
+    with wandb.init(project="nps-ad",  entity="hellovivek"):
         explain = ExplainPredictions(model_input_path = model_input_path, test_input_path=input_path, 
-                                     detection_threshold=0.5, wandb=wandb, save_result=False)
-        explain.generate_results(ablation_cam=False)
+                                     detection_threshold=0.75, wandb=wandb, save_result=True, ablation_cam=True)
+        explain.generate_results()
