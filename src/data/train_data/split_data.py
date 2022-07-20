@@ -39,9 +39,9 @@ class SplitData:
         self.aug_value = aug_value
         self.cores = multiprocessing.cpu_count()
         self.image_input = "images"
-        self.label_input = "masks"
-        
-    
+        self.label_input = "labels"
+
+
     def generate_split_dirs(self):
         '''Generate Proper Directory strucute with lables under train test
         and val'''
@@ -88,6 +88,21 @@ class SplitData:
         split_4 = int(0.9 * len(label_filenames))
 
         print("\n\nSplitting dataset into Train,Test and Val for  Images ...")
+        data_dict = dict(
+            train=dict(
+                images=image_filenames[:split_1],
+                labels=label_filenames[:split_1],
+            ),
+            val=dict(
+                images=image_filenames[split_1:split_2],
+                labels=label_filenames[split_1:split_2],
+            ),
+            test=dict(
+                images=image_filenames[split_2:],
+                labels=label_filenames[split_2:]
+            )
+        )
+
         train_filenames_images = image_filenames[:split_1]
         test_filenames_images = image_filenames[split_2:]
         val_filenames_images = image_filenames[split_1:split_2]
@@ -97,12 +112,27 @@ class SplitData:
         test_filenames_labels = label_filenames[split_4:]
         val_filenames_labels = label_filenames[split_3:split_4]
 
+
+        def wrapper_func(a, b, c):
+            print(a, b, c)
+
         # Step 4 : Copy the split contents to folders
         #Parallel Process - Images and Labels
+        [self.copy_split_files_to_dataset(data_dict[fold][x], dst_directory, f'{fold}/{x}') for x in 'images labels'.split() for fold in 'train val test'.split()]
+
+        pdb.set_trace()
+
+        # self.copy_split_files_to_dataset(val_filenames_images, dst_directory, 'val/images')
+        # self.copy_split_files_to_dataset(train_filenames_images, dst_directory, 'train/images')
+        # self.copy_split_files_to_dataset(train_filenames_images, dst_directory, 'train/images')
+        # self.copy_split_files_to_dataset(train_filenames_images, dst_directory, 'train/images')
+        # self.copy_split_files_to_dataset(train_filenames_images, dst_directory, 'train/images')
+        #
+
         pool = Pool(self.cores)
-        pool.map(self.copy_split_files_to_dataset, [train_filenames_images,
-                                                    test_filenames_images,
-                                                    val_filenames_images,
+        pool.map(copy_wrap, [(train_filenames_images, dst_directory,),
+                                                    (test_filenames_images, dst_directory,),
+                                                    (val_filenames_images),
                                                     train_filenames_labels,
                                                     test_filenames_labels,
                                                     val_filenames_labels],
@@ -121,7 +151,7 @@ class SplitData:
         print("\ntrain labels :", len(train_filenames_labels))
         print("test labels : ", len(test_filenames_labels))
         print("val labels : ", len(val_filenames_labels))
-    
+
     def copy_split_files_to_dataset(self, filenames, dst_directory, dst_type):
         '''
         This Fn will copy all the file belonging to true and false classes to
@@ -139,7 +169,7 @@ class SplitData:
             filename = os.path.basename(src_file)
             dst = os.path.join(dst_directory, dst_type, filename)
             copyfile(src_file, dst)
-    
+
     def check_distribution(self, name, image_filenames, label_filenames):
         '''This Fn will check for the distribution of Images and labels specified by
         the source name'''
@@ -149,7 +179,7 @@ class SplitData:
         print('\nTotal Images :', len(image_filenames))
         print('\nTotal Labels :', len(label_filenames))
         print("\n====================================")
-    
+
     def get_randimages_dataug(self, total_imgs, image_filenames, label_filenames):
         '''
         This Fn generates random files from the original dataset, which will
@@ -175,7 +205,7 @@ class SplitData:
             random_label_file.append(random.choice(label_filenames))
 
         return [random_image_file, random_label_file]
-    
+
     def upsample_dataset(self, random_filenames, file_type, variations):
         '''
         This Fn will upsample the images by performing data augmentation
@@ -218,7 +248,7 @@ class SplitData:
             #To rename the file with prefix A_
             filename = os.path.basename(random_file)
             filepath = os.path.dirname(random_file)
-        
+
             for j in range(variations):
                  # generate batch of images
                 batch = data_it.next()
@@ -243,9 +273,9 @@ class SplitData:
         Parameters:
         - image_filenames - images are accessed from remote box folder
         - label_filenames - labels are accessed from remote box folder
-        
+
        '''
-      
+
         image_filenames.sort()
         label_filenames.sort()
 
@@ -255,34 +285,34 @@ class SplitData:
 
         # Step 3 Data Augmentation Block
         if self.data_aug:
-            rand_image_filenames, rand_label_filenames = self.get_randimages_dataug(self.aug_value, 
+            rand_image_filenames, rand_label_filenames = self.get_randimages_dataug(self.aug_value,
                                                                                     image_filenames,
                                                                                     label_filenames)
             augmented_image_files = self.upsample_dataset(rand_image_filenames, "augmented_images", 2)
             augmented_label_files = self.upsample_dataset(rand_label_filenames, "augmented_labels", 2)
-            
-            
+
+
             self.check_distribution("augmented_data", augmented_image_files, augmented_label_files)
             print("\n Total Data :", len(augmented_image_files) + len(image_filenames))
-        
+
             self.split_dataset(augmented_image_files, augmented_label_files, self.dataset_base_dir)
-        
+
         # self.visualization.check_images(augmented_image_files, 2)
         # self.visualization.check_images(augmented_label_files, 2)
-    
 
 
-    
+
+
     def prepare_dataset(self):
         '''This Fn does performs all the necessary actions to prepare the dataset
         for training the model'''
 
-        # Extracting Image File Names 
+        # Extracting Image File Names
         images_input = os.path.join(self.dataset_base_dir, self.image_input)
         image_path = os.path.join(images_input, '*.png')
         image_filenames = glob.glob(image_path)
 
-        # Extracting labels File Names 
+        # Extracting labels File Names
         label_input = os.path.join(self.dataset_base_dir, self.label_input)
         label_path = os.path.join(label_input, '*.png')
         label_filenames = glob.glob(label_path)
@@ -292,11 +322,9 @@ class SplitData:
         self.generate_split_dirs()
         self.preprocess_dataset(image_filenames, label_filenames)
 
-    
+
 if __name__ == "__main__":
     #TODO Fix data aug - Not Running
-    split_data = SplitData("/home/vivek/Datasets/AmyB/amyb_wsi/", False, 500)
+    WSI_path = '/gladstone/finkbeiner/steve/work/data/npsad_data/gennadi/amy-def/'
+    split_data = SplitData(WSI_path, False, 500)
     split_data.prepare_dataset()
-       
-    
-    

@@ -226,28 +226,6 @@ def build_roi_heads(box_configs, mask_configs, roi_heads_config):
     )
 
 
-def build_default(configs, im_size=1024, backbone=None):
-    rpn_configs = defaults(configs['rpn_config'], 'anchor rpn_head rpn'.split(), suffix='_config')
-    box_configs = defaults(configs['roi_heads_config']['box_configs'], 'roi_pool head predictor'.split(), prefix='box_', suffix='_config')
-    mask_configs = defaults(configs['roi_heads_config']['mask_configs'], 'roi_pool head predictor'.split(), prefix='mask_', suffix='_config')
-    roi_heads_config, = defaults(configs['roi_heads_config'], 'roi_heads'.split(), suffix='_config', list=True)
-
-    rpn = build_rpn(**rpn_configs)
-    roi_heads = build_roi_heads(box_configs, mask_configs, roi_heads_config)
-
-    backbone = backbone_utils.resnet_fpn_backbone('resnet50', pretrained=False, trainable_layers=5) if backbone is None else backbone
-
-    transform = GeneralizedRCNNTransform(
-        min_size=im_size,
-        max_size=im_size,
-        image_mean=[0.485, 0.456, 0.406],
-        image_std=[0.229, 0.224, 0.225],
-    )
-
-    return GeneralizedRCNN(backbone, rpn, roi_heads, transform)
-
-
-
 if __name__ == '__main__':
     configs = _default_mrcnn_configs().config_dict
 

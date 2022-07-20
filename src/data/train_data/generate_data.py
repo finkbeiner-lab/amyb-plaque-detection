@@ -20,7 +20,7 @@ from skimage import measure
 from tqdm import tqdm
 from PIL import Image
 import pyvips as Vips
-import openslide
+# import openslide
 
 # Mask size should be same as image size
 # TODO Remove hardcoding
@@ -108,10 +108,10 @@ def process_json(WSI_path, visualize=False):
         os.makedirs(image_save_dir)
 
 
-    imagenames = glob.glob(os.path.join(WSI_path, "*.mrxs"))
-
+    # imagenames = glob.glob(os.path.join(WSI_path, "*.mrxs"))
+    imagenames = [os.path.join(WSI_path, 'XE19-010_1_AmyB_1.mrxs')]
     # TODO Remove this hardcoding later
-    imagenames = ["/home/vivek/Datasets/AmyB/amyb_wsi/XE19-010_1_AmyB_1.mrxs"]
+    # imagenames = ["/home/vivek/Datasets/AmyB/amyb_wsi/XE19-010_1_AmyB_1.mrxs"]
     plaque_dict = {}
 
     for img in imagenames:
@@ -122,14 +122,15 @@ def process_json(WSI_path, visualize=False):
         # Get the corresponding json file
         json_file_name = os.path.basename(img).split(".mrxs")[0] + ".json"
         json_file_name = os.path.join(os.path.dirname(img), json_file_name)
-        json_file_list = [json_file_name, "/home/vivek/Datasets/AmyB/amyb_wsi/XE19-010_1_AmyB_1_1.json"]
-        merge_json(json_file_list, "/home/vivek/Datasets/AmyB/amyb_wsi/test.json")
+        # json_file_list = [json_file_name, "/home/vivek/Datasets/AmyB/amyb_wsi/XE19-010_1_AmyB_1_1.json"]
+        # merge_json(json_file_list, "/home/vivek/Datasets/AmyB/amyb_wsi/test.json")
         # json_file_name = os.path.join(os.path.dirname(img), "XE19-010_1_AmyB_1_37894x_177901y_image.png[--series, 0].json")
 
-        json_file_name = "/home/vivek/Datasets/AmyB/amyb_wsi/test.json"
+        # json_file_name = "/home/vivek/Datasets/AmyB/amyb_wsi/test.json"
         print("file name : ", json_file_name)
         with open(json_file_name) as f:
             data = json.load(f)
+        # pdb.set_trace()
 
         for ele in tqdm(data):
 
@@ -246,11 +247,12 @@ if __name__ == '__main__':
     result = pyfiglet.figlet_format("Generate Mask", font="slant")
     print(result)
 
-    parser = argparse.ArgumentParser(description='Generate Mask')
+    # parser = argparse.ArgumentParser(description='Generate Mask')
+    #
+    # parser.add_argument('WSI_path',
+    #                     help='Enter the path where WSI resides')
+    #
+    # args = parser.parse_args()
 
-    parser.add_argument('WSI_path',
-                        help='Enter the path where WSI resides')
-
-    args = parser.parse_args()
-
-    process_json(args.WSI_path)
+    WSI_path = '/gladstone/finkbeiner/steve/work/data/npsad_data/gennadi/amy-def/'
+    process_json(WSI_path)
