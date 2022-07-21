@@ -28,6 +28,8 @@ from skimage import data, filters, measure, morphology
 import pandas as pd
 import wandb
 from tqdm import tqdm
+from skimage import data
+from skimage.color import rgb2hed, hed2rgb
 
 
 
@@ -35,19 +37,74 @@ from tqdm import tqdm
 class ExplainPredictions():
     
     # TODO fix the visualization flags
-    def __init__(self, model_input_path, test_input_path, detection_threshold, wandb, save_result, ablation_cam):
+    def __init__(self, model_input_path, test_input_path, detection_threshold, wandb, save_result, ablation_cam, save_thresholds):
         self.model_input_path = model_input_path
         self.test_input_path = test_input_path
         self.detection_threshold = detection_threshold
         self.wandb = wandb
         self.save_result = save_result
         self.ablation_cam = ablation_cam
+        self.save_thresholds = save_thresholds
         self.class_names = ['Unknown', 'Core', 'Diffuse', 'Neuritic']
         self.class_to_colors = {'Core': (255, 0, 0), 'Neuritic' : (0, 0, 255), 'Diffuse': (0,255,0)}
         self.result_save_dir= "../../reports/figures/"
         self.colors = np.random.uniform(0, 255, size=(len(self.class_names), 3))
-        self.column_names = ["image_name", "region", "region_mask", "label", "confidence", "centroid", "eccentricity", "area", "equivalent_diameter"]
+        self.column_names = ["image_name", "region", "region_mask", "label", "confidence", "brown_pixels", "centroid", "eccentricity", "area", "equivalent_diameter"]
+        self.results_path = ""
+        self.masks_path = "" 
+        self.detections_path = "" 
+        self.ablations_path = ""
+        self.quantify_path = ""
       
+    def get_brown_pixel_cnt(self, img, img_name):
+
+        # Separate the stains from the IHC image
+        ihc_hed = rgb2hed(img)
+
+        # Create an RGB image for each of the stains
+        null = np.zeros_like(ihc_hed[:, :, 0])
+        ihc_h = hed2rgb(np.stack((ihc_hed[:, :, 0], null, null), axis=-1))
+        ihc_e = hed2rgb(np.stack((null, ihc_hed[:, :, 1], null), axis=-1))
+        ihc_d = hed2rgb(np.stack((null, null, ihc_hed[:, :, 2]), axis=-1))
+        ihc_d = ihc_d.astype('float32')
+
+        gray = cv2.cvtColor(ihc_d, cv2.COLOR_RGB2GRAY)
+        gray = cv2.GaussianBlur(gray, (5, 5), 0)
+        x = gray[gray<0.35]
+
+
+        if len(x) != 0:
+            if self.save_thresholds:
+                # Display
+                fig, axes = plt.subplots(2, 2, figsize=(7, 6), sharex=True, sharey=True)
+                ax = axes.ravel()
+
+                ax[0].imshow(img)
+                ax[0].set_title("Original image")
+
+                ax[1].imshow(ihc_h)
+                ax[1].set_title("Hematoxylin")
+
+                ax[2].imshow(gray)
+                ax[2].set_title("gray")  # Note that there is no Eosin stain in this image
+
+                ax[3].imshow(ihc_d)
+                ax[3].set_title("DAB")
+
+                for a in ax.ravel():
+                    a.axis('off')
+
+                fig.tight_layout()
+            
+                
+                final_save_path = img_name + "_count_threhold.png"
+                final_save_path = os.path.join(self.pixel_count_path, final_save_path)
+                fig.savefig(final_save_path)
+                plt.close()
+            return len(x)
+        return 0
+
+
     def get_outputs(self, input_tensor, model, threshold):
         with torch.no_grad():
             # forward pass of the image through the modle
@@ -196,19 +253,27 @@ class ExplainPredictions():
         if not os.path.exists(ablations_path):
             os.makedirs(ablations_path)
         
+        pixel_count_path = os.path.join("../../reports/", "pixel_count")
+        if not os.path.exists(pixel_count_path):
+            os.makedirs(pixel_count_path)
+        
         csv_name = folder_name + "_quantify.csv"
         quantify_path = os.path.join(save_path, csv_name)
-        
-        return results_path, masks_path, detections_path, ablations_path, quantify_path
 
-    def quantify_plaques(self, df, wandb_result, img_name, result_img, result_masks, boxes, labels, scores):
+        self.results_path = results_path
+        self.masks_path = masks_path
+        self.detections_path = detections_path
+        self.ablations_path = ablations_path
+        self.quantify_path = quantify_path
+        self.pixel_count_path = pixel_count_path
+
+    def quantify_plaques(self, df, wandb_result, img_name, result_img, result_masks, boxes, labels, scores, total_brown_pixels):
         '''This function will take masks image and generate attributes like plaque
         count, area, eccentricity'''
 
         csv_result = []
         
-        
-        
+    
         for i in range(len(labels)):
 
             props = {}
@@ -247,6 +312,7 @@ class ExplainPredictions():
                         total_diffused_plaques+=1
                     
                     data_record = pd.DataFrame.from_records([{ 'image_name': img_name, 'label': labels[i] , 'confidence': scores[i],
+                                                               'brown_pixels': total_brown_pixels,
                                                                'core': total_core_plaques, 'neuritic': total_neuritic_plaques, 'diffuse': total_diffused_plaques,
                                                                'centroid': props.centroid, 'eccentricity': props.eccentricity, 
                                                                'area': props.area, 'equivalent_diameter': props.equivalent_diameter}])
@@ -257,8 +323,7 @@ class ExplainPredictions():
                    
         
         return df, wandb_result
-
-        
+ 
     def generate_results(self):
         # This will help us create a different color for each class
         # Load Trained 
@@ -270,29 +335,18 @@ class ExplainPredictions():
         test_folders = glob.glob(os.path.join(self.test_input_path, "*"))
         
         # Test images from each WSI folder
-
-        not_process = ['XE10-006_1_AmyB_1', 'XE11-018_1_AmyB_1', 'XE14-004_1_AmyB_1', 'XE16-053_7_AmyB_1', 'XE17-059_1_AmyB_1', 'XE16-014_1_AmyB_1', 'XE10-033_1_AmyB_1', 'XE09-056_1_AmyB_1', 'XE08-010_1_AmyB_1', 'XE15-012_7_AmyB_1', 'XE10-005_1_AmyB_1', 'XE16-021_7_AmyB_1', 'XE10-026_1_AmyB_1', 
-        'XE10-020_1_AmyB_1', 'XE10-019_1_AmyB_1', 'XE07-049_1_AmyB_1', 'XE16-023_7_AmyB_1', 'XE14-004_6_AmyB_1', 'XE09-041_1_AmyB_1', 'XE16-033_1_AmyB_1', 'XE10-042_1_AmyB_1', 'XE13-003_1_AmyB_1', 'XE16-002_7_AmyB_1', 'XE13-018_1_AmyB_1', 'XE12-036_1_AmyB_1', 'XE10-046_1_AmyB_1', 'XE12-015_1_AmyB_1',
-        'XE11-028_6_AmyB_1', 'XE17-029_7_AmyB_1', 'XE15-007_7_AmyB_1', 'XE17-013_1_AmyB_1', 'XE19-010_1_AmyB_1', 'XE07-060_1_AmyB_1', 'XE12-013_1_AmyB_1', 'XE11-027_1_AmyB_1', 'XE17-022_7_AmyB_1', 'XE12-010_1_AmyB_1', 'XE12-011_1_AmyB_1', 'XE17-048_1_AmyB_1', 'XE08-017_1_AmyB_1', 'XE12-009_1_AmyB_1', 
-        'XE11-039_1_AmyB_1', 'XE16-027_1_AmyB_1', 'XE13-017_1_AmyB_1', 'XE12-007_1_AmyB_1', 'XE09-049_1_AmyB_1', 'XE09-035_1_AmyB_1', 'XE19-037_1_AmyB_1', 'XE12-012_1_AmyB_1', 'XE15-007_1_AmyB_1', 'XE10-045_1_AmyB_1', 'XE10-053_1_AmyB_1', 'XE12-042_1_AmyB_1', 'XE07-048_1_AmyB_1', 'XE10-009_1_AmyB_1', 
-        'XE08-015_1_AmyB_1', 'XE17-065_1_AmyB_1', 'XE08-033_1_AmyB_1', 'XE07-067_1_AmyB_1', 'XE07-047_1_AmyB_1', 'XE08-047_1_AmyB_1', 'XE11-025_1_AmyB_1', 'XE18-004_7_AmyB_1', 'XE14-051_1_AmyB_1', 'XE18-045_1_AmyB_1', 'XE18-004_6_AmyB_1', 'XE14-037_1_AmyB_1', 'XE11-008_1_AmyB_1', 'XE08-018_1_AmyB_1', 
-        'XE10-021_1_AmyB_1', 'XE15-039_1_AmyB_1', 'XE16-053_1_AmyB_1', 'XE09-006_1_AmyB_1', 'XE15-012_1_AmyB_1', 'XE08-016_1_AmyB_1', 'XE16-002_1_AmyB_1', 'XE10-030_1_AmyB_1', 'XE07-064_1_AmyB_1', 'XE17-039_1_AmyB_1', 'XE14-033_1_AmyB_1', 
-        'XE09-013_1_AmyB_1', 'XE15-051_1_AmyB_1', 'XE09-063_1_AmyB_1', 'XE16-033_7_AmyB_1', 'XE09-028_1_AmyB_1', 'XE07-057_1_AmyB_1', 'XE16-023_1_AmyB_1', 'XE16-021_1_AmyB_1', 'XE07-056_1_AmyB_1', 'XE14-047_1_AmyB_1', 'XE16-027_7_AmyB_1', 'XE11-029_1_AmyB_1', 'XE17-048_7_AmyB_1', 'XE10-018_1_AmyB_1']
-
-
         test_folders = sorted(test_folders)
       
         for test_folder in tqdm(test_folders):
 
             print("\n", test_folder)
-
-            # if os.path.basename(test_folder) in not_process:
-            #     print("\n ====folder skip ===", test_folder)
-            #     continue
-            
-
             folder_name = os.path.basename(test_folder)
-            results_path, masks_path, detections_path, ablations_path, quantify_path = self.make_result_dirs(folder_name)
+
+            if folder_name == "XE07-047_1_AmyB_1":
+                continue
+
+            # make all necessary folders
+            self.make_result_dirs(folder_name)
             images = glob.glob(os.path.join(test_folder, '*.png'))
 
             i = 0
@@ -301,6 +355,8 @@ class ExplainPredictions():
             total_core_plaques = 0
             total_neuritic_plaques = 0
             total_diffused_plaques = 0
+            total_brown_pixels = 0
+            total_image_pixels = 0
 
             for img in tqdm(images):
                 result_img = 0
@@ -308,6 +364,7 @@ class ExplainPredictions():
         
                 image = np.array(Image.open(img))
 
+                total_image_pixels+= image.shape[0] * image.shape[1]
                 # Check if image has alpha channel
                 if image.shape[2] == 4:
                     image = image[:,:, :3]
@@ -317,18 +374,20 @@ class ExplainPredictions():
                 
                 result_img, result_masks = self.draw_segmentation_map(image, masks, boxes, labels)
 
-                df, wandb_result = self.quantify_plaques(df, wandb_result, img_name, result_img, result_masks, boxes, labels, scores)
+                total_brown_pixels+= self.get_brown_pixel_cnt(image, img_name)
+
+                df, wandb_result = self.quantify_plaques(df, wandb_result, img_name, result_img, result_masks, boxes, labels, scores, total_brown_pixels)
 
                 if self.save_result:
                     mask_img_name = img_name +  "_masks.png"
-                    mask_save_path = os.path.join(masks_path, mask_img_name)
+                    mask_save_path = os.path.join(self.masks_path, mask_img_name)
 
                     # Plot masks
                     cv2.imwrite(mask_save_path, result_masks)
 
                     # Plot detections
                     detection_img_name = img_name + "_detection.png"
-                    detection_save_path = os.path.join(detections_path, detection_img_name)
+                    detection_save_path = os.path.join(self.detections_path, detection_img_name)
                     bgr_img = cv2.cvtColor(result_img, cv2.COLOR_RGB2BGR)
                     cv2.imwrite(detection_save_path, bgr_img)
 
@@ -343,7 +402,7 @@ class ExplainPredictions():
                         plt.imshow(img_array[j])
                     
                     result_img_name = img_name +  "_result.png"
-                    result_save_path = os.path.join(results_path, result_img_name)
+                    result_save_path = os.path.join(self.results_path, result_img_name)
                     plt.savefig(result_save_path)
                     plt.close()
 
@@ -379,12 +438,13 @@ class ExplainPredictions():
 
                     if self.save_result:
                         ablation_img_name = img_name +  "_ablation_cam.png"
-                        save_path_ablation = os.path.join(ablations_path, ablation_img_name)
+                        save_path_ablation = os.path.join(self.ablations_path, ablation_img_name)
                         plt.savefig(save_path_ablation)
                 i = i + 1
                 # plt.show()
 
-            df.to_csv(quantify_path, index=False)
+            print("Total area of brown pixel", (total_brown_pixels/ total_image_pixels)*100)
+            df.to_csv(self.quantify_path, index=False)
             test_table = self.wandb.Table(data=wandb_result, columns=self.column_names)
             # self.wandb.log({'quantifications': test_table})
           
@@ -401,5 +461,5 @@ if __name__ == "__main__":
     
     with wandb.init(project="nps-ad",  entity="hellovivek"):
         explain = ExplainPredictions(model_input_path = model_input_path, test_input_path=input_path, 
-                                     detection_threshold=0.75, wandb=wandb, save_result=True, ablation_cam=True)
+                                     detection_threshold=0.75, wandb=wandb, save_result=True, ablation_cam=True, save_thresholds=False)
         explain.generate_results()
