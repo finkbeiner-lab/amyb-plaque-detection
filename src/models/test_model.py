@@ -23,7 +23,7 @@ if __name__ == "__main__":
 
     with wandb.init(project="nps-ad", entity="hellovivek"):
         explain = ExplainPredictions(model_input_path=args.trained_model_path , test_input_path=args.test_WSI_input, 
-                                    detection_threshold=float(args.detection_threshold),  wandb=wandb, save_result=False ,ablation_cam=False)
+                                    detection_threshold=float(args.detection_threshold),  wandb=wandb, save_result=False ,ablation_cam=False, save_thresholds=False)
         explain.generate_results()
 
 
