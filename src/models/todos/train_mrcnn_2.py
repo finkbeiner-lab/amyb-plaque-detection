@@ -102,6 +102,7 @@ if __name__ == '__main__':
     #   - switch to support for standard torchvision-bundled transforms
     #   - complete feature: add grad_optimizer support transparently (so that usage is the same for users and train_one_epoch interface whether torch.optim or grad_optim is selected, i.e. log grads automatically)
     #   - do ^^ via closures
+    #   - experimental: add an API to collect params and bufs by on module and/or name; generate on-the-fly state_dicts, gradient_dicts, higher-order gradient_dicts, etc.
 
     collate_fn = lambda _: tuple(zip(*_)) # one-liner, no need to import
 
@@ -111,9 +112,9 @@ if __name__ == '__main__':
         batch_size=1,
         num_classes=3,
         device_id=0,
-        checkpoints='/home/projects/amyb-plaque-detection/models/checkpoints/'
+        checkpoints='/home/projects/amyb-plaque-detection/models/checkpoints',
     )
-    model_config = _default_mrcnn_configs(num_classes=1 + train_config['num_classes']).config_dict
+    model_config = _default_mrcnn_config(num_classes=1 + train_config['num_classes']).config_dict
     optim_config = dict(
         # cls=grad_optim.GradSGD,
         cls=torch.optim.SGD,
@@ -122,7 +123,11 @@ if __name__ == '__main__':
     wandb_config = dict(
         project='mrcnn_train',
         entity='gladstone-npsad',
-        config=dict(train_config=train_config, model_config=model_config, optim_config=optim_config),
+        config=dict(
+            train_config=train_config,
+            model_config=model_config,
+            optim_config=optim_config,
+        ),
         save_code=False,
         group='warmup_runs',
         job_type='train',
@@ -148,14 +153,17 @@ if __name__ == '__main__':
 
     optimizer = optim_config['cls']([dict(params=list(model.parameters()))], **optim_config['defaults'])
 
-    wandb.init(**wandb_config)
+    run = wandb.init(**wandb_config)
+    assert run is wandb.run # check our run was successfully initialized and is not None
+    checkpoints = wandb.Artifact('checkpoints', 'model')
+
     for epoch in range(train_config['epochs']):
         print(f'Epoch {epoch} started.')
         for logs in train_one_epoch(model, loss_fn, optimizer, data_loader, device, epoch=epoch, log_freq=1):
             for log in logs:
-                wandb.log(log)
+                run.log(log)
         print(f'Epoch {epoch} ended.')
 
-
-
-    # train_one_epoch(model, , )
+        with checkpoints.new_file(f'{epoch}.pt') as fh:
+            torch.save(model.state_dict(), fh)
+        run.log_artifact(checkpoints)

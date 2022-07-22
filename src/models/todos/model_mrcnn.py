@@ -11,7 +11,7 @@ from torchvision.models.detection import backbone_utils
 from torchvision.models.detection.generalized_rcnn import GeneralizedRCNN
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
 
-class _default_mrcnn_configs:
+class _default_mrcnn_config:
     def __init__(
         self,
         num_classes=91,
@@ -94,19 +94,19 @@ class _default_mrcnn_configs:
             detections_per_img=100,
         )
 
-        self.config_dict = dict(
+        self.config = dict(
             rpn_config=dict(
                 anchor_config=anchor_config,
                 rpn_head_config=rpn_head_config,
                 rpn_config=rpn_config,
             ),
             roi_heads_config=dict(
-                box_configs=dict(
+                box_config=dict(
                     box_roi_pool_config=box_roi_pool_config,
                     box_head_config=box_head_config,
                     box_predictor_config=box_predictor_config,
                 ),
-                mask_configs=dict(
+                mask_config=dict(
                     mask_roi_pool_config=mask_roi_pool_config,
                     mask_head_config=mask_head_config,
                     mask_predictor_config=mask_predictor_config,
@@ -115,7 +115,7 @@ class _default_mrcnn_configs:
             ),
         )
 
-def defaults(d, keys, list=False, prefix=None, suffix=None):
+def defaults(d, keys, prefix=None, suffix=None, list=False):
     if prefix is not None:
         keys = [f'{prefix}{k}' for k in keys]
     if suffix is not None:
@@ -205,19 +205,19 @@ def build_mask_heads(mask_roi_pool_config, mask_head_config, mask_predictor_conf
         mask_predictor=build_mask_predictor(mask_predictor_config),
     )
 
-def build_roi_heads(box_configs, mask_configs, roi_heads_config):
-    roi_keywords = 'fg_iou_thresh bg_iou_thresh batch_size_per_image positive_fraction bbox_reg_weights score_thresh nms_thresh detections_per_img'
-    head_keywords = lambda t: [f'{t}_{k}_config' for k in 'roi_pool head predictor'.split()]
+def build_roi_heads(box_config, mask_config, roi_heads_config):
+    keywords = 'fg_iou_thresh bg_iou_thresh batch_size_per_image positive_fraction bbox_reg_weights score_thresh nms_thresh detections_per_img'
+    head_keywords = 'roi_pool head predictor'.split()
 
-    roi_heads_config = defaults(roi_heads_config, roi_keywords.split())
+    roi_heads_config = defaults(roi_heads_config, keywords.split())
 
-    box_configs = defaults(box_configs, 'roi_pool head predictor'.split(), prefix='box_', suffix='_config')
-    box_heads = build_box_heads(**box_configs)
+    box_config = defaults(box_config, head_keywords, prefix='box_', suffix='_config')
+    box_heads = build_box_heads(**box_config)
 
     mask_heads = dict()
-    if mask_configs is not None:
-        mask_configs = defaults(mask_configs, 'roi_pool head predictor'.split(), prefix='mask_', suffix='_config')
-        mask_heads = build_mask_heads(**mask_configs)
+    if mask_config is not None:
+        mask_config = defaults(mask_config, head_keywords, prefix='mask_', suffix='_config')
+        mask_heads = build_mask_heads(**mask_config)
 
     return RoIHeads(
         **box_heads,
@@ -226,53 +226,37 @@ def build_roi_heads(box_configs, mask_configs, roi_heads_config):
     )
 
 
-def build_default(configs, im_size=1024, backbone=None):
-    rpn_configs = defaults(configs['rpn_config'], 'anchor rpn_head rpn'.split(), suffix='_config')
-    box_configs = defaults(configs['roi_heads_config']['box_configs'], 'roi_pool head predictor'.split(), prefix='box_', suffix='_config')
-    mask_configs = defaults(configs['roi_heads_config']['mask_configs'], 'roi_pool head predictor'.split(), prefix='mask_', suffix='_config')
-    roi_heads_config, = defaults(configs['roi_heads_config'], 'roi_heads'.split(), suffix='_config', list=True)
+def build_default(config, im_size=1024, backbone=None, transform=None):
+    # TODO:
+    #   import custom backbone
+    #   import custom GeneralizedRCNNTransform
+    #   consolidate backbone, transform configs with default configs
 
-    rpn = build_rpn(**rpn_configs)
-    roi_heads = build_roi_heads(box_configs, mask_configs, roi_heads_config)
 
-    backbone = backbone_utils.resnet_fpn_backbone('resnet50', pretrained=True, trainable_layers=5) if backbone is None else backbone
+    rpn_config, roi_heads_config = defaults(config, 'rpn roi_heads'.split(), suffix='_config', list=True) # list=True flag unpacks the keys rather than returning a dict
+    roi_heads_config = defaults(roi_heads_config, 'box mask roi_heads'.split(), suffix='_config')
+
+    rpn = build_rpn(**rpn_config)
+    roi_heads = build_roi_heads(**roi_heads_config)
+
+
+    backbone = backbone_utils.resnet_fpn_backbone(
+        'resnet50',
+        pretrained=True,
+        trainable_layers=5
+    ) if backbone is None else backbone
 
     transform = GeneralizedRCNNTransform(
         min_size=im_size,
         max_size=im_size,
         image_mean=[0.485, 0.456, 0.406],
         image_std=[0.229, 0.224, 0.225],
-    )
+    ) if transform is None else transform
 
     return GeneralizedRCNN(backbone, rpn, roi_heads, transform)
 
 
 
 if __name__ == '__main__':
-    configs = _default_mrcnn_configs().config_dict
-
-    # pdb.set_trace()
-
-
-    rpn_configs = defaults(configs['rpn_config'], 'anchor rpn_head rpn'.split(), suffix='_config')
-    box_configs = defaults(configs['roi_heads_config']['box_configs'], 'roi_pool head predictor'.split(), prefix='box_', suffix='_config')
-    mask_configs = defaults(configs['roi_heads_config']['mask_configs'], 'roi_pool head predictor'.split(), prefix='mask_', suffix='_config')
-    roi_heads_config, = defaults(configs['roi_heads_config'], 'roi_heads'.split(), suffix='_config', list=True)
-
-    # pdb.set_trace()
-
-    rpn = build_rpn(**rpn_configs)
-    roi_heads = build_roi_heads(box_configs, mask_configs, roi_heads_config)
-
-    backbone = backbone_utils.resnet_fpn_backbone('resnet50', pretrained=False, trainable_layers=5)
-
-    im_size = 1024
-    transform = GeneralizedRCNNTransform(
-        min_size=im_size,
-        max_size=im_size,
-        image_mean=[0.485, 0.456, 0.406],
-        image_std=[0.229, 0.224, 0.225],
-    )
-
-    # TODO: test using pretrained weights to begin training, vs. starting from scratch i.e. pretrained=False
-    mrcnn_model = GeneralizedRCNN(backbone, rpn, roi_heads, transform)
+    config = _default_mrcnn_config().config
+    mrcnn_model = build_default(config)
