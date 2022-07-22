@@ -11,6 +11,8 @@ import torch
 from torch import nn, Tensor
 import torch.optim
 
+import wandb
+
 from model_mrcnn import _default_mrcnn_configs, build_default
 from features import build_features
 from features import transforms as T
@@ -48,15 +50,17 @@ def train_one_epoch(
     optimizer: torch.optim.Optimizer,
     data_loader: torch.utils.data.DataLoader,
     device: torch.device,
-    log_freq: int = 5,
+    log_freq: int = 10,
 ) -> None:
+    assert model.training
     model_params = set(model.parameters())
     model_devices = set([p.device for p in model_params])
     assert model_devices == set([device]) # validate model params device
     for g in optimizer.param_groups: # validate optimizer params
         assert set(g['params']).issubset(model_params)
 
-    # metric_names = 'loss_classifier loss_box_reg loss_mask loss_objectness loss_rpn_box_reg'.split()
+
+
     log_metrics = list()
 
     for i, (images, targets) in enumerate(data_loader):
@@ -69,17 +73,19 @@ def train_one_epoch(
         optimizer.step()
 
         log_metrics.append(dict(loss=loss.item(), metrics=metrics))
-
         if (i % log_freq) == 0:
-            print(f'Step {i} loss: {loss}')
-            print('\n'.join(f'  {k[5:]}: {v}' for k, v in metrics.items()))
-            print()
-
             yield log_metrics
             log_metrics = list()
 
 
+def get_loss_fn(weights, default=0.):
+    def compute_loss_fn(losses):
+        item = lambda k: (k, losses[k].item())
+        metrics = OrderedDict(list(map(item, [k for k in weights.keys() if k in losses.keys()] + [k for k in losses.keys() if k not in weights.keys()])))
 
+        loss = sum(map(lambda k: losses[k] * (weights[k] if weights is not None and k in weights.keys() else default), losses.keys()))
+        return loss, metrics
+    return compute_loss_fn
 
 
 def get_resp(prompt, prompt_fn=None, resps='n y'.split()):
@@ -93,51 +99,60 @@ if __name__ == '__main__':
     # TODO:
     #   - add functionality for calling backward with create_graph, i.e. for higher-order derivatives
     #   - switch to support for standard torchvision-bundled transforms
+    #   - complete feature: add grad_optimizer support transparently (so that usage is the same for users and train_one_epoch interface whether torch.optim or grad_optim is selected, i.e. log grads automatically)
+    #   - do ^^ via closures
 
     collate_fn = lambda _: tuple(zip(*_)) # one-liner, no need to import
 
-    batch_size = 2
-    dataset_path = '/gladstone/finkbeiner/steve/work/data/npsad_data/gennadi/amy-def/'
+    dataset_location = '/gladstone/finkbeiner/steve/work/data/npsad_data/gennadi/amy-def/'
+    train_config = dict(
+        epochs=1,
+        batch_size=1,
+        num_classes=3,
+        device_id=0,
+    )
+    model_config = _default_mrcnn_configs(num_classes=1 + train_config['num_classes']).config_dict
     optim_config = dict(
+        # cls=grad_optim.GradSGD,
         cls=torch.optim.SGD,
         defaults=dict(lr=5 * (10. ** (-3)))
     )
+    wandb_config = dict(
+        project='mrcnn_train',
+        entity='gryan',
+        config=dict(train_config=train_config, model_config=model_config, optim_config=optim_config),
+        save_code=False,
+        group='warmup_runs',
+        job_type='train',
+        tags='train'.split(),
+        name=None,
+    )
 
-    dataset = build_features.AmyBDataset(dataset_path, T.Compose([T.ToTensor()]))
-    data_loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=1, collate_fn=collate_fn)
 
+    dataset = build_features.AmyBDataset(dataset_location, T.Compose([T.ToTensor()]))
+    data_loader = torch.utils.data.DataLoader(dataset, batch_size=train_config['batch_size'], shuffle=True, num_workers=1, collate_fn=collate_fn)
+
+
+    model = build_default(model_config, im_size=1024)
     device = torch.device('cpu')
     if torch.cuda.is_available():
-        device_names = [torch.cuda.get_device_name(i) for i in range(torch.cuda.device_count())]
-
-        print('CUDA Device Availability: ')
-        print('\n'.join(list(map(lambda t: f'{t[0] + 1}: {t[1]}', enumerate(device_names))) + [str()]))
-
-        device_id = 0
-        if len(device_names) > 1:
-            device_id = get_resp(f'Device (1-{len(device_names)}): ', resps=list(map(str, range(1, len(device_names) + 1))))
-        device = torch.device('cuda', device_id)
-
-
-
-
-    config = _default_mrcnn_configs().config_dict
-    model = build_default(config, im_size=1024)
-
-    def get_loss_fn(weights=None, default=None):
-        def compute_loss_fn(losses):
-            metrics = OrderedDict([(k, v.item()) for k, v in losses.items()])
-            loss = sum(map(lambda k: losses[k] * (weights[k] if weights is not None and k in weights.keys() else default), losses.keys()))
-            return loss, metrics
-        return compute_loss_fn
-
+        assert train_config['device_id'] >= 0 and train_config['device_id'] < torch.cuda.device_count()
+        device = torch.device('cuda', train_config['device_id'])
     model = model.to(device)
-    loss_fn = get_loss_fn(default=1.)
+    model.train(True)
+
+    loss_weights = OrderedDict([(f'loss_{name}', 1.) for name in 'objectness rpn_box_reg classifier box_reg mask'.split()])
+    loss_fn = get_loss_fn(loss_weights)
+
     optimizer = optim_config['cls']([dict(params=list(model.parameters()))], **optim_config['defaults'])
 
-    if get_resp('Start training (y/n): '):
-        for logs in train_one_epoch(model, loss_fn, optimizer, data_loader, device):
-            pass
+    wandb.init(**wandb_config)
+    for epoch in range(train_config['epochs']):
+        print(f'Epoch {epoch} started.')
+        for logs in train_one_epoch(model, loss_fn, optimizer, data_loader, device, log_freq=1):
+            for log in logs:
+                wandb.log(log)
+        print(f'Epoch {epoch} ended.')
 
 
 
