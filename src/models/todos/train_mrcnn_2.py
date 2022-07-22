@@ -114,7 +114,7 @@ if __name__ == '__main__':
         device_id=0,
         checkpoints='/home/projects/amyb-plaque-detection/models/checkpoints',
     )
-    model_config = _default_mrcnn_config(num_classes=1 + train_config['num_classes']).config_dict
+    model_config = _default_mrcnn_config(num_classes=1 + train_config['num_classes']).config
     optim_config = dict(
         # cls=grad_optim.GradSGD,
         cls=torch.optim.SGD,
