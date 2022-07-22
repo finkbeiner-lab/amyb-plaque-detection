@@ -4,10 +4,10 @@ import torch.optim
 
 def step_with_grads(step_func):
   def step_wrap(self, closure=None, *args, grad_idxs, grad_fn, **kwargs):
-    loss = None
     if closure is not None:
       with torch.enable_grad():
         loss = closure()
+      closure = lambda: loss
 
     grad_groups = list()
     for idx, group in enumerate(self.param_groups):
@@ -20,8 +20,7 @@ def step_with_grads(step_func):
           grad_group.append(grad)
         grad_groups.append(grad_group)
 
-    loss = step_func(self, closure=lambda: loss, *args, **kwargs)
-    return loss, grad_groups
+    return step_func(self, closure=closure, *args, **kwargs), grad_groups
   return step_wrap
 
 
