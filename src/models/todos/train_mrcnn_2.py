@@ -1,3 +1,4 @@
+from typing import Callable, Dict, List, Optional, Set
 from collections import OrderedDict
 
 import os
@@ -5,7 +6,8 @@ import sys
 sys.path.append(os.path.join(os.getcwd(), *tuple(['..'] * 2)))
 
 import torch
-from torch.optim import SGD
+from torch import nn, Tensor
+import torch.optim
 
 from model_mrcnn import _default_mrcnn_configs, build_default
 from features import build_features
@@ -38,12 +40,18 @@ torch.__future__.set_overwrite_module_params_on_conversion(True)
 
 
 
-def train_one_epoch(model, loss_fn, optimizer, data_loader, device,):
-    def all_devices(tensors):
-        return set([t.device for t in tensors])
-    model_devices = all_devices(p for p in model.parameters())
-    optimizer_devices = all_devices(p for g in optimizer.param_groups for p in g['params'])
-    assert model_devices == optimizer_devices == set([device])
+def train_one_epoch(
+    model: torch.nn.Module,
+    loss_fn: Callable[[Dict[str, Tensor]], Tensor],
+    optimizer: torch.optim.Optimizer,
+    data_loader: torch.utils.data.DataLoader,
+    device: torch.device,
+) -> None:
+    model_params = set(model.parameters())
+    model_devices = set([p.device for p in model_params])
+    assert model_devices == set([device])
+    for g in optimizer.param_groups:
+        assert set(g['params']).issubset(model_params)
 
     for images, targets in data_loader:
         images = [image.to(device) for image in images]
