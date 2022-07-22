@@ -56,7 +56,7 @@ def train_one_epoch(
     for g in optimizer.param_groups: # validate optimizer params
         assert set(g['params']).issubset(model_params)
 
-    metric_names = 'loss_classifier loss_box_reg loss_mask loss_objectness loss_rpn_box_reg'.split()
+    # metric_names = 'loss_classifier loss_box_reg loss_mask loss_objectness loss_rpn_box_reg'.split()
     log_metrics = list()
 
     for i, (images, targets) in enumerate(data_loader):
@@ -72,7 +72,7 @@ def train_one_epoch(
 
         if (i % log_freq) == 0:
             print(f'Step {i} loss: {loss}')
-            print('\n'.join(f'{k}: {v}' for k, v in metrics))
+            print('\n'.join(f'  {k[5:]}: {v}' for k, v in metrics.items()))
             print()
 
             yield log_metrics
@@ -137,8 +137,7 @@ if __name__ == '__main__':
 
     if get_resp('Start training (y/n): '):
         for logs in train_one_epoch(model, loss_fn, optimizer, data_loader, device):
-            if not get_resp('Continue training (y/n): '):
-                break
+            pass
 
 
 
