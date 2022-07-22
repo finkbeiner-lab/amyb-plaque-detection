@@ -13,7 +13,7 @@ import torch.optim
 
 import wandb
 
-from model_mrcnn import _default_mrcnn_configs, build_default
+from model_mrcnn import _default_mrcnn_config, build_default
 from features import build_features
 from features import transforms as T
 
