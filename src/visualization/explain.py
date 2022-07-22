@@ -29,7 +29,8 @@ import pandas as pd
 import wandb
 from tqdm import tqdm
 from skimage import data
-from skimage.color import rgb2hed, hed2rgb
+from skimage.color import rgb2hed
+from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED
 
 
 
@@ -324,13 +325,117 @@ class ExplainPredictions():
         
         return df, wandb_result
  
+    def process_img(self, z, img):
+
+        print("process_imgd.", z)
+        total_core_plaques = 0
+        total_neuritic_plaques = 0
+        total_diffused_plaques = 0
+        total_brown_pixels = 0
+        total_image_pixels = 0
+
+
+        # model = torch.load(self.model_input_path)
+    
+        # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # model.eval().to(device)
+
+        # result_img = 0
+        # img_name = os.path.basename(img).split('.')[0]
+
+        # image = np.array(Image.open(img))
+
+        # total_image_pixels+= image.shape[0] * image.shape[1]
+        # # Check if image has alpha channel
+        # if image.shape[2] == 4:
+        #     image = image[:,:, :3]
+
+        # input_tensor, image_float_np = self.prepare_input(image)
+        # masks, boxes, labels, scores = self.get_outputs(input_tensor, model, self.detection_threshold)
+        
+        # result_img, result_masks = self.draw_segmentation_map(image, masks, boxes, labels)
+
+        # total_brown_pixels+= self.get_brown_pixel_cnt(image, img_name)
+
+        # print("total", total_brown_pixels)
+
+        # df, wandb_result = self.quantify_plaques(df, wandb_result, img_name, result_img, result_masks, boxes, labels, scores, total_brown_pixels)
+
+        # if self.save_result:
+        #     print("mask image", img_name)
+        #     mask_img_name = img_name +  "_masks.png"
+        #     mask_save_path = os.path.join(self.masks_path, mask_img_name)
+
+        #     # Plot masks
+        #     cv2.imwrite(mask_save_path, result_masks)
+
+        #     # Plot detections
+        #     detection_img_name = img_name + "_detection.png"
+        #     detection_save_path = os.path.join(self.detections_path, detection_img_name)
+        #     bgr_img = cv2.cvtColor(result_img, cv2.COLOR_RGB2BGR)
+        #     cv2.imwrite(detection_save_path, bgr_img)
+
+        #     # Plot Results
+        #     plt.figure(figsize=(10,10))
+        #     plt.title("Model Prediction")
+
+        #     img_array = [result_img, result_masks]
+
+        #     for j in range(2):
+        #         plt.subplot(1, 2, j+1)
+        #         plt.imshow(img_array[j])
+            
+        #     result_img_name = img_name +  "_result.png"
+        #     result_save_path = os.path.join(self.results_path, result_img_name)
+        #     plt.savefig(result_save_path)
+        #     plt.close()
+
+        # # plt.show()
+        # if self.ablation_cam:
+        #     # Ablation CAM
+        #     boxes, classes, labels, indices = self.predict(input_tensor, model, device, self.detection_threshold)
+        #     target_layers = [model.backbone]
+        #     targets = [FasterRCNNBoxScoreTarget(labels=labels, bounding_boxes=boxes)]
+        
+
+        #     cam = AblationCAM(model,
+        #                 target_layers, 
+        #                 use_cuda=torch.cuda.is_available(), 
+        #                 reshape_transform=fasterrcnn_reshape_transform,
+        #                 ablation_layer=AblationLayerFasterRCNN())
+
+        #     grayscale_cam = cam(input_tensor, targets=targets)
+        #     # Take the first image in the batch:
+        #     grayscale_cam = grayscale_cam[0, :]
+        #     cam_image = show_cam_on_image(image_float_np, grayscale_cam, use_rgb=True)
+        #     # And lets draw the boxes again:
+        #     image_with_bounding_boxes = self.draw_boxes(boxes, labels, classes, cam_image)
+
+        #     # plt.imshow(image_with_bounding_boxes)
+        #     plt.figure(figsize=(10,10))
+        #     plt.title("Ablation Cam")
+        #     ablation_list = [grayscale_cam, image_with_bounding_boxes]
+        #     for k in range(2):
+        #         plt.subplot(1, 2, k+1)
+        #         plt.imshow(ablation_list[k])
+
+
+        #     if self.save_result:
+        #         ablation_img_name = img_name +  "_ablation_cam.png"
+        #         save_path_ablation = os.path.join(self.ablations_path, ablation_img_name)
+        #         plt.savefig(save_path_ablation)
+        #         plt.close()
+        # i = i + 1
+
+        print("Thread Stopped no", z)
+
     def generate_results(self):
         # This will help us create a different color for each class
         # Load Trained 
-        model = torch.load(self.model_input_path)
+        # model = torch.load(self.model_input_path)
     
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        model.eval().to(device)
+        # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # model.eval().to(device)
 
         test_folders = glob.glob(os.path.join(self.test_input_path, "*"))
         
@@ -358,94 +463,21 @@ class ExplainPredictions():
             total_brown_pixels = 0
             total_image_pixels = 0
 
-            for img in tqdm(images):
-                result_img = 0
-                img_name = os.path.basename(img).split('.')[0]
-        
-                image = np.array(Image.open(img))
-
-                total_image_pixels+= image.shape[0] * image.shape[1]
-                # Check if image has alpha channel
-                if image.shape[2] == 4:
-                    image = image[:,:, :3]
-
-                input_tensor, image_float_np = self.prepare_input(image)
-                masks, boxes, labels, scores = self.get_outputs(input_tensor, model, self.detection_threshold)
-                
-                result_img, result_masks = self.draw_segmentation_map(image, masks, boxes, labels)
-
-                total_brown_pixels+= self.get_brown_pixel_cnt(image, img_name)
-
-                df, wandb_result = self.quantify_plaques(df, wandb_result, img_name, result_img, result_masks, boxes, labels, scores, total_brown_pixels)
-
-                if self.save_result:
-                    mask_img_name = img_name +  "_masks.png"
-                    mask_save_path = os.path.join(self.masks_path, mask_img_name)
-
-                    # Plot masks
-                    cv2.imwrite(mask_save_path, result_masks)
-
-                    # Plot detections
-                    detection_img_name = img_name + "_detection.png"
-                    detection_save_path = os.path.join(self.detections_path, detection_img_name)
-                    bgr_img = cv2.cvtColor(result_img, cv2.COLOR_RGB2BGR)
-                    cv2.imwrite(detection_save_path, bgr_img)
-
-                    # Plot Results
-                    plt.figure(figsize=(10,10))
-                    plt.title("Model Prediction")
-
-                    img_array = [result_img, result_masks]
-
-                    for j in range(2):
-                        plt.subplot(1, 2, j+1)
-                        plt.imshow(img_array[j])
-                    
-                    result_img_name = img_name +  "_result.png"
-                    result_save_path = os.path.join(self.results_path, result_img_name)
-                    plt.savefig(result_save_path)
-                    plt.close()
-
-                # plt.show()
-                if self.ablation_cam:
-                    # Ablation CAM
-                    boxes, classes, labels, indices = self.predict(input_tensor, model, device, self.detection_threshold)
-                    target_layers = [model.backbone]
-                    targets = [FasterRCNNBoxScoreTarget(labels=labels, bounding_boxes=boxes)]
-                
-
-                    cam = AblationCAM(model,
-                                target_layers, 
-                                use_cuda=torch.cuda.is_available(), 
-                                reshape_transform=fasterrcnn_reshape_transform,
-                                ablation_layer=AblationLayerFasterRCNN())
-
-                    grayscale_cam = cam(input_tensor, targets=targets)
-                    # Take the first image in the batch:
-                    grayscale_cam = grayscale_cam[0, :]
-                    cam_image = show_cam_on_image(image_float_np, grayscale_cam, use_rgb=True)
-                    # And lets draw the boxes again:
-                    image_with_bounding_boxes = self.draw_boxes(boxes, labels, classes, cam_image)
-
-                    # plt.imshow(image_with_bounding_boxes)
-                    plt.figure(figsize=(10,10))
-                    plt.title("Ablation Cam")
-                    ablation_list = [grayscale_cam, image_with_bounding_boxes]
-                    for k in range(2):
-                        plt.subplot(1, 2, k+1)
-                        plt.imshow(ablation_list[k])
+           
+            exe = ThreadPoolExecutor(max_workers=100)
+            futures = [exe.submit(self.process_img, z, img) for z, img in enumerate(images)]
+            done, not_done = wait(futures, return_when=ALL_COMPLETED)
+            exe.shutdown()
 
 
-                    if self.save_result:
-                        ablation_img_name = img_name +  "_ablation_cam.png"
-                        save_path_ablation = os.path.join(self.ablations_path, ablation_img_name)
-                        plt.savefig(save_path_ablation)
-                i = i + 1
+            
+
+               
                 # plt.show()
 
-            print("Total area of brown pixel", (total_brown_pixels/ total_image_pixels)*100)
-            df.to_csv(self.quantify_path, index=False)
-            test_table = self.wandb.Table(data=wandb_result, columns=self.column_names)
+            # print("Total area of brown pixel", (total_brown_pixels/ total_image_pixels)*100)
+            # df.to_csv(self.quantify_path, index=False)
+            # test_table = self.wandb.Table(data=wandb_result, columns=self.column_names)
             # self.wandb.log({'quantifications': test_table})
           
                 
