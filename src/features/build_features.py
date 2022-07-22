@@ -15,15 +15,17 @@ class AmyBDataset(object):
         # ensure that they are aligned
         self.imgs = list(sorted(os.listdir(os.path.join(root, "images"))))
         self.masks = list(sorted(os.listdir(os.path.join(root, "labels"))))
-        print("\nImages Order ", self.imgs)
-        print("\nLabels Order", self.masks)
-       
+
+        assert set([len(set(['_'.join('.'.join(s.split('.')[:-1]).split('_')[:-1]) for s in item])) for item in zip(self.imgs, self.masks)]) == {1}
+        # print("\nImages Order ", self.imgs)
+        # print("\nLabels Order", self.masks)
+
 
     def __getitem__(self, idx):
         # load images and masks
         img_path = os.path.join(self.root, "images", self.imgs[idx])
         mask_path = os.path.join(self.root, "labels", self.masks[idx])
-        
+
         img = Image.open(img_path).convert("RGB")
         # note that we haven't converted the mask to RGB,
         # because each color corresponds to a different instance
@@ -52,14 +54,14 @@ class AmyBDataset(object):
             boxes.append([xmin, ymin, xmax, ymax])
 
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
-      
+
         # labels = torch.tensor(labels, dtype=torch.int64)
         # labels = torch.ones((num_objs,), dtype=torch.int64)
 
         x = [id // 50 for id in obj_ids]
         labels = torch.tensor(x)
 
-    
+
         masks = torch.as_tensor(masks, dtype=torch.uint8)
 
         image_id = torch.tensor([idx])
@@ -73,7 +75,7 @@ class AmyBDataset(object):
         target["masks"] = masks
         target["image_id"] = image_id
         target["area"] = area
-        
+
         if self.transforms is not None:
             img, target = self.transforms(img, target)
 

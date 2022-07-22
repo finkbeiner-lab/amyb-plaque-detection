@@ -235,7 +235,7 @@ def build_default(configs, im_size=1024, backbone=None):
     rpn = build_rpn(**rpn_configs)
     roi_heads = build_roi_heads(box_configs, mask_configs, roi_heads_config)
 
-    backbone = backbone_utils.resnet_fpn_backbone('resnet50', pretrained=False, trainable_layers=5) if backbone is None else backbone
+    backbone = backbone_utils.resnet_fpn_backbone('resnet50', pretrained=True, trainable_layers=5) if backbone is None else backbone
 
     transform = GeneralizedRCNNTransform(
         min_size=im_size,
