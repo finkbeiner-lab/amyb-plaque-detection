@@ -50,6 +50,7 @@ def train_one_epoch(
     optimizer: torch.optim.Optimizer,
     data_loader: torch.utils.data.DataLoader,
     device: torch.device,
+    epoch: int = 1,
     log_freq: int = 10,
 ) -> None:
     assert model.training
@@ -72,7 +73,7 @@ def train_one_epoch(
         loss.backward()
         optimizer.step()
 
-        log_metrics.append(dict(loss=loss.item(), metrics=metrics))
+        log_metrics.append(dict(epoch=epoch, loss=loss.item(), metrics=metrics))
         if (i % log_freq) == 0:
             yield log_metrics
             log_metrics = list()
@@ -106,10 +107,11 @@ if __name__ == '__main__':
 
     dataset_location = '/gladstone/finkbeiner/steve/work/data/npsad_data/gennadi/amy-def/'
     train_config = dict(
-        epochs=1,
+        epochs=20,
         batch_size=1,
         num_classes=3,
         device_id=0,
+        checkpoints='/home/projects/amyb-plaque-detection/models/checkpoints/'
     )
     model_config = _default_mrcnn_configs(num_classes=1 + train_config['num_classes']).config_dict
     optim_config = dict(
@@ -119,7 +121,7 @@ if __name__ == '__main__':
     )
     wandb_config = dict(
         project='mrcnn_train',
-        entity='gryan',
+        entity='gladstone-npsad',
         config=dict(train_config=train_config, model_config=model_config, optim_config=optim_config),
         save_code=False,
         group='warmup_runs',
@@ -149,7 +151,7 @@ if __name__ == '__main__':
     wandb.init(**wandb_config)
     for epoch in range(train_config['epochs']):
         print(f'Epoch {epoch} started.')
-        for logs in train_one_epoch(model, loss_fn, optimizer, data_loader, device, log_freq=1):
+        for logs in train_one_epoch(model, loss_fn, optimizer, data_loader, device, epoch=epoch, log_freq=1):
             for log in logs:
                 wandb.log(log)
         print(f'Epoch {epoch} ended.')
