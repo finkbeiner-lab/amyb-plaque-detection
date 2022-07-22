@@ -99,7 +99,7 @@ def get_resp(prompt, prompt_fn=None, resps='n y'.split()):
 if __name__ == '__main__':
     # TODO:
     #   - add functionality for calling backward with create_graph, i.e. for higher-order derivatives
-    #   - switch to support for standard torchvision-bundled transforms
+    #   - switch to support for standard torchvision-bundled transforms (i.e. instead of `features.transforms as T` try `torchvision.transforms.transforms` or `torchvision.transforms.functional`)
     #   - complete feature: add grad_optimizer support transparently (so that usage is the same for users and train_one_epoch interface whether torch.optim or grad_optim is selected, i.e. log grads automatically)
     #   - do ^^ via closures
     #   - experimental: add an API to collect params and bufs by on module and/or name; generate on-the-fly state_dicts, gradient_dicts, higher-order gradient_dicts, etc.
@@ -133,6 +133,7 @@ if __name__ == '__main__':
         job_type='train',
         tags='train'.split(),
         name=None,
+        resume="allow",
     )
 
 
@@ -154,16 +155,23 @@ if __name__ == '__main__':
     optimizer = optim_config['cls']([dict(params=list(model.parameters()))], **optim_config['defaults'])
 
     run = wandb.init(**wandb_config)
-    assert run is wandb.run # check our run was successfully initialized and is not None
+    assert run is wandb.run # run was successfully initialized, is not None
+
     checkpoints = wandb.Artifact('checkpoints', 'model')
+    with checkpoints.new_file('0.txt', 'w') as fh:
+        fh.write('abc123')
+    run.log_artifact(checkpoints)
 
-    for epoch in range(train_config['epochs']):
-        print(f'Epoch {epoch} started.')
-        for logs in train_one_epoch(model, loss_fn, optimizer, data_loader, device, epoch=epoch, log_freq=1):
-            for log in logs:
-                run.log(log)
-        print(f'Epoch {epoch} ended.')
+    # pdb.set_trace()
 
-        with checkpoints.new_file(f'{epoch}.pt') as fh:
-            torch.save(model.state_dict(), fh)
-        run.log_artifact(checkpoints)
+    # train_config['epochs'] = 0
+    # for epoch in range(train_config['epochs']):
+    #     print(f'Epoch {epoch} started.')
+    #     for logs in train_one_epoch(model, loss_fn, optimizer, data_loader, device, epoch=epoch, log_freq=1):
+    #         for log in logs:
+    #             run.log(log)
+    #     print(f'Epoch {epoch} ended.')
+    #
+    #     with checkpoints.new_file(f'{epoch}.pt') as fh:
+    #         torch.save(model.state_dict(), fh)
+    #     run.log_artifact(checkpoints)
