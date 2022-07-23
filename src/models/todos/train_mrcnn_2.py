@@ -108,7 +108,7 @@ if __name__ == '__main__':
 
     dataset_location = '/gladstone/finkbeiner/steve/work/data/npsad_data/gennadi/amy-def/'
     train_config = dict(
-        epochs=20,
+        epochs=2,
         batch_size=1,
         num_classes=3,
         device_id=0,
@@ -133,7 +133,7 @@ if __name__ == '__main__':
         job_type='train',
         tags='train'.split(),
         name=None,
-        resume="allow",
+        # resume="allow",
     )
 
 
@@ -156,22 +156,16 @@ if __name__ == '__main__':
 
     run = wandb.init(**wandb_config)
     assert run is wandb.run # run was successfully initialized, is not None
+    checkpoints = wandb.Artifact(f'checkpoints', 'model')
 
-    checkpoints = wandb.Artifact('checkpoints', 'model')
-    with checkpoints.new_file('0.txt', 'w') as fh:
-        fh.write('abc123')
+    for epoch in range(train_config['epochs']):
+        print(f'Epoch {epoch} started.')
+        for logs in train_one_epoch(model, loss_fn, optimizer, data_loader, device, epoch=epoch, log_freq=1):
+            for log in logs:
+                run.log(log)
+        print(f'Epoch {epoch} ended.')
+
+        with checkpoints.new_file(f'{epoch}.pt', 'wb') as fh:
+            torch.save(model.state_dict(), fh)
+
     run.log_artifact(checkpoints)
-
-    # pdb.set_trace()
-
-    # train_config['epochs'] = 0
-    # for epoch in range(train_config['epochs']):
-    #     print(f'Epoch {epoch} started.')
-    #     for logs in train_one_epoch(model, loss_fn, optimizer, data_loader, device, epoch=epoch, log_freq=1):
-    #         for log in logs:
-    #             run.log(log)
-    #     print(f'Epoch {epoch} ended.')
-    #
-    #     with checkpoints.new_file(f'{epoch}.pt') as fh:
-    #         torch.save(model.state_dict(), fh)
-    #     run.log_artifact(checkpoints)
