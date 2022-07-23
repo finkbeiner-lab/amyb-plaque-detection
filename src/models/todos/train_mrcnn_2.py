@@ -150,8 +150,8 @@ if __name__ == '__main__':
     model.train(True)
 
     loss_names = 'objectness rpn_box_reg classifier box_reg mask'.split()
-    loss_weights = [1., 1. / 4, 1., 1. / 4, 1.,]
-    loss_weights = OrderedDict([(name, weight) for name, weight in zip(loss_names, loss_weights)])
+    loss_weights = [1., 4., 1., 4., 1.,]
+    loss_weights = OrderedDict([(f'loss_{name}', weight) for name, weight in zip(loss_names, loss_weights)])
 
     loss_fn = get_loss_fn(loss_weights)
 
