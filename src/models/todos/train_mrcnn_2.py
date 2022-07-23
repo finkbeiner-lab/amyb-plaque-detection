@@ -118,7 +118,7 @@ if __name__ == '__main__':
     optim_config = dict(
         # cls=grad_optim.GradSGD,
         cls=torch.optim.SGD,
-        defaults=dict(lr=5 * (10. ** (-3)))
+        defaults=dict(lr=1. * (10. ** (-3)))
     )
     wandb_config = dict(
         project='mrcnn_train',
