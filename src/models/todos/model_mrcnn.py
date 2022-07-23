@@ -243,7 +243,7 @@ def build_default(config, im_size=1024, backbone=None, transform=None):
     backbone = backbone_utils.resnet_fpn_backbone(
         'resnet50',
         pretrained=True,
-        trainable_layers=5
+        trainable_layers=3
     ) if backbone is None else backbone
 
     transform = GeneralizedRCNNTransform(
