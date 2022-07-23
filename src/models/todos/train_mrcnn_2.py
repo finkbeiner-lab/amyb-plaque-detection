@@ -108,11 +108,11 @@ if __name__ == '__main__':
 
     dataset_location = '/gladstone/finkbeiner/steve/work/data/npsad_data/gennadi/amy-def/'
     train_config = dict(
-        epochs=50,
-        batch_size=1,
+        epochs=20,
+        batch_size=3,
         num_classes=3,
         device_id=0,
-        ckpt_freq=5,
+        ckpt_freq=1,
     )
     model_config = _default_mrcnn_config(num_classes=1 + train_config['num_classes']).config
     optim_config = dict(
@@ -149,7 +149,10 @@ if __name__ == '__main__':
     model = model.to(device)
     model.train(True)
 
-    loss_weights = OrderedDict([(f'loss_{name}', 1.) for name in 'objectness rpn_box_reg classifier box_reg mask'.split()])
+    loss_names = 'objectness rpn_box_reg classifier box_reg mask'.split()
+    loss_weights = [1., 1. / 4, 1., 1. / 4, 1.,]
+    loss_weights = OrderedDict([(name, weight) for name, weight in zip(loss_names, loss_weights)])
+
     loss_fn = get_loss_fn(loss_weights)
 
     optimizer = optim_config['cls']([dict(params=list(model.parameters()))], **optim_config['defaults'])
@@ -165,7 +168,7 @@ if __name__ == '__main__':
                 run.log(log)
         print(f'Epoch {epoch} ended.')
 
-        if epoch == train_config['epochs'] or epoch % train_config['ckpt_freq'] == 0:
+        if epoch + 1 == train_config['epochs'] or epoch % train_config['ckpt_freq'] == 0:
             with checkpoints.new_file(f'{epoch}.pt', 'wb') as fh:
                 torch.save(model.state_dict(), fh)
 
