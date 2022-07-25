@@ -60,8 +60,6 @@ def train_one_epoch(
     for g in optimizer.param_groups: # validate optimizer params
         assert set(g['params']).issubset(model_params)
 
-
-
     log_metrics = list()
 
     for i, (images, targets) in enumerate(data_loader):
@@ -77,6 +75,8 @@ def train_one_epoch(
         if (i % log_freq) == 0:
             yield log_metrics
             log_metrics = list()
+
+    yield log_metrics
 
 
 def get_loss_fn(weights, default=0.):
@@ -108,7 +108,7 @@ if __name__ == '__main__':
 
     dataset_location = '/gladstone/finkbeiner/steve/work/data/npsad_data/gennadi/amy-def/'
     train_config = dict(
-        epochs=20,
+        epochs=50,
         batch_size=3,
         num_classes=3,
         device_id=0,
@@ -129,11 +129,8 @@ if __name__ == '__main__':
             optim_config=optim_config,
         ),
         save_code=False,
-        group='warmup_runs',
+        group='runs',
         job_type='train',
-        tags='train'.split(),
-        name=None,
-        # resume="allow",
     )
 
 
@@ -159,17 +156,42 @@ if __name__ == '__main__':
 
     run = wandb.init(**wandb_config)
     assert run is wandb.run # run was successfully initialized, is not None
-    checkpoints = wandb.Artifact(f'checkpoints', 'model')
+    run_id, run_dir = run.id, run.dir
+    # ckpt_dirname = 'ckpts'
+    # os.makedirs(os.path.join(run_dir, ckpt_dirname), exist_ok=False)
 
+    # entity, project = [wandb_config[k] for k in 'entity project'.split()]
+    # artifact_name = '/'.join([f'{wandb_config.get(k)}' for k in keys] + ['artifact:alias'])
+
+    artifact_name = f'{run_id}-logs'
     for epoch in range(train_config['epochs']):
         print(f'Epoch {epoch} started.')
         for logs in train_one_epoch(model, loss_fn, optimizer, data_loader, device, epoch=epoch, log_freq=1):
             for log in logs:
                 run.log(log)
-        print(f'Epoch {epoch} ended.')
 
         if epoch + 1 == train_config['epochs'] or epoch % train_config['ckpt_freq'] == 0:
-            with checkpoints.new_file(f'{epoch}.pt', 'wb') as fh:
-                torch.save(model.state_dict(), fh)
 
-    run.log_artifact(checkpoints)
+            artifact = wandb.Artifact(artifact_name, type='files')
+            with artifact.new_file(f'ckpt/{epoch}.pt', 'wb') as f:
+                torch.save(model.state_dict(), f)
+            run.log_artifact(artifact)
+
+        print(f'Epoch {epoch} ended.')
+
+    run.finish()
+
+
+    # ckpt_fname = os.path.join(run_dir, ckpt_dirname, f'{epoch}.pt')
+    #
+    # with open(ckpt_fname, 'wb') as fh:
+    #     torch.save(model.state_dict(), fh)
+    # torch.save(model.state_dict(), ckpt_fname)
+    # run.save(
+    #     glob_str=ckpt_fname,
+    #     base_path=run_dir, # keep subdirectory structure
+    #     policy='now', # sync immediatelly; allow removal afterward
+    # )
+    # os.remove(ckpt_fname)
+
+    # run.log_artifact(checkpoints)
