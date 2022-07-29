@@ -7,6 +7,8 @@ from PIL import Image
 import pyvips
 import tqdm
 import pdb
+from threading import Thread
+from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED
 
 
 def get_mask_contours(x):
@@ -86,6 +88,21 @@ def visualize_rois(rois, fill, shape, dtype):
         getROI(fill_rois, roi).fill(np.array(fill, dtype))
     return fill_rois
 
+def crop_tiles(self, i, x, y, vips_orig_img, savesubdir, orig_w, orig_h):
+        
+        print("Crop slide thread Started.", i)
+      
+        savecroppath = os.path.join(savesubdir, f'{self.file_name}_x_{x}_y_{y}.png')
+
+        # row is y, col is x
+        if y + self.tilesize < orig_h and x + self.tilesize < orig_w:
+            # TODO change to vips cropping
+            crop = vips_orig_img.crop(x, y, 1024, 1024)
+            crop.write_to_file(savecroppath)
+
+        print("Thread Stopped ", i)
+
+
 def get_slide_tiles(slide_vips, slide_level, tile_size, tile_cond=None, interactive=False, top_n=1, visualize=False):
     """
     Args:
@@ -144,7 +161,7 @@ def get_slide_tiles(slide_vips, slide_level, tile_size, tile_cond=None, interact
         fill_tiles = visualize_rois(selected_rois // ratio, fill, shape, dtype)
         visuals = np.concatenate([a[..., None] for a in [fill_mask, fill_roi, fill_tiles]], axis=-1)
 
-    return selected_tiles, selected_rois, thresh, visuals
+    return selected_tiles, selected_rois, thresh, fill_mask
 
 
 
@@ -158,16 +175,18 @@ def process_slides(base_dir, save_dir, slide_level=4, tile_size=1024):
     Returns:
         None
     """
+    
 
     file_names = sorted(glob.glob(os.path.join(base_dir, '*.mrxs')))
     selected_tiles = list()
+
 
     for file_name in file_names[:1]:
         img_name = os.path.split(file_name)[1]
         img_name = '.'.join(img_name.split('.')[:-1])
         img_vips, img_vips_ds = [pyvips.Image.new_from_file(file_name, level=level) for level in (0, slide_level,)]
 
-        tiles, _, thresh, visuals = get_slide_tiles(img_vips_ds, slide_level, tile_size, interactive=True, visualize=True, top_n=3)
+        tiles, _, thresh, visuals = get_slide_tiles(img_vips_ds, slide_level, tile_size, interactive=False, visualize=True, top_n=3)
 
         tile_selection = '\n'.join([','.join(map(str, t)) for t in tiles])
         with open(os.path.join(save_dir, f'{img_name}_tiles.txt'), 'w') as fh:
@@ -194,7 +213,7 @@ def get_resp(prompt, responses=('n', 'y')):
 
 
 if __name__ == '__main__':
-    base_dir = '/Users/gennadiryan/Documents/gladstone/projects/slide_utils/slides/mrxs'
+    base_dir = '/home/vivek/Datasets/AmyB/amyb_wsi/'
     save_dir = base_dir + '_out'
 
     process_slides(base_dir, save_dir)
