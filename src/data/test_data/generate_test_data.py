@@ -304,7 +304,7 @@ class GenerateTestData:
             self.file_name = img_name
             img_vips, img_vips_ds = [Vips.Image.new_from_file(file_name, level=level) for level in (0, self.slide_level,)]
 
-            tiles, _, thresh, visuals = self.get_slide_tiles(img_vips_ds, interactive=True, visualize=True, top_n=1)
+            tiles, _, thresh, visuals = self.get_slide_tiles(img_vips_ds, interactive=True, visualize=False, top_n=1)
             Image.fromarray(visuals).save(os.path.join(threshold_dir, f'{img_name}_visuals_{thresh}.png'))
 
             vinfo = self.getVipsInfo(img_vips)
@@ -312,63 +312,9 @@ class GenerateTestData:
 
             self.crop_slide(img_vips, tiles, orig_w, orig_h)
 
-
-        # for imagename in tqdm(imagenames):
-
-        #     print(imagename)
-
-        #     # Get file_name Ex:'XE19-010_1_AmyB_1'
-        #     file_name = imagename.split('.')
-        #     file_name = file_name[0].split("/")[-1]
-        #     self.file_name = file_name
-
-        #     # # Test
-        #     vips_img = Vips.Image.new_from_file(imagename, level=self.slide_level)
-        #     start = timer()
-        #     vips_norm = normalizer.transform(vips_img)
-        #     end = timer()
-        #     print("Time Taken for Normalization: ", (end - start)/60)
-
-        #     vips_img_orig = Vips.Image.new_from_file(imagename, level=0)
-        #     vinfo = self.getVipsInfo(vips_img_orig)
-        #     orig_w, orig_h = int(vinfo['level[0].width']), int(vinfo['level[0].height'])
-           
-        #     vips_img = vips_norm.crop(0, 1520,  5578,  13176-1700)
-            
-        #     vips_array = np.ndarray(buffer=vips_img.write_to_memory(), dtype=np.uint8, shape=(vips_img.height, vips_img.width, vips_img.bands))
-        #     vips_array = vips_array[:,:,:3]
-
-        #     gray = cv2.cvtColor(vips_array, cv2.COLOR_RGB2GRAY)
-        #     gray = cv2.GaussianBlur(gray, (5, 5), 0)
-            
-        #     thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV+ cv2.THRESH_OTSU)
-
-        #     # Dialtion to fill holes
-        #     thresh_dilation = 0
-        #     for k in range(0, 3):
-        #         thresh_dilation = cv2.dilate(thresh[1], None, iterations=k + 1)
-        #     result_img = [vips_array, thresh_dilation]
-
-        #     for j in range(2):
-        #         plt.subplot(1, 2, j+1)
-        #         plt.imshow(result_img[j])
-        #     save_img =  file_name + ".png"
-        #     plt.savefig(os.path.join(threshold_dir, save_img))
-            
-        #     cnt, downscaled_w, downscaled_h = self.getContour(thresh_dilation, vips_array,plot_countor=False)
-
-        #     points = self.get_points_in_contour(cnt, downscaled_w, downscaled_h)
-            
-           
-        #     # CROP
-        #     self.crop_slide(vips_img_orig, points, orig_w, orig_h)
-        
-        #     # Sleep for 180 seconds before next thread is started
-        #     print('Start waiting')
-        #     time.sleep(15)
-        #     print("==========+Wait Over")
-        #     self.stage1_filter(file_name)
-        #     src = os.path.join(self.save_dir, file_name)
+            # Sleep for 180 seconds before next thread is started
+            print('Start waiting')
+            time.sleep(15)
            
 if __name__ == '__main__':
     result = pyfiglet.figlet_format("Generate Data", font="slant")
