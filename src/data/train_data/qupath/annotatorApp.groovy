@@ -18,6 +18,7 @@ import javafx.scene.control.ChoiceBox
 import javafx.scene.control.Label
 import javafx.scene.control.TextArea
 import javafx.scene.control.TextField
+import javafx.scene.input.KeyCombination
 import javafx.scene.layout.GridPane
 import javafx.util.Callback
 import javafx.util.StringConverter
@@ -147,7 +148,7 @@ abstract class ParamDialog<P, R> implements Callable {
 
 class AnnotatorDialog implements Runnable {
     ArrayList<Param<ChoiceParam<Object>, Object>> params
-    Callable<Boolean> annotatorCallable
+    Callable<PathClass> annotatorCallable
     ParamDialog<ArrayList<Param<ChoiceParam<Object>, Object>>, ArrayList<Object>> dialog
     PathObjectHierarchy hierarchy
 
@@ -227,31 +228,32 @@ class AnnotatorDialog implements Runnable {
         return null
     }
 
-    Boolean setObjectClass(PathObject object) {
+    PathClass setObjectClass(PathObject object) {
         Optional<List<Object>> resultOpt = this.dialog.build().call()
         if (!resultOpt.isPresent()) {
-            return false
+            return null
         }
 
         List<Object> result = resultOpt.get()
         PathClass pathClass = result.get(0)
         Integer intensity = result.get(1)
-        if (pathClass == PathClassFactory.getPathClassUnclassified()) {
-            return false
+        if (pathClass == null || pathClass == PathClassFactory.getPathClassUnclassified()) {
+            return null
+        }
+        if (intensity == null || !(0 <= intensity && intensity <= 3)) {
+            return null
         }
 
-        assert 0 <= intensity && intensity <= 3
         pathClass = this.getPathClass(pathClass, intensity)
-        assert pathClass != null
-
-        object.setPathClass(pathClass)
-
-        return true
+        if (pathClass != null) {
+            object.setPathClass(pathClass)
+        }
+        return pathClass
     }
 
     void buildAnnotatorCallable() {
-        this.annotatorCallable = new Callable<Boolean>() {
-            @Override Boolean call() {
+        this.annotatorCallable = new Callable<PathClass>() {
+            @Override PathClass call() {
                 PathObjectSelectionModel selectionModel = AnnotatorDialog.this.hierarchy.getSelectionModel()
                 if (selectionModel.noSelection()) {
                     AnnotatorDialog.this.buildAlertCallable("No selected objects found").call()
@@ -272,12 +274,18 @@ class AnnotatorDialog implements Runnable {
                     return false
                 }
 
-                return AnnotatorDialog.this.setObjectClass(selected)
+                PathClass result = AnnotatorDialog.this.setObjectClass(selected)
+                if (result == null) {
+                    AnnotatorDialog.this.buildAlertCallable("No PathClass set").call()
+                } else {
+                    AnnotatorDialog.this.buildAlertCallable("PathClass set to: " + result.toString()).call()
+                }
+                return result
             }
         }
     }
 
-    Callable<Boolean> build() {
+    Callable<PathClass> build() {
         this.buildAnnotatorCallable()
         return this.annotatorCallable
     }
@@ -287,7 +295,21 @@ class AnnotatorDialog implements Runnable {
     }
 }
 
-def gui = QPEx.getQuPath().getInstance()
-def hier = QPEx.getCurrentHierarchy()
-def app = new AnnotatorDialog(hier)
-def menu = gui.installCommand("annotatorApp", app)
+
+def build(String keyCombination=null) {
+    def gui = QPEx.getQuPath().getInstance()
+    def hier = QPEx.getCurrentHierarchy()
+    def app = new AnnotatorDialog(hier)
+    def menu = gui.installCommand("annotatorApp", app)
+
+    if (keyCombination != null) {
+        Platform.runLater({
+            menu.acceleratorProperty().unbind()
+            menu.accelerator = KeyCombination.keyCombination(keyCombination)
+        })
+    }
+
+    return menu
+}
+
+def menu = build("Ctrl+E")
