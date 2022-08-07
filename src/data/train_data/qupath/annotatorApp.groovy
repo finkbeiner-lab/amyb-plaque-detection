@@ -141,11 +141,6 @@ abstract class ParamDialog<P, R> implements Callable {
 }
 
 
-
-
-
-
-
 class AnnotatorDialog implements Runnable {
     ArrayList<Param<ChoiceParam<Object>, Object>> params
     Callable<PathClass> annotatorCallable
@@ -257,21 +252,21 @@ class AnnotatorDialog implements Runnable {
                 PathObjectSelectionModel selectionModel = AnnotatorDialog.this.hierarchy.getSelectionModel()
                 if (selectionModel.noSelection()) {
                     AnnotatorDialog.this.buildAlertCallable("No selected objects found").call()
-                    return false
+                    return null
                 }
                 if (!selectionModel.singleSelection()) {
                     AnnotatorDialog.this.buildAlertCallable("More than one selected object found").call()
-                    return false
+                    return null
                 }
 
                 PathObject selected = selectionModel.getSelectedObject()
                 if (!selected.isAnnotation()) {
                     AnnotatorDialog.this.buildAlertCallable("Selected object is not an annotation").call()
-                    return false
+                    return null
                 }
                 if (selected.isLocked()) {
                     AnnotatorDialog.this.buildAlertCallable("Selected object is locked").call()
-                    return false
+                    return null
                 }
 
                 PathClass result = AnnotatorDialog.this.setObjectClass(selected)
