@@ -273,7 +273,7 @@ class AnnotatorDialog implements Runnable {
                 if (result == null) {
                     AnnotatorDialog.this.buildAlertCallable("No PathClass set").call()
                 } else {
-                    AnnotatorDialog.this.buildAlertCallable("PathClass set to: " + result.toString()).call()
+//                     AnnotatorDialog.this.buildAlertCallable("PathClass set to: " + result.toString()).call()
                 }
                 return result
             }
