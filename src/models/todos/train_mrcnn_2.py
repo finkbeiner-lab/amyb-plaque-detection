@@ -4,18 +4,15 @@ sys.path.append(os.path.join(os.getcwd(), *tuple(['..'] * 2)))
 
 from typing import Callable, Dict, List, Optional, Set
 from collections import OrderedDict
-
 import pdb
-
 import torch
 from torch import nn, Tensor
 import torch.optim
-
 import wandb
-
 from model_mrcnn import _default_mrcnn_config, build_default
 from features import build_features
 from features import transforms as T
+from utils.engine import evaluate
 
 
 # Sets the behavior of calls such as
@@ -41,9 +38,6 @@ from features import transforms as T
 torch.__future__.set_overwrite_module_params_on_conversion(True)
 
 
-
-
-
 def train_one_epoch(
     model: torch.nn.Module,
     loss_fn: Callable[[Dict[str, Tensor]], Tensor],
@@ -51,8 +45,8 @@ def train_one_epoch(
     data_loader: torch.utils.data.DataLoader,
     device: torch.device,
     epoch: int = 1,
-    log_freq: int = 10,
-) -> None:
+    log_freq: int = 10,) -> None:
+
     assert model.training
     model_params = set(model.parameters())
     model_devices = set([p.device for p in model_params])
@@ -62,7 +56,7 @@ def train_one_epoch(
 
     log_metrics = list()
 
-    for i, (images, targets) in enumerate(data_loader):
+    for i, (images, targets) in enumerate(train_data_loader):
         images = [image.to(device) for image in images]
         targets = [dict([(k, v.to(device)) for k, v in target.items()]) for target in targets]
 
@@ -72,6 +66,7 @@ def train_one_epoch(
         optimizer.step()
 
         log_metrics.append(dict(epoch=epoch, loss=loss.item(), metrics=metrics))
+
         if (i % log_freq) == 0:
             yield log_metrics
             log_metrics = list()
@@ -80,6 +75,7 @@ def train_one_epoch(
 
 
 def get_loss_fn(weights, default=0.):
+    
     def compute_loss_fn(losses):
         item = lambda k: (k, losses[k].item())
         metrics = OrderedDict(list(map(item, [k for k in weights.keys() if k in losses.keys()] + [k for k in losses.keys() if k not in weights.keys()])))
@@ -104,16 +100,24 @@ if __name__ == '__main__':
     #   - do ^^ via closures
     #   - experimental: add an API to collect params and bufs by on module and/or name; generate on-the-fly state_dicts, gradient_dicts, higher-order gradient_dicts, etc.
 
+    ## CONFIGS ##
     collate_fn = lambda _: tuple(zip(*_)) # one-liner, no need to import
 
-    dataset_location = '/gladstone/finkbeiner/steve/work/data/npsad_data/gennadi/amy-def/'
+    dataset_train_location = '/home/vivek/Datasets/AmyB/amyb_wsi/train'
+    dataset_test_location = '/home/vivek/Datasets/AmyB/amyb_wsi/test'
+
     train_config = dict(
-        epochs=50,
-        batch_size=3,
-        num_classes=3,
-        device_id=0,
-        ckpt_freq=1,
+        epochs = 50,
+        batch_size = 3,
+        num_classes = 3,
+        device_id = 0,
+        ckpt_freq =1,
     )
+
+    test_config = dict(
+        batch_size = 1
+    )
+
     model_config = _default_mrcnn_config(num_classes=1 + train_config['num_classes']).config
     optim_config = dict(
         # cls=grad_optim.GradSGD,
@@ -134,10 +138,20 @@ if __name__ == '__main__':
     )
 
 
-    dataset = build_features.AmyBDataset(dataset_location, T.Compose([T.ToTensor()]))
-    data_loader = torch.utils.data.DataLoader(dataset, batch_size=train_config['batch_size'], shuffle=True, num_workers=1, collate_fn=collate_fn)
+    ## Dataset loading
+    train_dataset = build_features.AmyBDataset(dataset_train_location, T.Compose([T.ToTensor()]))
+    test_dataset = build_features.AmyBDataset(dataset_test_location, T.Compose([T.ToTensor()]))
 
+    train_data_loader = torch.utils.data.DataLoader(
+            train_dataset, batch_size=train_config['batch_size'], shuffle=True, num_workers=4,
+            collate_fn=collate_fn)
+    
+    test_data_loader = torch.utils.data.DataLoader(
+            test_dataset, batch_size=test_config['batch_size'], shuffle=True, num_workers=4,
+            collate_fn=collate_fn)
 
+    
+    # Model Building
     model = build_default(model_config, im_size=1024)
     device = torch.device('cpu')
     if torch.cuda.is_available():
@@ -164,9 +178,13 @@ if __name__ == '__main__':
     # artifact_name = '/'.join([f'{wandb_config.get(k)}' for k in keys] + ['artifact:alias'])
 
     artifact_name = f'{run_id}-logs'
+
+    # Train Data
     for epoch in range(train_config['epochs']):
         print(f'Epoch {epoch} started.')
-        for logs in train_one_epoch(model, loss_fn, optimizer, data_loader, device, epoch=epoch, log_freq=1):
+
+
+        for logs in train_one_epoch(model, loss_fn, optimizer, train_data_loader, device, epoch=epoch, log_freq=1):
             for log in logs:
                 run.log(log)
 
@@ -176,6 +194,9 @@ if __name__ == '__main__':
             with artifact.new_file(f'ckpt/{epoch}.pt', 'wb') as f:
                 torch.save(model.state_dict(), f)
             run.log_artifact(artifact)
+
+        if epoch % 5 == 0:
+            eval_logs, eval_res = evaluate(model, test_data_loader, device=device)
 
         print(f'Epoch {epoch} ended.')
 
