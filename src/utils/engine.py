@@ -28,6 +28,9 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, wandb, print_f
         )
 
     for images, targets in metric_logger.log_every(data_loader, print_freq, header):
+        # print(torch.cuda.memory_stats())
+        print(torch.cuda.memory_allocated())
+        print(torch.cuda.memory_reserved())
         images = list(image.to(device) for image in images)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
         with torch.cuda.amp.autocast(enabled=scaler is not None):
