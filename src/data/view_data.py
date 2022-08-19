@@ -4,13 +4,13 @@ sys.path.append('../')
 
 import torch
 import numpy as np
-from pipeline import HistoDataset
+from pipeline import RoboDataset
 from models.train_model import get_transform
 from utils import utils
 import matplotlib.pyplot as plt
 
 def view_data():
-    dataset = HistoDataset('/mnt/linsley/Shijie_ML/Ms_Tau/dataset/train', get_transform(train=True), istraining=True)
+    dataset = RoboDataset('/mnt/linsley/Shijie_ML/Ms_Tau/dataset/train', get_transform(train=True), istraining=True)
 
     data_loader = torch.utils.data.DataLoader(
         dataset, batch_size=12, shuffle=True, num_workers=0,

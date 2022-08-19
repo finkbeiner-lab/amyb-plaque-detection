@@ -38,7 +38,7 @@ def rescale(img, mask, output_size):
     return np.uint16(img), np.uint8(mask)
 
 
-class HistoDataset(object):
+class RoboDataset(object):
     def __init__(self, root, transforms, istraining, debug=False):
         self.root = root
         self.istraining = istraining
@@ -72,7 +72,7 @@ class HistoDataset(object):
         # 5532
         # 7195
         def getmasks(img_path, mask_path):
-            assert img_path.split('/')[-1] in mask_path
+            # assert img_path.split('/')[-1] in mask_path
             img = Image.open(img_path).convert('RGB')
             # img = Image.open(img_path)
             mask = Image.open(mask_path).convert('P')
@@ -196,6 +196,7 @@ class HistoDataset(object):
             return [i for i in range(len(boxes)) if i not in remove]
 
         # load images and masks
+
         img_path = os.path.join(self.root, "images", self.imgs[idx])
         mask_path = os.path.join(self.root, "labels", self.masks[idx])
         img, mask, obj_ids = getmasks(img_path, mask_path)
@@ -263,11 +264,11 @@ class HistoDataset(object):
         if len(np.shape(img)) != 3:
             img = np.array([img, img, img])
         # else:
-        if 'vivek' in self.root:
-            img = np.moveaxis(img, -1, 0)  # channels first
+        # if 'vivek' in self.root:
+        #     img = np.moveaxis(img, -1, 0)  # channels first
         img = torch.from_numpy(np.ascontiguousarray(img))
-        # if self.transforms is not None:
-        #     img, target = self.transforms(img, target)
+        if self.transforms is not None:
+            img, target = self.transforms(img, target)
 
         return img, target
 
@@ -277,7 +278,8 @@ class HistoDataset(object):
 
 def get_transform(train):
     if train:
-        transforms = [T.ToTensor(),
+        transforms = [
+            # T.ToTensor(),
                       T.RandomIoUCrop(),
                       T.RandomPhotometricDistort(contrast=(0.5, 1.5), saturation=(1, 1), hue=(0, 0), brightness=(.8, 1.2),
                                                  p=0.5)
@@ -356,7 +358,7 @@ if __name__ == '__main__':
     import utils.utils as utils
 
     # view data
-    dataset = HistoDataset('/mnt/linsley/Shijie_ML/Ms_Tau/dataset/train', get_transform(), istraining=True, debug=True)
+    dataset = RoboDataset('/mnt/linsley/Shijie_ML/Ms_Tau/dataset/train_vivek', get_transform(train=True), istraining=True, debug=False)
     # dataset = HistoDataset('/mnt/linsley/Shijie_ML/Ms_Tau/dataset/train', get_transform(), istraining=True)
     data_loader = torch.utils.data.DataLoader(
         dataset, batch_size=1, shuffle=True, num_workers=0,
@@ -373,6 +375,7 @@ if __name__ == '__main__':
         # img = np.uint8(images[0])
         if np.shape(images[0])[0] == 3:
             img = np.moveaxis(images[0] * 255, 0, -1)
+
         else:
             img = images[0] * 255
         img = np.ascontiguousarray(np.uint8(img))

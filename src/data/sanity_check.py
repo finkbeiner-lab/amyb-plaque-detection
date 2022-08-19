@@ -1,13 +1,13 @@
 import torchvision
 import torch
-from pipeline import HistoDataset
+from pipeline import RoboDataset
 import utils
 
 model = torchvision.models.detection.fasterrcnn_resnet50_fpn(pretrained=True)
 targetdir = '/mnt/linsley/Shijie_ML/Ms_Tau/dataset/train'
 
-dataset = HistoDataset(targetdir, get_transform(),
-                       istraining=False)
+dataset = RoboDataset(targetdir, get_transform(),
+                      istraining=False)
 # dataset = PennFudanDataset('PennFudanPed', get_transform(train=True))
 data_loader = torch.utils.data.DataLoader(
     dataset, batch_size=2, shuffle=True, num_workers=4,

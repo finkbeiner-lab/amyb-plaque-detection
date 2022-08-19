@@ -18,7 +18,7 @@ import pdb
 import matplotlib.pyplot as plt
 from visualization.visualize import visualize_train
 from visualization.explain import ExplainPredictions
-from data.pipeline import HistoDataset, get_transform
+from data.pipeline import RoboDataset, get_transform
 import datetime
 # import albumentations as A
 
@@ -39,7 +39,7 @@ lr_config = dict(
 )
 config = dict(  # TODO: assert no params are overriden
     num_epochs=10,
-    batch_size=12,  # 12 for Vivek's histo dataset
+    batch_size=4,  # 12 for Vivek's histo dataset
     **optim_config,
     **lr_config,
     detection_threshold=0.75,
@@ -95,10 +95,10 @@ if __name__ == "__main__":
     num_classes = 1 + 2
 
     # use our dataset and defined transformations
-    dataset = HistoDataset('/mnt/linsley/Shijie_ML/Ms_Tau/dataset/train', get_transform(train=True), istraining=True,
-                           debug=True)
-    dataset_test = HistoDataset('/mnt/linsley/Shijie_ML/Ms_Tau/dataset/val', get_transform(train=False),
-                                istraining=False, debug=False)
+    dataset = RoboDataset('/mnt/linsley/Shijie_ML/Ms_Tau/dataset/train', get_transform(train=True), istraining=True,
+                          debug=False)
+    dataset_test = RoboDataset('/mnt/linsley/Shijie_ML/Ms_Tau/dataset/val', get_transform(train=False),
+                               istraining=False, debug=False)
     # dataset = build_features.AmyBDataset('/mnt/linsley/Shijie_ML/Ms_Tau/dataset/train_vivek', get_transform(train=True))
     # dataset_test = build_features.AmyBDataset('/mnt/linsley/Shijie_ML/Ms_Tau/dataset/train_vivek', get_transform(train=False))
     with wandb.init(project="mrcnn", entity="jdlamstein", config=config):

@@ -20,7 +20,7 @@ import pdb
 import matplotlib.pyplot as plt
 from visualization.visualize import visualize_train
 from visualization.explain import ExplainPredictions
-from data.pipeline import HistoDataset
+from data.pipeline import RoboDataset
 import cv2
 
 # import albumentations as A
@@ -115,9 +115,9 @@ if __name__ == "__main__":
     num_classes = 1 + 2
 
     # use our dataset and defined transformations
-    dataset = HistoDataset('/mnt/linsley/Shijie_ML/Ms_Tau/dataset/train', get_transform(train=True), istraining=True)
-    dataset_test = HistoDataset('/mnt/linsley/Shijie_ML/Ms_Tau/dataset/val', get_transform(train=False),
-                                istraining=False)
+    dataset = RoboDataset('/mnt/linsley/Shijie_ML/Ms_Tau/dataset/train', get_transform(train=True), istraining=True)
+    dataset_test = RoboDataset('/mnt/linsley/Shijie_ML/Ms_Tau/dataset/val', get_transform(train=False),
+                               istraining=False)
 
     # with wandb.init(project="nps-ad", entity="hellovivek", config=config):
 
