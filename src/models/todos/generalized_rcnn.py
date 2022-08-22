@@ -15,6 +15,11 @@ import matplotlib.patches as patches
 import pdb
 
 
+# Color Coding
+id2label = {'1':'Core', '2':'Diffuse',
+             '3':'Neuritic', 'Unknown':'0'}
+
+
 class GeneralizedRCNN(nn.Module):
     """
     Main class for Generalized R-CNN.
@@ -46,39 +51,69 @@ class GeneralizedRCNN(nn.Module):
         return detections
      
     # custom visualizaton function
-    def visualize_feature_maps(self, features, layer_type='pool'):
+    def visualize_feature_maps(self, features, layer_type='pool', show=False):
 
-        feature = features['pool']
+        feature = features['layer_type']
         feature = feature[0]
         feature = feature.detach().cpu().numpy()
         feature = feature.transpose(1, 2, 0)
-        plt.imshow(feature[:,:,0])
-        # plt.show()
+        if show:
+            plt.imshow(feature[:,:,0])
+            plt.show()
     
-    
-    def visualize_rpn_proposals(self, images, proposals):
+    def visualize_roi_detections(self, images, detections, show=False):
         img = images.tensors[0]
         img = img.detach().cpu().numpy()
         img = img.transpose(1, 2, 0)
-        fig, ax = plt.subplots(1, figsize=(10, 10))
         
-        ax.imshow(img)
-        proposal = proposals[0].detach().cpu().numpy()
-        pdb.set_trace()
+        if show:
+            fig, ax = plt.subplots(1, figsize=(10, 10))
+            ax.imshow(img)
+            for detection in detections:
+                boxes = detection['boxes']
+                labels = detection['labels']
+                scores = detection['scores']
+                masks = detection['masks']
 
-        for i, prop in enumerate(proposal):
-            x = prop[0]
-            y = prop[1]
-            w = prop[2]
-            h = prop[3]
+                for i in range(len(boxes)):
+                    box = boxes[i].detach().cpu().numpy()
+                    label = labels[i].detach().cpu().numpy()
+                    x = box[0]
+                    y = box[1]
+                    w = box[2]
+                    h = box[3]
+                    p = patches.Rectangle((x, y), w, h, linewidth=2, facecolor='none', label=id2label[str(label)],
+                                    edgecolor=(1.0, 0, 0))
+                    ax.add_patch(p)
+            pdb.set_trace()
+            plt.show()
+  
+    def visualize_rpn_proposals(self, images, proposals, show=False):
+        img = images.tensors[0]
+        img = img.detach().cpu().numpy()
+        img = img.transpose(1, 2, 0)
+       
 
-            if i == 100:
-                break
+        if show:
+            fig, ax = plt.subplots(1, figsize=(10, 10))
+            ax.imshow(img)
+            proposal = proposals[0].detach().cpu().numpy()
+            pdb.set_trace()
 
-            p = patches.Rectangle((x, y), w, h, linewidth=2, facecolor='none',
-                              edgecolor=(1.0, 0, 0))
-            ax.add_patch(p)
-        plt.show()
+            for i, prop in enumerate(proposal):
+                x = prop[0]
+                y = prop[1]
+                w = prop[2]
+                h = prop[3]
+
+                if i == 100:
+                    break
+
+                p = patches.Rectangle((x, y), w, h, linewidth=2, facecolor='none',
+                                edgecolor=(1.0, 0, 0))
+                ax.add_patch(p)
+            
+            plt.show()
 
 
 
@@ -136,7 +171,7 @@ class GeneralizedRCNN(nn.Module):
 
         # Image is passed through backbone model
         features = self.backbone(images.tensors)
-        self.visualize_feature_maps(features)
+        self.visualize_feature_maps(features, show=False)
 
         if isinstance(features, torch.Tensor):
             features = OrderedDict([('0', features)])
@@ -146,9 +181,12 @@ class GeneralizedRCNN(nn.Module):
         # images - torch.Size([3, 3, 1024, 1024])
         # proposals - torch.Size([2000, 4])
         proposals, proposal_losses = self.rpn(images, features, targets)
-        self.visualize_rpn_proposals(images, proposals)
+        self.visualize_rpn_proposals(images, proposals, False)
         detections, detector_losses = self.roi_heads(features, proposals, images.image_sizes, targets)
         detections = self.transform.postprocess(detections, images.image_sizes, original_image_sizes)
+        if len(detections)!= 0:
+            self.visualize_roi_detections(images, detections, True)
+            pdb.set_trace()
 
         losses = {}
         losses.update(detector_losses)
