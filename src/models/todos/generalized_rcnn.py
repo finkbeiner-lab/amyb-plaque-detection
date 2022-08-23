@@ -51,7 +51,7 @@ class GeneralizedRCNN(nn.Module):
         return detections
      
     # custom visualizaton function
-    def visualize_feature_maps(self, images, features, layer_type='pool', show=False):
+    def visualize_feature_maps(self, images, features, show=False):
 
         if show:
             img = images.tensors[0]
@@ -59,11 +59,10 @@ class GeneralizedRCNN(nn.Module):
             img = img.transpose(1, 2, 0)
 
             feature_img_list = [img]
-            pdb.set_trace()
 
             for key, val in features.items():
                 feature = features[key]
-                feature = feature[0]
+                feature = feature[-1]
                 feature = feature.detach().cpu().numpy()
                 feature = feature.transpose(1, 2, 0)
 
@@ -71,29 +70,38 @@ class GeneralizedRCNN(nn.Module):
 
             plt.figure(figsize=(10,10)) # specifying the overall grid size
             plt.suptitle('Feature maps at different scale')
+            plt.subplot(1,6, 1)
+            plt.title('Input Image')
+            scale = ['', '1/2', '1/4', '1/8', '1/16', '1/32']
             for i in range(6):
+                
                 plt.subplot(1,6,i+1)    # the number of images in the grid is 5*5 (25)
                 # title_name = 'Feature maps at {i}th scale}'
-                plt.title('Feature maps at {i}th scale'.format(i=i+1))
-                plt.imshow(feature_img_list[i])
-            
+                if i == 0:
+                    plt.imshow(feature_img_list[i])
+                    continue
+                else:
+                    plt.title('Feature maps at {i} scale'.format(i=scale[i]))
+                    plt.imshow(feature_img_list[i])
+            save_name = "../../reports/figures/feature_maps.png"
+            plt.savefig(save_name)
             plt.show()
     
-    def visualize_roi_detections(self, images, detections, show=False):
-        img = images.tensors[0]
-        img = img.detach().cpu().numpy()
-        img = img.transpose(1, 2, 0)
-        
+    def visualize_roi_detections(self, images, detections, no_of_top_detections=20, show=False):
         if show:
+            img = images.tensors[0]
+            img = img.detach().cpu().numpy()
+            img = img.transpose(1, 2, 0)
+
             fig, ax = plt.subplots(1, figsize=(10, 10))
             ax.imshow(img)
+
             for detection in detections:
                 boxes = detection['boxes']
                 labels = detection['labels']
                 scores = detection['scores']
                 masks = detection['masks']
-
-                for i in range(len(boxes)):
+                for i in range(no_of_top_detections):
                     box = boxes[i].detach().cpu().numpy()
                     label = labels[i].detach().cpu().numpy()
                     x = box[0]
@@ -103,7 +111,8 @@ class GeneralizedRCNN(nn.Module):
                     p = patches.Rectangle((x, y), w, h, linewidth=2, facecolor='none', label=id2label[str(label)],
                                     edgecolor=(1.0, 0, 0))
                     ax.add_patch(p)
-            pdb.set_trace()
+            save_name = "../../reports/figures/roi_detections.png"
+            plt.savefig(save_name)
             plt.show()
   
     def visualize_rpn_proposals(self, images, proposals, show=False):
@@ -130,7 +139,8 @@ class GeneralizedRCNN(nn.Module):
                 p = patches.Rectangle((x, y), w, h, linewidth=2, facecolor='none',
                                 edgecolor=(1.0, 0, 0))
                 ax.add_patch(p)
-            
+            save_name = "../../reports/figures/rpn_proposals.png"
+            plt.savefig(save_name)
             plt.show()
 
 
@@ -189,7 +199,7 @@ class GeneralizedRCNN(nn.Module):
 
         # Image is passed through backbone model
         features = self.backbone(images.tensors)
-        self.visualize_feature_maps(images, features, show=True)
+        self.visualize_feature_maps(images, features, show=False)
 
         if isinstance(features, torch.Tensor):
             features = OrderedDict([('0', features)])
@@ -202,8 +212,9 @@ class GeneralizedRCNN(nn.Module):
         self.visualize_rpn_proposals(images, proposals, False)
         detections, detector_losses = self.roi_heads(features, proposals, images.image_sizes, targets)
         detections = self.transform.postprocess(detections, images.image_sizes, original_image_sizes)
+
         if len(detections)!= 0:
-            self.visualize_roi_detections(images, detections, True)
+            self.visualize_roi_detections(images, detections, 20,False)
             pdb.set_trace()
 
         losses = {}

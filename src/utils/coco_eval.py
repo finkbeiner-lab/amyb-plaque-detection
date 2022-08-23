@@ -26,6 +26,7 @@ class CocoEvaluator:
         self.eval_imgs = {k: [] for k in iou_types}
 
     def update(self, predictions):
+        pdb.set_trace()
         img_ids = list(np.unique(list(predictions.keys())))
         self.img_ids.extend(img_ids)
 

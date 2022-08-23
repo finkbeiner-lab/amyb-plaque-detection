@@ -162,6 +162,7 @@ def convert_to_coco_api(ds):
         labels = targets["labels"].tolist()
         areas = targets["area"].tolist()
         iscrowd = targets["iscrowd"].tolist()
+
         if "masks" in targets:
             masks = targets["masks"]
             # make masks Fortran contiguous for coco_mask
