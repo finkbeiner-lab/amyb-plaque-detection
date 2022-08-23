@@ -51,14 +51,32 @@ class GeneralizedRCNN(nn.Module):
         return detections
      
     # custom visualizaton function
-    def visualize_feature_maps(self, features, layer_type='pool', show=False):
+    def visualize_feature_maps(self, images, features, layer_type='pool', show=False):
 
-        feature = features['layer_type']
-        feature = feature[0]
-        feature = feature.detach().cpu().numpy()
-        feature = feature.transpose(1, 2, 0)
         if show:
-            plt.imshow(feature[:,:,0])
+            img = images.tensors[0]
+            img = img.detach().cpu().numpy()
+            img = img.transpose(1, 2, 0)
+
+            feature_img_list = [img]
+            pdb.set_trace()
+
+            for key, val in features.items():
+                feature = features[key]
+                feature = feature[0]
+                feature = feature.detach().cpu().numpy()
+                feature = feature.transpose(1, 2, 0)
+
+                feature_img_list.append(feature[:,:,0])
+
+            plt.figure(figsize=(10,10)) # specifying the overall grid size
+            plt.suptitle('Feature maps at different scale')
+            for i in range(6):
+                plt.subplot(1,6,i+1)    # the number of images in the grid is 5*5 (25)
+                # title_name = 'Feature maps at {i}th scale}'
+                plt.title('Feature maps at {i}th scale'.format(i=i+1))
+                plt.imshow(feature_img_list[i])
+            
             plt.show()
     
     def visualize_roi_detections(self, images, detections, show=False):
@@ -171,7 +189,7 @@ class GeneralizedRCNN(nn.Module):
 
         # Image is passed through backbone model
         features = self.backbone(images.tensors)
-        self.visualize_feature_maps(features, show=False)
+        self.visualize_feature_maps(images, features, show=True)
 
         if isinstance(features, torch.Tensor):
             features = OrderedDict([('0', features)])
