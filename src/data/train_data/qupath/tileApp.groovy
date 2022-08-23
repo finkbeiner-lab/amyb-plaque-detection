@@ -358,7 +358,13 @@ class TileObjects implements Runnable {
         params.add("input", "Json: ", new TextArea())
         if (this.dialogCallable(params.pane()).call()) {
             def deserialized = this.deserializeAnns(params.get("input").getText())
-            this.alertCallable(deserialized.toString()).call()
+            def res = this.alertCallable(deserialized.toString()).call()
+            if (res.isPresent() && res.get() == ButtonType.OK) {
+                def anns = deserialized.get(0)
+                this.hier.addPathObjects(anns)
+                this.alertCallable("Delete the annotations now").call()
+                this.hier.removeObjects(anns, false)
+            }
         }
     }
 
