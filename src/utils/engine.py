@@ -28,17 +28,22 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, wandb, print_f
         )
 
     for images, targets in metric_logger.log_every(data_loader, print_freq, header):
+        # print('beginning', torch.cuda.memory_stats()['active_bytes.all.allocated'])
+        # print(torch.cuda.memory_allocated())
+        # print(torch.cuda.memory_reserved())
         images = list(image.to(device) for image in images)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
         with torch.cuda.amp.autocast(enabled=scaler is not None):
             loss_dict = model(images, targets)
+            # print('got loss', torch.cuda.memory_stats()['active_bytes.all.allocated'])
             losses = sum(loss for loss in loss_dict.values())
+            # print('summed losses', torch.cuda.memory_stats()['active_bytes.all.allocated'])
 
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = utils.reduce_dict(loss_dict)
-        losses_reduced = sum(loss for loss in loss_dict_reduced.values())
+        losses_reduced = sum(loss.item() for loss in loss_dict_reduced.values())
 
-        loss_value = losses_reduced.item()
+        loss_value = losses_reduced
 
         if not math.isfinite(loss_value):
             print(f"Loss is {loss_value}, stopping training")
@@ -50,16 +55,29 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, wandb, print_f
             scaler.scale(losses).backward()
             scaler.step(optimizer)
             scaler.update()
+            print('scaler update', torch.cuda.memory_stats()['active_bytes.all.allocated'])
+
         else:
+            # print('backward 1', torch.cuda.memory_stats()['active_bytes.all.allocated'])
             losses.backward()
+            # print('backward 2', torch.cuda.memory_stats()['active_bytes.all.allocated'])
             optimizer.step()
+            # print('backward 3', torch.cuda.memory_stats()['active_bytes.all.allocated'])
+
 
         if lr_scheduler is not None:
             lr_scheduler.step()
 
         metric_logger.update(loss=losses_reduced, **loss_dict_reduced)
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
-        
+        # del losses
+        # del images
+        # del targets
+        # del losses_reduced
+        # del loss_dict
+        # del loss_value
+        # del loss_dict_reduced
+        # torch.cuda.empty_cache()
     return metric_logger
 
 

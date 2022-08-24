@@ -40,7 +40,9 @@ class AmyBDataset(object):
 
         # split the color-encoded mask into a set
         # of binary masks
+        # print('mask sh', np.shape(mask))
         masks = mask == obj_ids[:, None, None]
+        # print('masks sh', np.shape(masks))
 
         # get bounding box coordinates for each mask
         num_objs = len(obj_ids)

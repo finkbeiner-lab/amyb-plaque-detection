@@ -1,9 +1,11 @@
 import sys
+
 sys.path.append('../')
+sys.path.append('../../')
 import numpy as np
 import torch
 import wandb
-
+import os
 
 import torchvision
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
@@ -16,13 +18,18 @@ import pdb
 import matplotlib.pyplot as plt
 from visualization.visualize import visualize_train
 from visualization.explain import ExplainPredictions
-import albumentations as A
+from data.pipeline import RoboDataset, get_transform
+import datetime
+# import albumentations as A
 
 
 ######## WANDB integration begins (mainly) here
 
+now = datetime.datetime.now()
+timestamp = '%d%02d%02d-%02d%02d%02d' % (now.year, now.month, now.day, now.hour, now.minute, now.second)
+
 optim_config = dict(
-    lr=0.001,
+    lr=1e-3,
     momentum=0.9,
     weight_decay=0.0005,
 )
@@ -30,13 +37,14 @@ lr_config = dict(
     step_size=3,
     gamma=0.1
 )
-config = dict( # TODO: assert no params are overriden
-    num_epochs=50,
-    batch_size= 16, 
+config = dict(  # TODO: assert no params are overriden
+    num_epochs=10,
+    batch_size=4,  # 12 for Vivek's histo dataset
     **optim_config,
     **lr_config,
     detection_threshold=0.75,
 )
+
 
 def get_model_instance_segmentation(num_classes):
     # load an instance segmentation model pre-trained pre-trained on COCO
@@ -57,46 +65,50 @@ def get_model_instance_segmentation(num_classes):
 
     return model
 
-def get_transform(train):
-    transforms = []
-    transforms.append(T.ToTensor())
-    if train:
-        transforms.append(T.RandomHorizontalFlip(0.5))
-        # transforms.append(T.RandomPhotometricDistort())
-        # transforms.append(T.RandomZoomOut())
-        # transforms.append(T.RandomIoUCrop())
-        # transforms = A.Compose([A.RandomCrop(width=256, height=256),
-        #                        A.HorizontalFlip(p=0.5),
-        #                        A.RandomBrightnessContrast(p=0.2)])
-    
-        # transforms = torchvision.transforms.Compose([
-        # torchvision.transforms.RandomHorizontalFlip(),
-        # torchvision.transforms.RandomVerticalFlip(),
-        # torchvision.transforms.GaussianBlur([3,3], sigma=(0.1, 2.0))
-        # ])
-    return T.Compose(transforms)
-    # return transforms
-    
-if __name__ == "main":
+
+# def get_transform(train):
+#     transforms = []
+#     transforms.append(T.ToTensor())
+#     # if train:
+#     #     transforms.append(T.RandomHorizontalFlip(0.5))
+#         # transforms.append(T.RandomPhotometricDistort())
+#         # transforms.append(T.RandomZoomOut())
+#         # transforms.append(T.RandomIoUCrop())
+#         # transforms = A.Compose([A.RandomCrop(width=256, height=256),
+#         #                        A.HorizontalFlip(p=0.5),
+#         #                        A.RandomBrightnessContrast(p=0.2)])
+#
+#         # transforms = torchvision.transforms.Compose([
+#         # torchvision.transforms.RandomHorizontalFlip(),
+#         # torchvision.transforms.RandomVerticalFlip(),
+#         # torchvision.transforms.GaussianBlur([3,3], sigma=(0.1, 2.0))
+#         # ])
+#     return T.Compose(transforms)
+#     # return transforms
+
+if __name__ == "__main__":
 
     # train on the GPU or on the CPU, if a GPU is not available
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
     # our dataset has two classes only - background and person
-    num_classes = 1 + 3
+    num_classes = 1 + 2
 
     # use our dataset and defined transformations
-    dataset = build_features.AmyBDataset('/home/vivek/Datasets/AmyB/amyb_wsi/train', get_transform(train=True))
-    dataset_test = build_features.AmyBDataset('/home/vivek/Datasets/AmyB/amyb_wsi/val', get_transform(train=False))
-
-    with wandb.init(project="nps-ad", entity="hellovivek", config=config):
+    dataset = RoboDataset('/mnt/linsley/Shijie_ML/Ms_Tau/dataset/train', get_transform(train=True), istraining=True,
+                          debug=False)
+    dataset_test = RoboDataset('/mnt/linsley/Shijie_ML/Ms_Tau/dataset/val', get_transform(train=False),
+                               istraining=False, debug=False)
+    # dataset = build_features.AmyBDataset('/mnt/linsley/Shijie_ML/Ms_Tau/dataset/train_vivek', get_transform(train=True))
+    # dataset_test = build_features.AmyBDataset('/mnt/linsley/Shijie_ML/Ms_Tau/dataset/train_vivek', get_transform(train=False))
+    with wandb.init(project="mrcnn", entity="jdlamstein", config=config):
 
         # Get the Id
         print("\n =======Wandb Run Id========", wandb.util.generate_id())
 
         # define training and validation data loaders
         data_loader = torch.utils.data.DataLoader(
-            dataset, batch_size=config['batch_size'], shuffle=True, num_workers=4,
+            dataset, batch_size=config['batch_size'], shuffle=False, num_workers=4,
             collate_fn=utils.collate_fn)
 
         data_loader_test = torch.utils.data.DataLoader(
@@ -123,7 +135,7 @@ if __name__ == "main":
         #     img_no = img_no + 1
 
         for epoch in range(config['num_epochs']):
-
+            # wandb = None
             train_logs = train_one_epoch(model, optimizer, data_loader, device, epoch, wandb, print_freq=1)
             # update the learning rate
             # lr_scheduler.step()
@@ -144,27 +156,27 @@ if __name__ == "main":
             #   eval_res.iou_types. The dictionary eval_res.eval_imgs stores,
             #   with eval_res.iou_types as keys, the results of an evaluation run.
             # eval_imgs = eval_res.eval_imgs
-            train_metrics_dict = {k: list(v.deque) for k, v in train_metrics.items() if k!='lr'}
-            
+            train_metrics_dict = {k: list(v.deque) for k, v in train_metrics.items() if k != 'lr'}
+
             d = train_metrics_dict
             keys, vals = tuple(zip(*d.items()))
-            unpacked = [dict(zip(keys, v)) for v in list(zip(*vals))] 
+            unpacked = [dict(zip(keys, v)) for v in list(zip(*vals))]
 
-            
-
-            wandb.log({'loss': train_metrics['loss'].global_avg, 
+            wandb.log({'loss': train_metrics['loss'].global_avg,
                     'loss_classifier': train_metrics['loss_classifier'].global_avg,
                     'loss_rpn_box_reg': train_metrics['loss_rpn_box_reg'].global_avg,
                     'loss_box_reg': train_metrics['loss_box_reg'].global_avg,
                     'loss_mask': train_metrics['loss_mask'].global_avg,
                     'loss_objectness': train_metrics['loss_objectness'].global_avg,
                         'epoch': epoch,
-                        'data_point_details':unpacked})
-                
-            # wandb.log(train_metrics_dict)
+                        'data_point_details':unpacked,
+                       'timestamp': timestamp})
 
-        model_save_name = "../../models/mrcnn_model_{epoch}.pth"
-        torch.save(model, model_save_name.format(epoch=config['num_epochs']))
+            wandb.log(train_metrics_dict)
+
+        savedir = '/mnt/linsley/Shijie_ML/Ms_Tau/rcnn_models'
+        model_save_name = os.path.join(savedir, f'mrcnn_model_{timestamp}_{epoch}.pth')  # todo: get timestamp
+        torch.save(model, model_save_name)
 
         print("\n =================The Model is Trained!====================")
 
@@ -174,8 +186,8 @@ if __name__ == "main":
         input_path = '/home/vivek/Datasets/AmyB/amyb_wsi/test-data/'
         model_input_path = '../models/mcrnn_model_{epoch}.pth'
 
-        explain = ExplainPredictions(model_input_path = model_save_name.format(epoch=config['num_epochs']), test_input_path=input_path, 
-                                    detection_threshold=config['detection_threshold'], wandb=wandb)
-        explain.generate_results(ablation_cam=False)
+        # explain = ExplainPredictions(model_input_path = model_save_name.format(epoch=config['num_epochs']), test_input_path=input_path,
+        #                             detection_threshold=config['detection_threshold'], wandb=wandb)
+        # explain.generate_results(ablation_cam=False)
 
-        wandb.finish()
+    wandb.finish()
