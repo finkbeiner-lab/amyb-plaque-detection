@@ -166,7 +166,8 @@ if __name__ == '__main__':
     artifact_name = f'{run_id}-logs'
     for epoch in range(train_config['epochs']):
         print(f'Epoch {epoch} started.')
-        for logs in train_one_epoch(model, loss_fn, optimizer, data_loader, device, epoch=epoch, log_freq=1):
+        for logs in train_one_epoch(model, loss_fn, optimizer, data_loader, device, epoch=epoch, log_freq=len(data_loader)):
+            # this is where the epoch-wise log can be made
             for log in logs:
                 run.log(log)
 
