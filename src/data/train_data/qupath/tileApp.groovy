@@ -48,7 +48,7 @@ import javafx.util.StringConverter
 import java.util.concurrent.Callable
 import java.util.concurrent.FutureTask
 
-import org.json.JSONArray
+import org.json.*
 
 import qupath.lib.geom.Point2
 
@@ -83,19 +83,40 @@ class Params {
     }
 }
 
-class OptionConverter extends StringConverter<Integer> {
-    List<String> opts
-    def OptionConverter(List<String> opts) {
-        this.opts = opts
+class OptionBox {
+    OptionConverter converter
+    ChoiceBox box
+
+    class OptionConverter extends StringConverter<Integer> {
+        List<String> options
+        String defaultOption
+
+        def OptionConverter(List<String> options, String defaultOption=null) {
+            this.options = options
+            if (defaultOption == null) {
+                this.defaultOption = ""
+            }
+        }
+
+        @Override String toString(Integer index) {
+            if (index == null) {
+                return this.defaultOption
+            }
+            return this.options.get(index)
+        }
+
+        @Override Integer fromString(String value) {
+            return this.options.indexOf(value)
+        }
     }
-    String toString(Integer value) {
-        return this.opts.get(value)
-    }
-    Integer fromString(String value) {
-        return this.opts.indexOf(value)
+
+    def OptionBox(List<String> options, String defaultOption=null) {
+        this.converter = new OptionConverter(options, defaultOption)
+        this.box = new ChoiceBox<Integer>()
+        this.box.setConverter(this.converter)
+        this.box.getItems().setAll((0 .. options.size() - 1).toArray())
     }
 }
-
 
 
 
@@ -157,7 +178,8 @@ class TileObjects implements Runnable {
         this.hier.getTileObjects().each({
             if (it.getPathClass() == this.pathClass && it.getName() != null && it.getName().matches("[0-9]+")) {
                 def id = it.getName().toInteger()
-                if (!(id in this.tileMap.keySet() && this.tileMap.get(id).isLocked() && !it.isLocked())) {
+                // if (!(id in this.tileMap.keySet() && this.tileMap.get(id).isLocked() && !it.isLocked())) {}
+                if (!(id in this.tileMap.keySet()) || (!this.tileMap.get(id).isLocked() && it.isLocked())) {
                     this.tileMap.put(id, it)
                 }
             }
@@ -198,14 +220,15 @@ class TileObjects implements Runnable {
     }
 
     def alertCallable(String msg) {
-        return new Callable<Optional<ButtonType>>() {
-            @Override Optional<ButtonType> call() {
-                Alert alert = new Alert(AlertType.CONFIRMATION)
-                alert.initModality(Modality.NONE)
-                alert.setContentText(msg)
-                return alert.showAndWait()
-            }
-        }
+      return new Callable<Boolean>() {
+          @Override Boolean call() {
+              Alert alert = new Alert(AlertType.CONFIRMATION)
+              alert.initModality(Modality.NONE)
+              alert.setContentText(msg)
+              Optional<ButtonType> resp = alert.showAndWait()
+              return resp.isPresent() && resp.get() == ButtonType.OK
+          }
+      }
     }
 
     def dialogCallable(DialogPane pane) {
@@ -243,127 +266,132 @@ class TileObjects implements Runnable {
 
     List<PathAnnotationObject> tiledAnnSelector(List<Integer> tiles) {
         def tiledAnns = []
-//        def tilesToAnns = [:]
-        this.hier.getAnnotationObjects()
-            .each({
-                for (tile in this.getObjectTileOverlap(it)) {
-                    if (tile in tiles) {
-                        if (!(it in tiledAnns)) {
-                            tiledAnns.add(it)
-                        }
-//                        if (!(tile in tilesToAnns.keySet())) {
-//                            tilesToAnns.put(tile, [])
-//                        }
-//                        tilesToAnns.get(tile).add(it)
+        this.hier.getAnnotationObjects().each({
+            for (tile in this.getObjectTileOverlap(it)) {
+                if (tile in tiles) {
+                    if (!(it in tiledAnns)) {
+                        tiledAnns.add(it)
                     }
                 }
-            })
-        return tiledAnns//, tilesToAnns
+            }
+        })
+        return tiledAnns
     }
 
 
     void buildUnlockedTiles() {
         def tiles = this.annSelector()
-        def res = this.alertCallable(tiles.toString()).call()
-        if (res.isPresent() && res.get() == ButtonType.OK) {
+        if (this.alertCallable(tiles.toString()).call()) {
             this.addTiles(tiles, false)
         }
     }
 
     void lockTiles(boolean lock) {
         def tiles = this.tileSelector()
-        def res = this.alertCallable(tiles.toString()).call()
-        if (res.isPresent() && res.get() == ButtonType.OK) {
+        if (this.alertCallable(tiles.toString()).call()) {
             tiles.collect({this.tileMap.get(it)}).each({it.setLocked(lock)})
         }
     }
 
     void removeUnlockedTiles() {
         def tiles = this.tileMap.findAll({!it.value.isLocked()}).collect({it.key})
-        def res = this.alertCallable(tiles.toString()).call()
-        if (res.isPresent() && res.get() == ButtonType.OK) {
+        if (this.alertCallable(tiles.toString()).call()) {
             this.removeTiles(tiles)
         }
     }
 
-    String serializeAnns(List<PathAnnotationObject> anns) {
-        def out = new JSONArray()
-        def tiles = []
-        anns.collect({ def ann ->
-            def map = [:]
+
+    def jsonArrToList(JSONArray jsonArr) {
+      return jsonArr.length() == 0 ? [] : (0 .. jsonArr.length() - 1).toArray().collect({jsonArr.get(it)})
+    }
+
+    JSONArray serializeAnns(List<PathAnnotationObject> anns) {
+        return (new JSONArray(anns.collect({ def ann ->
             def roi = ann.getROI()
             def allPoints = roi.getAllPoints().collect({[it.getX(), it.getY()]})
-            map.put("x", allPoints.collect({it.get(0)}))
-            map.put("y", allPoints.collect({it.get(1)}))
+
+            def map = [:]
+            map.put("x", allPoints.collect({(double) it.get(0)}))
+            map.put("y", allPoints.collect({(double) it.get(1)}))
             map.put("plane", [roi.getC(), roi.getZ(), roi.getT()])
             map.put("tiles", this.getObjectTileOverlap(ann))
-            map.put("pathClasses", ann.pathClass != null ? PathClassTools.splitNames(ann.pathClass) : [])
-            tiles.addAll(map.get("tiles").findAll({!(it in tiles)}))
-            out.put(map)
-        })
-        return new JSONArray([out, tiles])
+            map.put("pathClasses", ann.pathClass == null ? [] : PathClassTools.splitNames(ann.pathClass))
+            return map
+        })))
     }
 
-    PathAnnotationObject recoverAnn(Map annDict) {
-        return null
-    }
+    List deserializeAnns(String json, Integer classDepth=-1) {
+        def annsArr = jsonArrToList(new JSONArray(json))
 
-    List deserializeAnns(String json, Boolean baseClass=false) {
-        def jsonArr = new JSONArray(json)
-        def annsArr = jsonArr.get(0)
-        def tilesArr = jsonArr.get(1)
-
-        def anns = (0 .. annsArr.length() - 1).toArray().collect({ Integer i ->
+        annsArr = annsArr.collect({ JSONObject ann ->
             def map = [:]
-            def item = annsArr.get(i)
 
-            def x = (0 .. item.get("x").length() - 1).toArray().collect({(double) item.get("x").get(it)})
-            def y = (0 .. item.get("y").length() - 1).toArray().collect({(double) item.get("y").get(it)})
-            def plane = ImagePlane.getPlaneWithChannel(*((0 .. 2).toArray().collect({item.get("plane").get(it)})))
-            def roi = ROIs.createPolygonROI((double[]) x, (double[]) y, plane)
+            map.put("x", (double[]) jsonArrToList(ann.get("x")))
+            map.put("y", (double[]) jsonArrToList(ann.get("y")))
+            map.put("tiles", (ArrayList<Integer>) jsonArrToList(ann.get("tiles")))//.collect({(Integer) it}))
+            map.put("plane", (ArrayList<Integer>) jsonArrToList(ann.get("plane")))//.collect({(Integer) it}))
+            map.put("pathClasses", (ArrayList<String>) jsonArrToList(ann.get("pathClasses")))//.collect({(String) it}))
 
-            def pathClasses = (ArrayList<String>) (0 .. item.get("pathClasses").length() - 1).toArray().collect({item.get("pathClasses").get(it)})
-            def pathClass = PathClassFactory.getPathClass(baseClass ? pathClasses[0] : pathClasses)
+            if (classDepth != -1 && map.get("pathClasses").size() > classDepth) {
+                map.put("pathClasses", map.get("pathClasses").subList(0, classDepth))
+            }
 
-            def annotation = PathObjects.createAnnotationObject(roi, pathClass)
-
-            map.put("roi", roi)
-            map.put("pathClass", pathClass)
-            map.put("annotation", annotation)
-
-            return annotation
+            return map
         })
-        def tiles = (0 .. tilesArr.length() - 1).toArray().collect({(Integer) tilesArr.get(it)})
 
-        return [anns, tiles]
+        return annsArr.collect({ Map annDict ->
+            def x = annDict.get("x")
+            def y = annDict.get("y")
+            def plane = ImagePlane.getPlaneWithChannel(*annDict.get("plane"))
+            def roi = ROIs.createPolygonROI(x, y, plane)
+            def pathClass = annDict.get("pathClasses").size() == 0 ? PathClassFactory.getPathClassUnclassified() : PathClassFactory.getPathClass(annDict.get("pathClasses"))
+            def annObj = PathObjects.createAnnotationObject(roi, pathClass)
+            return annObj
+        })
     }
+
 
     void getTilesAnnsJson() {
         def tiles = this.tileMap.findAll({it.value.isLocked()}).collect({it.key})
-        def tiledAnns = this.tiledAnnSelector(tiles).findAll({it.getROI().getRoiType() == ROI.RoiType.AREA && it.getROI().getRoiName() == "Polygon"})
-        def serialized = this.serializeAnns(tiledAnns)
-//        def annsDeserialized = this.deserializeAnns(annsSerialized)
-        this.alertCallable("There are " + tiledAnns.size().toString() + " annotations for " + tiles.size().toString() + " locked tiles.").call()
+        def anns = this.tiledAnnSelector(tiles).findAll({it.getROI().getRoiType() == ROI.RoiType.AREA && it.getROI().getRoiName() == "Polygon"})
+
+        String serialized = (new JSONObject())
+            .put("annotations", this.serializeAnns(anns))
+            .put("tiles", new JSONArray(tiles))
+            .toString()
 
         def params = new Params()
-        params.add("output", "Json: ", new TextArea())
+        params.add("output", "JSON (output): ", new TextArea())
         params.get("output").setText(serialized)
-//        params.add("display2", "Object: ", new TextArea())
-//        params.get("display2").setText(annsDeserialized.toString())
+
+        this.alertCallable("There are " + tiles.size().toString() + " locked tiles containing " + anns.size().toString() + " annotations.").call()
         this.dialogCallable(params.pane()).call()
     }
 
     void putTilesAnnsJson() {
         def params = new Params()
-        params.add("input", "Json: ", new TextArea())
+        params.add("input", "JSON (input): ", new TextArea())
+        params.add("pc", "Use pathClass: ", (new OptionBox(["None", "Base", "All"])).box)
+        params.add("output", "JSON (output): ", new TextArea())
+
         if (this.dialogCallable(params.pane()).call()) {
-            def deserialized = this.deserializeAnns(params.get("input").getText())
-            def res = this.alertCallable(deserialized.toString()).call()
-            if (res.isPresent() && res.get() == ButtonType.OK) {
-                def anns = deserialized.get(0)
+            def pcRes = params.get("pc").getValue()
+            def depth = -1
+            if (pcRes != null && pcRes < 2) {
+                depth = pcRes
+            }
+
+            def serialized = params.get("input").getText()
+            def deserialized = new JSONObject(serialized)
+            def anns = deserializeAnns(deserialized.get("annotations").toString(), depth)
+            def tiles = (ArrayList<Integer>) jsonArrToList(deserialized.get("tiles"))
+
+            params.get("output").setText(anns.toString())
+            if (this.dialogCallable(params.pane()).call()) {
                 this.hier.addPathObjects(anns)
-                this.alertCallable("Delete the annotations now").call()
-                this.hier.removeObjects(anns, false)
+                if (!this.alertCallable("Keep annotations?").call()) {
+                    this.hier.removeObjects(anns, false)
+                }
             }
         }
     }
@@ -371,35 +399,32 @@ class TileObjects implements Runnable {
 
 
     void run() {
-        def optList = [
+        def optBox = new OptionBox([
             "Build tiles (from annotations)",
             "Lock tiles",
             "Unlock tiles",
             "Remove unlocked tiles",
             "Annotations -> Json",
             "Json -> Annotations",
-        ]
-        def opts = new ChoiceBox()
-        opts.getItems().setAll(optList)
+        ]).box
 
         def params = new Params()
-        params.add("opts", "Options: ", opts)
+        params.add("optBox", "Options: ", optBox)
 
         if (this.dialogCallable(params.pane()).call()) {
-            def resp = params.get("opts").getValue()
+            def resp = params.get("optBox").getValue()
             if (resp != null) {
-                def opt = optList.indexOf(resp)
-                if (opt == 0) {
+                if (resp == 0) {
                     this.buildUnlockedTiles()
-                } else if (opt == 1) {
+                } else if (resp == 1) {
                     this.lockTiles(true)
-                } else if (opt == 2) {
+                } else if (resp == 2) {
                     this.lockTiles(false)
-                } else if (opt == 3) {
+                } else if (resp == 3) {
                     this.removeUnlockedTiles()
-                } else if (opt == 4) {
+                } else if (resp == 4) {
                     this.getTilesAnnsJson()
-                } else if (opt == 5) {
+                } else if (resp == 5) {
                     this.putTilesAnnsJson()
                 }
             }
