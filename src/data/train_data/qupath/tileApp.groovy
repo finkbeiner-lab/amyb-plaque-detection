@@ -385,7 +385,7 @@ class TileObjects implements Runnable {
             def deserialized = new JSONObject(serialized)
             def anns = deserializeAnns(deserialized.get("annotations").toString(), depth)
             def tiles = (ArrayList<Integer>) jsonArrToList(deserialized.get("tiles"))
-
+            
             params.get("output").setText(anns.toString())
             if (this.dialogCallable(params.pane()).call()) {
                 this.hier.addPathObjects(anns)
@@ -393,6 +393,41 @@ class TileObjects implements Runnable {
                     this.hier.removeObjects(anns, false)
                 }
             }
+        }
+    }
+    
+    void modifyJson() {
+        def params = new Params()
+        params.add("input", "JSON (input): ", new TextArea())
+        params.add("pc", "Use pathClass: ", (new OptionBox(["None", "Base", "All"])).box)
+        params.add("output", "JSON (output): ", new TextArea())
+
+        if (this.dialogCallable(params.pane()).call()) {
+            def pcRes = params.get("pc").getValue()
+            def depth = -1
+            if (pcRes != null && pcRes < 2) {
+                depth = pcRes
+            }
+
+            def serialized = params.get("input").getText()
+            def deserialized = new JSONObject(serialized)
+            def anns = deserializeAnns(deserialized.get("annotations").toString(), depth)
+            def tiles = (ArrayList<Integer>) jsonArrToList(deserialized.get("tiles"))
+            
+            
+             String new_serialized = (new JSONObject())
+            .put("annotations", this.serializeAnns(anns))
+            .put("tiles", new JSONArray(tiles))
+            .toString()
+
+            params.get("output").setText(new_serialized)
+             if (this.dialogCallable(params.pane()).call()) {
+                this.hier.addPathObjects(anns)
+                if (!this.alertCallable("Keep annotations?").call()) {
+                    this.hier.removeObjects(anns, false)
+                }
+            }
+
         }
     }
 
@@ -406,6 +441,7 @@ class TileObjects implements Runnable {
             "Remove unlocked tiles",
             "Annotations -> Json",
             "Json -> Annotations",
+            "modifyJson",
         ]).box
 
         def params = new Params()
@@ -426,8 +462,10 @@ class TileObjects implements Runnable {
                     this.getTilesAnnsJson()
                 } else if (resp == 5) {
                     this.putTilesAnnsJson()
+                } else if (resp == 6) {
+                    this.modifyJson()
                 }
-            }
+             }
         }
     }
 }
