@@ -44,12 +44,21 @@ import javafx.scene.control.TextArea
 import javafx.scene.control.TextField
 import javafx.scene.layout.GridPane
 import javafx.stage.Modality
+import javafx.stage.FileChooser
+import javafx.stage.DirectoryChooser
 import javafx.util.StringConverter
+
+import java.io.BufferedReader
+import java.io.FileReader
+import java.io.File
+
 
 import java.util.concurrent.Callable
 import java.util.concurrent.FutureTask
 
 import org.json.*
+import org.apache.commons.io.FileUtils;
+
 
 import qupath.lib.geom.Point2
 
@@ -152,6 +161,7 @@ class OptionBox extends ChoiceBox<Integer> {
 
 
 class TileObjects implements Runnable {
+    QuPathGUI gui
     PathObjectHierarchy hier
 
     Integer tileSize = 1024
@@ -204,17 +214,60 @@ class TileObjects implements Runnable {
     }
 
 
-    def TileObjects(PathObjectHierarchy hier) {
-        this.hier = hier
-        this.hier.getTileObjects().each({
-            if (it.getPathClass() == this.pathClass && it.getName() != null && it.getName().matches("[0-9]+")) {
-                def id = it.getName().toInteger()
-                if (!(id in this.tileMap.keySet()) || (it.isLocked() && !this.tileMap.get(id).isLocked())) {
-                    this.tileMap.put(id, it)
-                }
-            }
-        })
+    // def TileObjects(PathObjectHierarchy hier) {
+    //     // this.hier = hier
+    //     // this.hier.getTileObjects().each({
+    //     //     if (it.getPathClass() == this.pathClass && it.getName() != null && it.getName().matches("[0-9]+")) {
+    //     //         def id = it.getName().toInteger()
+    //     //         if (!(id in this.tileMap.keySet()) || (it.isLocked() && !this.tileMap.get(id).isLocked())) {
+    //     //             this.tileMap.put(id, it)
+    //     //         }
+    //     //     }
+    //     // })
+    //     // this.renderTiles()
+    //     this.hier = hier
+    //     this.tileMap = this.hierarchyToTiles(this.hier)
+    //     this.renderTiles()
+    // }
+
+    def TileObjects(QuPathGUI gui) {
+        this.gui = gui
+    }
+
+    def loadTiles() {
+        def imageData = this.gui.getImageData()
+        if (imageData == null) {
+            return false
+        }
+
+        this.hier = imageData.getHierarchy()
+        this.tileMap = this.hierarchyToTiles(this.hier)
         this.renderTiles()
+        return true
+    }
+
+    def hierarchyToTiles(PathObjectHierarchy hierarchy) {
+        def map = [:]
+        def selections = hierarchy.getSelectionModel()
+        hierarchy.getTileObjects().each({
+          if (it.getPathClass() == this.pathClass && it.getName() != null && it.getName().matches("[0-9]+")) {
+              def id = it.getName().toInteger()
+              def locked = it.isLocked()
+              def selected = selections.isSelected(it)
+
+              if (!(id in map.keySet())) {
+                  map.put(id, it)
+              } else {
+                  map.get(id).setLocked(locked)
+                  map.get(id).setSelected(selected)
+              }
+
+              // if (!(id in map.keySet()) || (it.isLocked() && !map.get(id).isLocked())) {
+              //     map.put(id, it)
+              // }
+          }
+        })
+        return map
     }
 
     PathTileObject createTileObject(Integer id, Boolean locked=false) {
@@ -353,7 +406,7 @@ class TileObjects implements Runnable {
 
 
     def jsonArrToList(JSONArray jsonArr) {
-      return jsonArr.length() == 0 ? [] : (0 .. jsonArr.length() - 1).toArray().collect({jsonArr.get(it)})
+      return jsonArr.length() == 0 ? [] : (0 ..< jsonArr.length()).toArray().collect({jsonArr.get(it)})
     }
 
     JSONArray serializeAnns(List<PathAnnotationObject> anns) {
@@ -401,86 +454,162 @@ class TileObjects implements Runnable {
         })
     }
 
+    //
+    // void getTilesAnnsJson() {
+    //     def tiles = this.tileMap.findAll({it.value.isLocked()}).collect({it.key})
+    //     def anns = this.annsFromTiles(tiles).findAll({it.getROI().getRoiType() == ROI.RoiType.AREA && it.getROI().getRoiName() == "Polygon"})
+    //
+    //     String serialized = (new JSONObject())
+    //         .put("annotations", this.serializeAnns(anns))
+    //         .put("tiles", new JSONArray(tiles))
+    //         .toString()
+    //
+    //     def params = new Params()
+    //     params.add("output", "JSON (output): ", new TextArea())
+    //     params.get("output").setText(serialized)
+    //
+    //     this.alertCallable("There are " + tiles.size().toString() + " locked tiles containing " + anns.size().toString() + " annotations.").call()
+    //     this.dialogCallable(params.pane()).call()
+    // }
+    //
+    // void putTilesAnnsJson() {
+    //     def params = new Params()
+    //     params.add("input", "JSON (input): ", new TextArea())
+    //     params.add("pc", "Use pathClass: ", new OptionBox(["None", "Base", "All"]))
+    //     params.add("output", "JSON (output): ", new TextArea())
+    //
+    //     if (this.dialogCallable(params.pane()).call()) {
+    //         def pcRes = params.get("pc").getValue()
+    //         def depth = -1
+    //         if (pcRes != null && pcRes < 2) {
+    //             depth = pcRes
+    //         }
+    //
+    //         def serialized = params.get("input").getText()
+    //         def deserialized = new JSONObject(serialized)
+    //         def anns = deserializeAnns(deserialized.get("annotations").toString(), depth)
+    //         def tiles = (ArrayList<Integer>) jsonArrToList(deserialized.get("tiles"))
+    //
+    //         params.get("output").setText(anns.toString())
+    //         if (this.dialogCallable(params.pane()).call()) {
+    //             this.hier.addPathObjects(anns)
+    //             if (!this.alertCallable("Keep annotations?").call()) {
+    //                 this.hier.removeObjects(anns, false)
+    //             }
+    //         }
+    //     }
+    // }
+    //
+    // void modifyJson() {
+    //     def params = new Params()
+    //     params.add("input", "JSON (input): ", new TextArea())
+    //     params.add("pc", "Use pathClass: ", new OptionBox(["None", "Base", "All"]))
+    //     params.add("output", "JSON (output): ", new TextArea())
+    //
+    //     if (this.dialogCallable(params.pane()).call()) {
+    //         def pcRes = params.get("pc").getValue()
+    //         def depth = -1
+    //         if (pcRes != null && pcRes < 2) {
+    //             depth = pcRes
+    //         }
+    //
+    //         def serialized = params.get("input").getText()
+    //         def deserialized = new JSONObject(serialized)
+    //         def anns = deserializeAnns(deserialized.get("annotations").toString(), depth)
+    //         def tiles = (ArrayList<Integer>) jsonArrToList(deserialized.get("tiles"))
+    //
+    //
+    //          String new_serialized = (new JSONObject())
+    //         .put("annotations", this.serializeAnns(anns))
+    //         .put("tiles", new JSONArray(tiles))
+    //         .toString()
+    //
+    //         params.get("output").setText(new_serialized)
+    //          if (this.dialogCallable(params.pane()).call()) {
+    //             this.hier.addPathObjects(anns)
+    //             if (!this.alertCallable("Keep annotations?").call()) {
+    //                 this.hier.removeObjects(anns, false)
+    //             }
+    //         }
+    //
+    //     }
+    // }
 
-    void getTilesAnnsJson() {
+    void exportJsonDialog() {
         def tiles = this.tileMap.findAll({it.value.isLocked()}).collect({it.key})
         def anns = this.annsFromTiles(tiles).findAll({it.getROI().getRoiType() == ROI.RoiType.AREA && it.getROI().getRoiName() == "Polygon"})
 
-        String serialized = (new JSONObject())
+        def json = (new JSONObject())
             .put("annotations", this.serializeAnns(anns))
             .put("tiles", new JSONArray(tiles))
-            .toString()
 
-        def params = new Params()
-        params.add("output", "JSON (output): ", new TextArea())
-        params.get("output").setText(serialized)
-
-        this.alertCallable("There are " + tiles.size().toString() + " locked tiles containing " + anns.size().toString() + " annotations.").call()
-        this.dialogCallable(params.pane()).call()
+        def file = (new FileChooser()).showSaveDialog()
+        if (file != null) {
+            FileUtils.writeStringToFile(file, json.toString(), null)
+        }
     }
 
-    void putTilesAnnsJson() {
-        def params = new Params()
-        params.add("input", "JSON (input): ", new TextArea())
-        params.add("pc", "Use pathClass: ", new OptionBox(["None", "Base", "All"]))
-        params.add("output", "JSON (output): ", new TextArea())
+    void importJsonDialog() {
+        def file = (new FileChooser()).showOpenDialog()
+        if (file != null) {
+            def json = new JSONObject(FileUtils.readFileToString(file, null))
+            def anns = deserializeAnns(json.get("annotations").toString())
+            def tiles = jsonArrToList(json.get("tiles"))
 
-        if (this.dialogCallable(params.pane()).call()) {
-            def pcRes = params.get("pc").getValue()
-            def depth = -1
-            if (pcRes != null && pcRes < 2) {
-                depth = pcRes
+            // if (this.alertCallable("Import " + anns.size().toString() " annotations for " + tiles.size().toString()).call()) {
+            if (this.alertCallable("Import annotations?").call()) {
+                def oldTilesLocked = this.tileMap.findAll({it.value.isLocked()}).collect({it.key})
+                def oldTilesUnlocked = this.tileMap.findAll({!it.value.isLocked()}).collect({it.key})
+
+                this.hier.addPathObjects(anns)
+                this.addTiles(tiles, true)
+
+                def params = new Params()
+                params.add("anns", "Keep annotations: ", new CheckBox())
+                params.get("anns").setSelected(true)
+                params.get("anns").setAllowIndeterminate(false)
+
+                params.add("tiles", "Keep locked tiles: ", new CheckBox())
+                params.get("tiles").setSelected(true)
+                params.get("tiles").setAllowIndeterminate(false)
+
+                def resp = this.dialogCallable(params.pane()).call()
+                def keepAnns = !resp ? false : params.get("anns").isSelected()
+                def keepTiles = !resp ? false : params.get("tiles").isSelected()
+
+                if (!keepAnns) {
+                    this.hier.removeObjects(anns)
+                }
+                if (!keepTiles) {
+                    this.removeTiles(tiles, true)
+                    this.addTiles(oldTilesLocked, true)
+                    this.addTiles(oldTilesUnlocked, false)
+                }
             }
+        }
+    }
 
-            def serialized = params.get("input").getText()
-            def deserialized = new JSONObject(serialized)
-            def anns = deserializeAnns(deserialized.get("annotations").toString(), depth)
-            def tiles = (ArrayList<Integer>) jsonArrToList(deserialized.get("tiles"))
+    void modifyJsonDialog() {
+        def oldFile = (new FileChooser()).showOpenDialog()
+        if (oldFile != null) {
+            def oldJson = new JSONObject(FileUtils.readFileToString(oldFile, null))
+            def anns = deserializeAnns(oldJson.get("annotations").toString())
+            def tiles = jsonArrToList(oldJson.get("tiles"))
 
-            params.get("output").setText(anns.toString())
+            def params = new Params()
+            params.add("pc", "Use pathClass: ", new OptionBox(["None", "Base", "All"]))
             if (this.dialogCallable(params.pane()).call()) {
-                this.hier.addPathObjects(anns)
-                if (!this.alertCallable("Keep annotations?").call()) {
-                    this.hier.removeObjects(anns, false)
+                def newJson = (new JSONObject())
+                    .put("annotations", this.serializeAnns(anns))
+                    .put("tiles", new JSONArray(tiles))
+                def newFile = (new FileChooser()).showSaveDialog()
+                if (newFile != null) {
+                    FileUtils.writeStringToFile(newFile, newJson.toString(), null)
                 }
             }
         }
     }
 
-    void modifyJson() {
-        def params = new Params()
-        params.add("input", "JSON (input): ", new TextArea())
-        params.add("pc", "Use pathClass: ", new OptionBox(["None", "Base", "All"]))
-        params.add("output", "JSON (output): ", new TextArea())
-
-        if (this.dialogCallable(params.pane()).call()) {
-            def pcRes = params.get("pc").getValue()
-            def depth = -1
-            if (pcRes != null && pcRes < 2) {
-                depth = pcRes
-            }
-
-            def serialized = params.get("input").getText()
-            def deserialized = new JSONObject(serialized)
-            def anns = deserializeAnns(deserialized.get("annotations").toString(), depth)
-            def tiles = (ArrayList<Integer>) jsonArrToList(deserialized.get("tiles"))
-
-
-             String new_serialized = (new JSONObject())
-            .put("annotations", this.serializeAnns(anns))
-            .put("tiles", new JSONArray(tiles))
-            .toString()
-
-            params.get("output").setText(new_serialized)
-             if (this.dialogCallable(params.pane()).call()) {
-                this.hier.addPathObjects(anns)
-                if (!this.alertCallable("Keep annotations?").call()) {
-                    this.hier.removeObjects(anns, false)
-                }
-            }
-
-        }
-    }
 
     void builderDialog() {
         def sel = this.hier.getSelectionModel()
@@ -554,85 +683,82 @@ class TileObjects implements Runnable {
         }
     }
 
-
     void run() {
-        def optBox = new OptionBox([
-            "Build tiles",
-            "Select tiles",
-            "Lock tiles",
-            "Remove tiles",
-            "Annotations -> Json",
-            "Json -> Annotations",
-            "modifyJson",
-        ])
+        if (this.loadTiles()) {
+            def params = new Params()
+            params.add("options", "Options: ", new OptionBox([
+                "Build tiles",
+                "Select tiles",
+                "Lock tiles",
+                "Remove tiles",
+                "Export to JSON",
+                "Import from JSON",
+                "Modify JSON",
+            ]))
 
-        def params = new Params()
-        params.add("optBox", "Options: ", optBox)
-
-        if (this.dialogCallable(params.pane()).call()) {
-            def resp = params.get("optBox").getValue()
-            if (resp != null) {
-                if (resp == 0) {
-                    this.builderDialog()
-                } else if (resp == 1) {
-                    this.selectorDialog()
-                } else if (resp == 2) {
-                    this.lockerDialog()
-                } else if (resp == 3) {
-                    this.removerDialog()
-                } else if (resp == 4) {
-                    this.getTilesAnnsJson()
-                } else if (resp == 5) {
-                    this.putTilesAnnsJson()
-                } else if (resp == 6) {
-                    this.modifyJson()
+            if (this.dialogCallable(params.pane()).call()) {
+                def resp = params.get("options").getValue()
+                if (resp != null) {
+                    if (resp == 0) {
+                        this.builderDialog()
+                    } else if (resp == 1) {
+                        this.selectorDialog()
+                    } else if (resp == 2) {
+                        this.lockerDialog()
+                    } else if (resp == 3) {
+                        this.removerDialog()
+                    } else if (resp == 4) {
+                        // this.getTilesAnnsJson()
+                        this.exportJsonDialog()
+                    } else if (resp == 5) {
+                        // this.putTilesAnnsJson()
+                        this.importJsonDialog()
+                    } else if (resp == 6) {
+                        // this.modifyJson()
+                        this.modifyJsonDialog()
+                    }
                 }
             }
-        }
-    }
-}
-
-
-
-
-//def hier = QPEx.getCurrentHierarchy()
-def gui = QPEx.getQuPath().getInstance()
-
-//def app = new TileObjects(hier)
-//gui.installCommand("tileTool", app)
-
-class Runner implements Runnable {
-    def Runner(QuPathGUI gui) {
-        this.gui = gui
-        this.imageData = null
-        this.instance = null
-    }
-
-    def getInstance() {
-        def imageData = this.gui.getImageData()
-        if (imageData != null) {
-            if (imageData != this.imageData) {
-                this.imageData = imageData
-                this.instance = new TileObjects(this.imageData.getHierarchy())
-            } else if (this.instance == null) {
-                this.instance = new TileObjects(this.imageData.getHierarchy())
-            }
         } else {
-            this.instance = null
-        }
-    }
-
-    @Override void run() {
-        this.getInstance()
-        if (this.instance != null) {
-            this.gui.installCommand("tileTool", this.instance)
+            this.alertCallable("No ImageData available").call()
         }
     }
 }
 
 
-gui.installCommand("tileToolBuilder", new Runnable() {
-    @Override void run() {
-        gui.installCommand("tileTool", new TileObjects(gui.getImageData().getHierarchy()))
-    }
-})
+def gui = QPEx.getQuPath().getInstance()
+gui.installCommand("Tile Manager", new TileObjects(gui))
+
+
+// class Runner implements Runnable {
+//     QuPathGUI gui
+//     ImageData imageData
+//     Runnable instance
+//
+//     def Runner(QuPathGUI gui) {
+//         this.gui = gui
+//         this.imageData = null
+//         this.instance = null
+//     }
+//
+//     def getInstance() {
+//         def imageData = this.gui.getImageData()
+//         if (imageData == null) {
+//             this.instance = null
+//         } else if (imageData != this.imageData) {
+//             this.instance = new TileObjects(imageData.getHierarchy())
+//         }
+//         this.imageData = imageData
+//         return this.instance
+//     }
+//
+//     @Override void run() {
+//         if (this.getInstance() != null) {
+//             this.instance.run()
+//         }
+//     }
+// }
+//
+//
+// def gui = QPEx.getQuPath().getInstance()
+// gui.installCommand("Tile Manager", new Runner(gui))
