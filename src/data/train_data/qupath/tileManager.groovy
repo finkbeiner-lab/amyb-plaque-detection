@@ -64,6 +64,7 @@ import qupath.lib.geom.Point2
 
 
 
+// Main wrapper class for storing/accessing parameters and generating GridPanes for Dialog boxes
 
 class Params {
     def paramDict
@@ -93,40 +94,8 @@ class Params {
     }
 }
 
-// class OptionBox {
-//     OptionConverter converter
-//     ChoiceBox box
-//
-//     class OptionConverter extends StringConverter<Integer> {
-//         List<String> options
-//         String defaultOption
-//
-//         def OptionConverter(List<String> options, String defaultOption=null) {
-//             this.options = options
-//             if (defaultOption == null) {
-//                 this.defaultOption = ""
-//             }
-//         }
-//
-//         @Override String toString(Integer index) {
-//             if (index == null) {
-//                 return this.defaultOption
-//             }
-//             return this.options.get(index)
-//         }
-//
-//         @Override Integer fromString(String value) {
-//             return this.options.indexOf(value)
-//         }
-//     }
-//
-//     def OptionBox(List<String> options, String defaultOption=null) {
-//         this.converter = new OptionConverter(options, defaultOption)
-//         this.box = new ChoiceBox<Integer>()
-//         this.box.setConverter(this.converter)
-//         this.box.getItems().setAll((0 .. options.size() - 1).toArray())
-//     }
-// }
+
+// Custom ChoiceBox wrapper to accept a fixed list of options and return option index number via converter by default
 
 class OptionBox extends ChoiceBox<Integer> {
     class OptionConverter extends StringConverter<Integer> {
@@ -159,6 +128,7 @@ class OptionBox extends ChoiceBox<Integer> {
 }
 
 
+// Main wrapper class for the app (need to break this up into controller/viewer classes)
 
 class TileObjects implements Runnable {
     QuPathGUI gui
@@ -213,27 +183,16 @@ class TileObjects implements Runnable {
         return this.getBoundsTileOverlap(*xy, *wh).collect({TileObjects.encode(*it)})
     }
 
-
-    // def TileObjects(PathObjectHierarchy hier) {
-    //     // this.hier = hier
-    //     // this.hier.getTileObjects().each({
-    //     //     if (it.getPathClass() == this.pathClass && it.getName() != null && it.getName().matches("[0-9]+")) {
-    //     //         def id = it.getName().toInteger()
-    //     //         if (!(id in this.tileMap.keySet()) || (it.isLocked() && !this.tileMap.get(id).isLocked())) {
-    //     //             this.tileMap.put(id, it)
-    //     //         }
-    //     //     }
-    //     // })
-    //     // this.renderTiles()
-    //     this.hier = hier
-    //     this.tileMap = this.hierarchyToTiles(this.hier)
-    //     this.renderTiles()
-    // }
-
+    
+    // Recent change: we now only persist a QuPathGUI instance, and on each call extract the active hierarchy if applicable and render tiles from there
+    
     def TileObjects(QuPathGUI gui) {
         this.gui = gui
     }
-
+    
+    
+    // TODO: make tileMap an ObservableMap?
+    
     def loadTiles() {
         def imageData = this.gui.getImageData()
         if (imageData == null) {
@@ -261,10 +220,6 @@ class TileObjects implements Runnable {
                   map.get(id).setLocked(locked)
                   map.get(id).setSelected(selected)
               }
-
-              // if (!(id in map.keySet()) || (it.isLocked() && !map.get(id).isLocked())) {
-              //     map.put(id, it)
-              // }
           }
         })
         return map
@@ -296,12 +251,18 @@ class TileObjects implements Runnable {
         })
         this.renderTiles()
     }
-
+    
+    
+    // Refreshes the tile renders cheaply by holding on to tile objects and replacing with the authoritative copies of said objects from the tileMap
+    // TODO: perform check on tile agreement here (i.e. loadTiles() call?) if we do not implement an ObservableMap for the tileMap
+    
     void renderTiles() {
         this.hier.removeObjects(this.hier.getTileObjects(), false)
         this.hier.addPathObjects(this.tileMap.values())
     }
 
+    
+    // Utility for generating simple alert box
     def alertCallable(String msg) {
       return new Callable<Boolean>() {
           @Override Boolean call() {
@@ -313,7 +274,8 @@ class TileObjects implements Runnable {
           }
       }
     }
-
+    
+    // Utility for generating Dialog box with custom GridPane inserted and modality None (should this be a parameter?)
     def dialogCallable(DialogPane pane) {
         return new Callable<Boolean>() {
             @Override Boolean call() {
@@ -326,22 +288,6 @@ class TileObjects implements Runnable {
         }
     }
 
-
-
-    // List<Integer> tilesFromSelectedAnns() {
-    //     def sel = this.hier.getSelectionModel()
-    //     def tiles = []
-    //     this.hier.getAnnotationObjects()
-    //         .findAll({sel.isSelected(it)})
-    //         .each({
-    //             for (tile in this.getObjectTileOverlap(it)) {
-    //                 if (!(tile in tiles)) {
-    //                     tiles.add(tile)
-    //                 }
-    //             }
-    //         })
-    //     return tiles
-    // }
 
     List<Integer> tilesFromAnns(List<PathAnnotationObject> anns) {
         def tiles = []
@@ -370,7 +316,7 @@ class TileObjects implements Runnable {
     }
 
 
-
+    // Select: whether to select or deselect, Locked: whether to address locked tiles, Unlocked: whether to address unlocked tiles
     void setSelectedTiles(boolean select, boolean locked, boolean unlocked) {
         def sel = this.hier.getSelectionModel()
         def tiles = this.tileMap.values().findAll({(locked && it.isLocked()) || (unlocked && !it.isLocked())})
@@ -382,33 +328,15 @@ class TileObjects implements Runnable {
     }
 
 
-    // List<Integer> getSelectedTiles() {
-    //   def sel = this.hier.getSelectionModel()
-    //   return this.tileMap//.values()
-    //   .findAll({sel.isSelected(it.value)})
-    //   .collect({it.key})//getName().toInteger()})
-    // }
-
-
-    // void lockTiles(boolean lock) {
-    //     def tiles = this.getSelectedTiles()
-    //     if (this.alertCallable(tiles.toString()).call()) {
-    //         tiles.collect({this.tileMap.get(it)}).each({it.setLocked(lock)})
-    //     }
-    // }
-
-    // void removeUnlockedTiles() {
-    //     def tiles = this.tileMap.findAll({!it.value.isLocked()}).collect({it.key})
-    //     if (this.alertCallable(tiles.toString()).call()) {
-    //         this.removeTiles(tiles)
-    //     }
-    // }
-
-
     def jsonArrToList(JSONArray jsonArr) {
       return jsonArr.length() == 0 ? [] : (0 ..< jsonArr.length()).toArray().collect({jsonArr.get(it)})
     }
 
+    
+    // Serialization routines:
+    //   should these be broken out into a separate class for tweaks and for testing/portability purposes?
+    
+    
     JSONArray serializeAnns(List<PathAnnotationObject> anns) {
         return (new JSONArray(anns.collect({ def ann ->
             def roi = ann.getROI()
@@ -454,7 +382,8 @@ class TileObjects implements Runnable {
         })
     }
 
-    //
+    // Old text-based serialization dialogs
+    
     // void getTilesAnnsJson() {
     //     def tiles = this.tileMap.findAll({it.value.isLocked()}).collect({it.key})
     //     def anns = this.annsFromTiles(tiles).findAll({it.getROI().getRoiType() == ROI.RoiType.AREA && it.getROI().getRoiName() == "Polygon"})
@@ -535,6 +464,9 @@ class TileObjects implements Runnable {
     //     }
     // }
 
+    
+    // New file-based serialization dialogs
+    
     void exportJsonDialog() {
         def tiles = this.tileMap.findAll({it.value.isLocked()}).collect({it.key})
         def anns = this.annsFromTiles(tiles).findAll({it.getROI().getRoiType() == ROI.RoiType.AREA && it.getROI().getRoiName() == "Polygon"})
@@ -610,6 +542,8 @@ class TileObjects implements Runnable {
         }
     }
 
+    
+    // New builder, selector, locker, remover Dialogs
 
     void builderDialog() {
         def sel = this.hier.getSelectionModel()
@@ -683,6 +617,9 @@ class TileObjects implements Runnable {
         }
     }
 
+    
+    // This is called when you click the menu
+    
     void run() {
         if (this.loadTiles()) {
             def params = new Params()
@@ -729,6 +666,9 @@ class TileObjects implements Runnable {
 def gui = QPEx.getQuPath().getInstance()
 gui.installCommand("Tile Manager", new TileObjects(gui))
 
+
+
+// Old workaround hack to prevent old cache from carrying over to a new image context (obsolete)
 
 // class Runner implements Runnable {
 //     QuPathGUI gui
