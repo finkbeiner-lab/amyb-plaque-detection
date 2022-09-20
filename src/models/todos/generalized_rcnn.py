@@ -215,7 +215,6 @@ class GeneralizedRCNN(nn.Module):
 
         if len(detections)!= 0:
             self.visualize_roi_detections(images, detections, 20,False)
-            pdb.set_trace()
 
         losses = {}
         losses.update(detector_losses)

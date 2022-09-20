@@ -5,8 +5,11 @@ import torch
 import torch.utils.data
 import torchvision
 from features import transforms as T
+
+# TODO
 from pycocotools import mask as coco_mask
 from pycocotools.coco import COCO
+import pdb
 
 
 class FilterAndRemapCocoCategories:
@@ -157,19 +160,21 @@ def convert_to_coco_api(ds):
         img_dict["width"] = img.shape[-1]
         dataset["images"].append(img_dict)
         bboxes = targets["boxes"].clone()
+        #Convert x, y, w, h to list [x1, y1, x2, y2]
         bboxes[:, 2:] -= bboxes[:, :2]
         bboxes = bboxes.tolist()
+        
         labels = targets["labels"].tolist()
         areas = targets["area"].tolist()
         iscrowd = targets["iscrowd"].tolist()
 
+        # TODO Vivek Remove keypoints 
         if "masks" in targets:
             masks = targets["masks"]
-            # make masks Fortran contiguous for coco_mask
+
+            # make masks Fortran contiguous for coco_mask - Since it is changed to N, H, W format
             masks = masks.permute(0, 2, 1).contiguous().permute(0, 2, 1)
-        if "keypoints" in targets:
-            keypoints = targets["keypoints"]
-            keypoints = keypoints.reshape(keypoints.shape[0], -1).tolist()
+        
         num_objs = len(bboxes)
         for i in range(num_objs):
             ann = {}
@@ -182,9 +187,6 @@ def convert_to_coco_api(ds):
             ann["id"] = ann_id
             if "masks" in targets:
                 ann["segmentation"] = coco_mask.encode(masks[i].numpy())
-            if "keypoints" in targets:
-                ann["keypoints"] = keypoints[i]
-                ann["num_keypoints"] = sum(k != 0 for k in keypoints[i][2::3])
             dataset["annotations"].append(ann)
             ann_id += 1
     dataset["categories"] = [{"id": i} for i in sorted(categories)]
@@ -194,13 +196,14 @@ def convert_to_coco_api(ds):
 
 
 def get_coco_api_from_dataset(dataset):
-    for _ in range(10):
-        if isinstance(dataset, torchvision.datasets.CocoDetection):
-            break
-        if isinstance(dataset, torch.utils.data.Subset):
-            dataset = dataset.dataset
-    if isinstance(dataset, torchvision.datasets.CocoDetection):
-        return dataset.coco
+    #TODO Vivek remove this part as it is not needed
+    # for _ in range(10):
+    #     if isinstance(dataset, torchvision.datasets.CocoDetection):
+    #         break
+    #     if isinstance(dataset, torch.utils.data.Subset):
+    #         dataset = dataset.dataset
+    # if isinstance(dataset, torchvision.datasets.CocoDetection):
+    #     return dataset.coco
     return convert_to_coco_api(dataset)
 
 

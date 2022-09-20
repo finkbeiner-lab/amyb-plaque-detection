@@ -13,6 +13,7 @@ from model_mrcnn import _default_mrcnn_config, build_default
 from features import build_features
 from features import transforms as T
 from utils.engine import evaluate
+from codecarbon import EmissionsTracker
 
 
 # Sets the behavior of calls such as
@@ -107,11 +108,11 @@ if __name__ == '__main__':
     dataset_test_location = '/home/vivek/Datasets/AmyB/amyb_wsi/test'
 
     train_config = dict(
-        epochs = 50,
-        batch_size = 3,
+        epochs = 150,
+        batch_size = 8,
         num_classes = 3,
         device_id = 0,
-        ckpt_freq =1,
+        ckpt_freq =100,
     )
 
     test_config = dict(
@@ -122,11 +123,11 @@ if __name__ == '__main__':
     optim_config = dict(
         # cls=grad_optim.GradSGD,
         cls=torch.optim.SGD,
-        defaults=dict(lr=1. * (10. ** (-3)))
+        defaults=dict(lr=1. * (10. ** (-2)))
     )
     wandb_config = dict(
-        project='mrcnn_train',
-        entity='gladstone-npsad',
+        project='nps-ad-vivek',
+        entity='hellovivek',
         config=dict(
             train_config=train_config,
             model_config=model_config,
@@ -171,17 +172,13 @@ if __name__ == '__main__':
     run = wandb.init(**wandb_config)
     assert run is wandb.run # run was successfully initialized, is not None
     run_id, run_dir = run.id, run.dir
-    # ckpt_dirname = 'ckpts'
-    # os.makedirs(os.path.join(run_dir, ckpt_dirname), exist_ok=False)
-
-    # entity, project = [wandb_config[k] for k in 'entity project'.split()]
-    # artifact_name = '/'.join([f'{wandb_config.get(k)}' for k in keys] + ['artifact:alias'])
 
     artifact_name = f'{run_id}-logs'
 
     # Train Data
+    # with EmissionsTracker() as tracker:
     for epoch in range(train_config['epochs']):
-        print(f'Epoch {epoch} started.')
+        print(f'Epoch {epoch}=======================================>.')
 
 
         for logs in train_one_epoch(model, loss_fn, optimizer, train_data_loader, device, epoch=epoch, log_freq=1):
@@ -195,24 +192,12 @@ if __name__ == '__main__':
                 torch.save(model.state_dict(), f)
             run.log_artifact(artifact)
 
-        if epoch % 5 == 0:
-            eval_logs, eval_res = evaluate(model, test_data_loader, device=device)
-
-        print(f'Epoch {epoch} ended.')
+        if epoch % 10 == 0:
+            eval_res = evaluate(run, model, test_data_loader, device=device)
+        
+        model.train(True)
 
     run.finish()
 
-
-    # ckpt_fname = os.path.join(run_dir, ckpt_dirname, f'{epoch}.pt')
-    #
-    # with open(ckpt_fname, 'wb') as fh:
-    #     torch.save(model.state_dict(), fh)
-    # torch.save(model.state_dict(), ckpt_fname)
-    # run.save(
-    #     glob_str=ckpt_fname,
-    #     base_path=run_dir, # keep subdirectory structure
-    #     policy='now', # sync immediatelly; allow removal afterward
-    # )
-    # os.remove(ckpt_fname)
-
-    # run.log_artifact(checkpoints)
+    model_save_name = "../../models/pytorch_mrcnn_model_{epoch}.pth"
+    torch.save(model, model_save_name.format(epoch=train_config['epochs']))

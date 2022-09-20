@@ -8,7 +8,7 @@ from torchvision.ops import boxes as box_ops, roi_align
 import pdb
 import matplotlib.pyplot as plt
 
-from . import _utils as det_utils
+from . import det_utils
 
 def fastrcnn_loss(class_logits, box_regression, labels, regression_targets):
     # type: (Tensor, Tensor, List[Tensor], List[Tensor]) -> Tuple[Tensor, Tensor]

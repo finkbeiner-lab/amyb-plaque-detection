@@ -64,19 +64,21 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, wandb, print_f
 
 
 def _get_iou_types(model):
-    model_without_ddp = model
-    if isinstance(model, torch.nn.parallel.DistributedDataParallel):
-        model_without_ddp = model.module
-    iou_types = ["bbox"]
-    if isinstance(model_without_ddp, torchvision.models.detection.MaskRCNN):
-        iou_types.append("segm")
-    if isinstance(model_without_ddp, torchvision.models.detection.KeypointRCNN):
-        iou_types.append("keypoints")
+    #TODO Vivek commented this, to enable segm metrics
+    # model_without_ddp = model
+    # if isinstance(model, torch.nn.parallel.DistributedDataParallel):
+    #     model_without_ddp = model.module
+    # iou_types = ["bbox"]
+    # if isinstance(model_without_ddp, torchvision.models.detection.MaskRCNN):
+    #     iou_types.append("segm")
+    # if isinstance(model_without_ddp, torchvision.models.detection.KeypointRCNN):
+    #     iou_types.append("keypoints")
+    iou_types = ["bbox", "segm"]
     return iou_types
 
 
 @torch.inference_mode()
-def evaluate(model, data_loader, device):
+def evaluate(run, model, data_loader, device):
     n_threads = torch.get_num_threads()
     # FIXME remove this and make paste_masks_in_image run on the GPU
     torch.set_num_threads(1)
@@ -103,7 +105,6 @@ def evaluate(model, data_loader, device):
         res = {target["image_id"].item(): output for target, output in zip(targets, outputs)}
         # print(len(outputs))
         # print("Outputs", outputs[0]['labels'])
-        # pdb.set_trace()
         
         evaluator_time = time.time()
         coco_evaluator.update(res)
@@ -113,10 +114,11 @@ def evaluate(model, data_loader, device):
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
+    
     coco_evaluator.synchronize_between_processes()
 
     # accumulate predictions from all images
     coco_evaluator.accumulate()
-    coco_evaluator.summarize()
+    coco_evaluator.summarize(run)
     torch.set_num_threads(n_threads)
     return coco_evaluator
