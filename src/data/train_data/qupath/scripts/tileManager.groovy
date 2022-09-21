@@ -434,14 +434,14 @@ class TileObjects implements Runnable {
 
         def file = (new FileChooser()).showSaveDialog()
         if (file != null) {
-            FileUtils.writeStringToFile(file, json.toString(), null)
+            FileUtils.writeStringToFile(file, json.toString(), (String) null)
         }
     }
 
     void importJsonDialog() {
         def file = (new FileChooser()).showOpenDialog()
         if (file != null) {
-            def json = new JSONObject(FileUtils.readFileToString(file, null))
+            def json = new JSONObject(FileUtils.readFileToString(file, (String) null))
             def anns = deserializeAnns(json.get("annotations").toString())
             def tiles = jsonArrToList(json.get("tiles"))
 
