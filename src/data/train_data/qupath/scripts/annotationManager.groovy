@@ -149,10 +149,12 @@ class AnnotatorDialog implements Runnable {
 
     def AnnotatorDialog(PathObjectHierarchy hierarchy) {
         this.hierarchy = hierarchy
+        
+        List<String> pathClassList = ["Core", "Diffuse", "Neuritic", "CAA"]
 
         LinkedHashMap<String, PathClass> pathClassMap = new LinkedHashMap<String, PathClass>()
         pathClassMap.put("", PathClassFactory.getPathClassUnclassified())
-        ["Core", "Diffuse", "Neuritic"].each({pathClassMap.put(it, PathClassFactory.getPathClass(it))})
+        pathClassList.each({pathClassMap.put(it, PathClassFactory.getPathClass(it))})
 
         LinkedHashMap<String, Integer> intensityMap = new LinkedHashMap<String, Integer>()
         intensityMap.put("0", 0)
