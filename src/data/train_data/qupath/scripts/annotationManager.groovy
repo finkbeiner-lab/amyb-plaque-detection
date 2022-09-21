@@ -295,7 +295,7 @@ def build(String keyCombination=null) {
     def gui = QPEx.getQuPath().getInstance()
     def hier = QPEx.getCurrentHierarchy()
     def app = new AnnotatorDialog(hier)
-    def menu = gui.installCommand("annotatorApp", app)
+    def menu = gui.installCommand("Annotation Manager", app)
 
     if (keyCombination != null) {
         Platform.runLater({
