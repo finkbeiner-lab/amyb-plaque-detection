@@ -110,7 +110,7 @@ class Installer {
     }
 }
 
-Platform.runLater(Installer.getInstaller("extensions"))
+Platform.runLater(Installer.getInstaller("scripts"))
 
 
 
