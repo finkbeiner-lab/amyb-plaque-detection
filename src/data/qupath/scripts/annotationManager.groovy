@@ -146,9 +146,10 @@ class AnnotatorDialog implements Runnable {
     Callable<PathClass> annotatorCallable
     ParamDialog<ArrayList<Param<ChoiceParam<Object>, Object>>, ArrayList<Object>> dialog
     PathObjectHierarchy hierarchy
+    QuPathGUI gui
 
-    def AnnotatorDialog(PathObjectHierarchy hierarchy) {
-        this.hierarchy = hierarchy
+    def AnnotatorDialog(QuPathGUI gui) {
+        this.gui = gui
         
         List<String> pathClassList = ["Core", "Diffuse", "Neuritic", "CAA"]
 
@@ -288,15 +289,17 @@ class AnnotatorDialog implements Runnable {
     }
 
     @Override void run() {
-        this.build().call()
+        if (this.gui.getImageData() != null) {
+            this.hierarchy = this.gui.getImageData().getHierarchy()
+            this.build().call()
+        }
     }
 }
 
 
 def build(String keyCombination=null) {
     def gui = QPEx.getQuPath().getInstance()
-    def hier = QPEx.getCurrentHierarchy()
-    def app = new AnnotatorDialog(hier)
+    def app = new AnnotatorDialog(gui)
     def menu = gui.installCommand("Annotation Manager", app)
 
     if (keyCombination != null) {
