@@ -90,7 +90,7 @@ class Installer {
     
     static def getManifestPairs() {
         def localRoot = Paths.get(PathPrefs.getUserPath()) // Local user directory
-        def remoteRoot = new URL("https://raw.githubusercontent.com/finkbeiner-lab/amyb-plaque-detection/qupath/src/data/qupath/") // Equivalent remote directory
+        def remoteRoot = new URL("https://raw.githubusercontent.com/finkbeiner-lab/amyb-plaque-detection/main/src/data/qupath/") // Equivalent remote directory
         def remoteManifest = new URL(remoteRoot, "manifest.txt") // Remote manifest file
         def manifestGroups = ["scripts": ["groovy"], "extensions": ["jar"]] // Filter manifest file according to these descriptors
         
