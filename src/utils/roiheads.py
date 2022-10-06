@@ -341,7 +341,6 @@ def keypointrcnn_inference(x, boxes):
 
     return kp_probs, kp_scores
 
-
 def _onnx_expand_boxes(boxes, scale):
     # type: (Tensor, float) -> Tensor
     w_half = (boxes[:, 2] - boxes[:, 0]) * 0.5

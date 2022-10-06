@@ -108,8 +108,8 @@ if __name__ == '__main__':
     dataset_test_location = '/home/vivek/Datasets/AmyB/amyb_wsi/test'
 
     train_config = dict(
-        epochs = 150,
-        batch_size = 8,
+        epochs = 50,
+        batch_size = 4,
         num_classes = 3,
         device_id = 0,
         ckpt_freq =100,
@@ -148,7 +148,7 @@ if __name__ == '__main__':
             collate_fn=collate_fn)
     
     test_data_loader = torch.utils.data.DataLoader(
-            test_dataset, batch_size=test_config['batch_size'], shuffle=True, num_workers=4,
+            test_dataset, batch_size=test_config['batch_size'], shuffle=False, num_workers=4,
             collate_fn=collate_fn)
 
     
