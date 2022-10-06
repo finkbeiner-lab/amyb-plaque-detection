@@ -4,12 +4,15 @@ import qupath.lib.roi.ROIs
 import qupath.lib.regions.ImagePlane
 import qupath.lib.regions.ImageRegion
 import qupath.lib.io.GsonTools
+import qupath.lib.objects.classes.PathClassTools
 
 
 //TODO:
 // general cleanup
 // fix (or check) image server pixel size, plane
 // find grid specs, methods to define custom overlays/grid overlays/text overlays
+
+def tileSize = 1024
 
 def imageData = QPEx.getCurrentImageData()
 def server = imageData.getServer()
@@ -28,7 +31,7 @@ def annotationsMap(annotations) {
         if (label == null) {
             unlabeled.add(annotation)
         } else {
-            label = label.name
+            label = PathClassTools.splitNames(label)
             if (labeled[label] == null) {
                 labeled.put(label, [])
             }
@@ -50,10 +53,11 @@ def annotationsToROIsMap(annotations) {
         if (label == null) {
             unlabeled.add(roi)
         } else {
-            label = label.name
+            label = PathClassTools.splitNames(label)
             if (labeled[label] == null) {
                 labeled.put(label, [])
             }
+            
             labeled[label].add(roi)
         }
     }
@@ -143,13 +147,6 @@ def ROIsToTileROIs(t, rois, plane) {
     return allTileROIs
 }
 
-//def ROIsToTileDicts(t, rois) {
-//    def allTileDicts = [:]
-//    for (roi in rois) {
-//        allTileDicts.put(roi, ROIToTileDict(t, roi))   
-//    }
-//}
-
 
 // Generate dictionary of ROI keys, (t, x, y) tile values (as a list)
 def ROIsToTilesMap(t, rois) {
@@ -195,6 +192,7 @@ def ROIToDict(t, roi) {
     roiDict.put("points", points)
     roiDict.put("tiles", ROIToTileDict(t, roi))
     
+    
     return roiDict
 }
 
@@ -212,11 +210,11 @@ def tileToDict(t, x, y) {
     tileDict = [:]
     z= 0
     
-    // Plot rectangel ROI 
-    def plane = ImagePlane.getPlane(z, 0)
-    roi = tileToROI(t, x, y, plane)
-    def annotation = PathObjects.createAnnotationObject(roi)
-    addObject(annotation)
+    //*********** Plot rectangel ROI ****************
+//    def plane = ImagePlane.getPlane(z, 0)
+//    roi = tileToROI(t, x, y, plane)
+//    def annotation = PathObjects.createAnnotationObject(roi)
+//    addObject(annotation)
     
     
     tileDict.put("tileId", [x, y])
@@ -241,26 +239,27 @@ def tilesToAnnotations(t, tiles, plane) {
 }
 
 
-
-
-
 def viewer = qupath.lib.gui.scripting.QPEx.getCurrentViewer()
 def hierarchy = viewer.hierarchy
-//def server = viewer.server
-//def imageData = viewer.imageData
-//def plane = viewer.imagePlane
 
 def annotations = hierarchy.annotationObjects
-def allROIs = annotationsToROIsMap(annotations)
-
-def roiTypes = ["Core", "Neuritic", "Diffused"]
-def roisByType = roiTypes.collectEntries{[it, allROIs[1][it]]}
+def (unlabeled, labeled) = annotationsToROIsMap(annotations)
 
 
-def tileSize = 1024
+def roiTypes = ["Core", "Neuritic", "Diffuse", "CAA"]
+def roisByType = [:]
+roiTypes.each({
+    for (k in labeled.keySet()) {
+        if (k.get(0) == it) {
+            if (!(k.get(0) in roisByType.keySet()))
+                roisByType[k.get(0)] = []
+            roisByType.get(k.get(0)).addAll(labeled.get(k))
+        }
+    }
+})
+
 def plane = viewer.imagePlane
 def gson = GsonTools.getInstance(true)
-//def gson = GsonTools.getInstance()
 
 def results = []
 def roi_count = 0
@@ -268,7 +267,6 @@ def roi_count = 0
 for (item in roisByType) { 
     def roiType = item.key
     def rois = item.value
-    print(roiType)
     def temp_results = [:]  
     temp_results["label"] = roiType
     temp_results["filename"] = filename
@@ -289,8 +287,11 @@ for (item in roisByType) {
     roi_count = roi_count + 1
 }
 
+
+
 savepath = "/home/vivek/Datasets/AmyB/amyb_wsi/" + filename + ".json"
 print(savepath)
+
 try (Writer writer = new FileWriter(savepath)) {
         gson.toJson(results, writer);
     }

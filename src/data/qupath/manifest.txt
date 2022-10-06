@@ -1,0 +1,3 @@
+scripts/annotationManager.groovy
+scripts/projectManager.groovy
+scripts/tileManager.groovy
