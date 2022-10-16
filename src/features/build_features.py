@@ -75,7 +75,6 @@ class AmyBDataset(object):
         target["masks"] = masks
         target["image_id"] = image_id
         target["area"] = area
-        target["iscrowd"] = iscrowd
 
         if self.transforms is not None:
             img, target = self.transforms(img, target)

@@ -17,7 +17,7 @@ import pdb
 
 # Color Coding
 id2label = {'1':'Core', '2':'Diffuse',
-             '3':'Neuritic', 'Unknown':'0'}
+             '3':'Neuritic', '4':'CAA','Unknown':'0'}
 
 
 class GeneralizedRCNN(nn.Module):
@@ -125,7 +125,6 @@ class GeneralizedRCNN(nn.Module):
             fig, ax = plt.subplots(1, figsize=(10, 10))
             ax.imshow(img)
             proposal = proposals[0].detach().cpu().numpy()
-            pdb.set_trace()
 
             for i, prop in enumerate(proposal):
                 x = prop[0]
@@ -142,8 +141,6 @@ class GeneralizedRCNN(nn.Module):
             save_name = "../../reports/figures/rpn_proposals.png"
             plt.savefig(save_name)
             plt.show()
-
-
 
     def forward(self, images, targets=None):
         # type: (List[Tensor], Optional[List[Dict[str, Tensor]]]) -> Tuple[Dict[str, Tensor], List[Dict[str, Tensor]]]
@@ -181,7 +178,9 @@ class GeneralizedRCNN(nn.Module):
             assert len(val) == 2
             original_image_sizes.append((val[0], val[1]))
 
+        #TODO Why Another Transform Here?
         images, targets = self.transform(images, targets)
+        
 
         # Check for degenerate boxes
         # TODO: Move this to a function

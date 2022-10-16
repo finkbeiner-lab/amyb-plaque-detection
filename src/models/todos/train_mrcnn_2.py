@@ -13,7 +13,8 @@ from model_mrcnn import _default_mrcnn_config, build_default
 from features import build_features
 from features import transforms as T
 from utils.engine import evaluate
-from codecarbon import EmissionsTracker
+import torchvision
+import matplotlib.pyplot as plt
 
 
 # Sets the behavior of calls such as
@@ -38,6 +39,29 @@ from codecarbon import EmissionsTracker
 # underlying Tensor object itself would be required (i.e. a _to()), but this is not universally supported.
 torch.__future__.set_overwrite_module_params_on_conversion(True)
 
+def visualize_augmentations(images, targets):
+
+    plt.figure(figsize=(10,10)) # specifying the overall grid size
+    plt.suptitle('Data Augmentations')
+    plt.subplot(1,2, 1)
+    
+
+    for i in range(len(images)):
+        display_list = []
+        img = images[i].detach().cpu().numpy()
+        display_list.append(img)
+        mask = targets[i]['masks'].detach().cpu().numpy()
+        mask = mask.transpose(1, 2, 0)
+        display_list.append(mask)
+
+        for j in range(2):
+            plt.subplot(1,2,j+1)
+            plt.imshow(display_list[j])
+        
+        save_name = "../../../reports/figures/augmentation_{img_no}.png"
+
+        plt.savefig(save_name.format(img_no=i))
+
 
 def train_one_epoch(
     model: torch.nn.Module,
@@ -60,7 +84,8 @@ def train_one_epoch(
     for i, (images, targets) in enumerate(train_data_loader):
         images = [image.to(device) for image in images]
         targets = [dict([(k, v.to(device)) for k, v in target.items()]) for target in targets]
-
+        # visualize_augmentations(images , targets)
+        # pdb.set_trace()
         optimizer.zero_grad()
         loss, metrics = loss_fn(model.forward(images, targets))
         loss.backward()
@@ -104,15 +129,16 @@ if __name__ == '__main__':
     ## CONFIGS ##
     collate_fn = lambda _: tuple(zip(*_)) # one-liner, no need to import
 
-    dataset_train_location = '/home/vivek/Datasets/AmyB/amyb_wsi/train'
-    dataset_test_location = '/home/vivek/Datasets/AmyB/amyb_wsi/test'
+    dataset_train_location = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/train'
+    dataset_test_location = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test'
 
     train_config = dict(
-        epochs = 50,
+        epochs = 10,
         batch_size = 4,
-        num_classes = 3,
+        num_classes = 4,
         device_id = 0,
         ckpt_freq =100,
+        eval_freq = 5,
     )
 
     test_config = dict(
@@ -176,10 +202,8 @@ if __name__ == '__main__':
     artifact_name = f'{run_id}-logs'
 
     # Train Data
-    # with EmissionsTracker() as tracker:
     for epoch in range(train_config['epochs']):
         print(f'Epoch {epoch}=======================================>.')
-
 
         for logs in train_one_epoch(model, loss_fn, optimizer, train_data_loader, device, epoch=epoch, log_freq=1):
             for log in logs:
@@ -192,12 +216,11 @@ if __name__ == '__main__':
                 torch.save(model.state_dict(), f)
             run.log_artifact(artifact)
 
-        if epoch % 10 == 0:
+        if epoch % train_config['eval_freq'] == 0:
             eval_res = evaluate(run, model, test_data_loader, device=device)
         
         model.train(True)
 
     run.finish()
-
-    model_save_name = "../../models/pytorch_mrcnn_model_{epoch}.pth"
+    model_save_name = "display_list = []pytorch_mrcnn_model_{epoch}.pth"
     torch.save(model, model_save_name.format(epoch=train_config['epochs']))

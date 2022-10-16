@@ -289,7 +289,7 @@ for (item in roisByType) {
 
 
 
-savepath = "/home/vivek/Datasets/AmyB/amyb_wsi/" + filename + ".json"
+savepath = "/mnt/new-nas/work/data/npsad_data/vivek/amy-def-mfg-jsons/" + filename + ".json"
 print(savepath)
 
 try (Writer writer = new FileWriter(savepath)) {

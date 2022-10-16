@@ -43,7 +43,7 @@ class SplitData:
 
 
     def generate_split_dirs(self):
-        '''Generate Proper Directory strucute with lables under train test
+        '''Generate Proper Directory strucute with labels under train test
         and val'''
 
         labeldirs = ['images', 'labels']
@@ -325,6 +325,6 @@ class SplitData:
 
 if __name__ == "__main__":
     #TODO Fix data aug - Not Running
-    WSI_path = '/gladstone/finkbeiner/steve/work/data/npsad_data/gennadi/amy-def/'
-    split_data = SplitData(WSI_path, False, 500)
+    base_WSI_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/'
+    split_data = SplitData(base_WSI_path, False, 500)
     split_data.prepare_dataset()
