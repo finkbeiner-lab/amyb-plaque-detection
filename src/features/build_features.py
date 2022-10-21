@@ -30,6 +30,10 @@ class AmyBDataset(object):
         # note that we haven't converted the mask to RGB,
         # because each color corresponds to a different instance
         # with 0 being background
+
+        # Palette "P" mode works by creating a mapping table, which corresponds to an 
+        # index (between 0 and 255) to a discrete color in a larger 
+        # color space (like RGB).
         mask = Image.open(mask_path).convert('P')
 
         mask = np.array(mask)
@@ -41,6 +45,10 @@ class AmyBDataset(object):
         # split the color-encoded mask into a set
         # of binary masks
         masks = mask == obj_ids[:, None, None]
+        # masks.shape (1, 1024, 1024) first element denotes number of objects
+        # (num_objects, height, width)
+
+
 
         # get bounding box coordinates for each mask
         num_objs = len(obj_ids)
@@ -51,7 +59,13 @@ class AmyBDataset(object):
             xmax = np.max(pos[1])
             ymin = np.min(pos[0])
             ymax = np.max(pos[0])
+            
+            if xmax <= xmin and ymax <=ymin:
+                print("degenrate boxes", mask_path)
+                print(len(obj_ids))
+                break
             boxes.append([xmin, ymin, xmax, ymax])
+        
 
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
 

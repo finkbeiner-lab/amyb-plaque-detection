@@ -25,6 +25,7 @@ from multiprocessing import Pool
 import shutil
 import albumentations as A
 import cv2
+import numpy as np
 
 __author__ = 'Vivek Gopal Ramaswamy'
 
@@ -220,11 +221,10 @@ class SplitData:
         for i in trange(total_imgs):
 
             # load the image
-            img = cv2.imread(random_img_filenames[i])
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-            mask = cv2.imread(rand_label_filenames[i])
-            mask = cv2.cvtColor(mask, cv2.COLOR_BGR2RGB)
+            img = Image.open(random_img_filenames[i]).convert("RGB")
+            img = np.array(img)
+            mask = Image.open(rand_label_filenames[i]).convert('P')
+            mask = np.array(mask)
 
             for j in range(variations):
             
@@ -283,7 +283,7 @@ class SplitData:
             rand_image_filenames, rand_label_filenames = self.get_randimages_dataug(self.aug_value,
                                                                                     image_filenames,
                                                                                     label_filenames)
-            augmented_image_files, augmented_label_files = self.upsample_dataset(rand_image_filenames, rand_label_filenames, 2)
+            augmented_image_files, augmented_label_files = self.upsample_dataset(rand_image_filenames, rand_label_filenames, 3)
           
             self.check_distribution("augmented_data", augmented_image_files, augmented_label_files)
             print("\n Total Data :", len(augmented_image_files) + len(image_filenames))
@@ -319,5 +319,5 @@ class SplitData:
 if __name__ == "__main__":
     #TODO Fix data aug - Not Running
     base_WSI_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/'
-    split_data = SplitData(base_WSI_path, True, 5)
+    split_data = SplitData(base_WSI_path, True, 100)
     split_data.prepare_dataset()

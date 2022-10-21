@@ -189,6 +189,9 @@ class GeneralizedRCNN(nn.Module):
                 boxes = target["boxes"]
                 degenerate_boxes = boxes[:, 2:] <= boxes[:, :2]
                 if degenerate_boxes.any():
+                    print(target_idx)
+                    print(target["boxes"])
+                    pdb.set_trace()
                     # print the first degenerate box
                     bb_idx = torch.where(degenerate_boxes.any(dim=1))[0][0]
                     degen_bb: List[float] = boxes[bb_idx].tolist()

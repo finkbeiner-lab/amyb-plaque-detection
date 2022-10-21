@@ -92,7 +92,9 @@ def train_one_epoch(
         optimizer.step()
 
         log_metrics.append(dict(epoch=epoch, loss=loss.item(), metrics=metrics))
-
+        # print(dict(epoch=epoch, loss=loss.item(), metrics=metrics))
+        print_logs = "epoch no : {epoch}, total loss : {loss},  classifier :{classifier}, mask: {mask} ==================="
+        print(print_logs.format(epoch=epoch, loss=loss.item(),  classifier=metrics['loss_classifier'], mask=metrics['loss_mask']))
         if (i % log_freq) == 0:
             yield log_metrics
             log_metrics = list()
@@ -133,8 +135,8 @@ if __name__ == '__main__':
     dataset_test_location = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test'
 
     train_config = dict(
-        epochs = 10,
-        batch_size = 4,
+        epochs = 50,
+        batch_size = 6,
         num_classes = 4,
         device_id = 0,
         ckpt_freq =100,
@@ -203,7 +205,7 @@ if __name__ == '__main__':
 
     # Train Data
     for epoch in range(train_config['epochs']):
-        print(f'Epoch {epoch}=======================================>.')
+        # print(f'Epoch {epoch}=======================================>.')
 
         for logs in train_one_epoch(model, loss_fn, optimizer, train_data_loader, device, epoch=epoch, log_freq=1):
             for log in logs:

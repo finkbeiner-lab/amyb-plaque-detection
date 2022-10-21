@@ -164,9 +164,6 @@ def process_json(WSI_path, json_path,  visualize=False):
                 tileX = (tileX * tileWidth) + int(vinfo['bounds-x'])
                 tileY = (tileY * tileHeight) + int(vinfo['bounds-y'])
 
-                # if tileX == 38918 and tileY==178925:
-                #     pdb.set_trace()
-
                 vips_img_crop = vips_img.crop(tileX, tileY,tileWidth, tileHeight)
 
                 # Region Bounds

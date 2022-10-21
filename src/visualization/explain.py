@@ -46,8 +46,8 @@ class ExplainPredictions():
         self.ablation_cam = ablation_cam
         self.save_thresholds = save_thresholds
         self.class_names = ['Unknown', 'Core', 'Diffuse', 'Neuritic']
-        self.class_to_colors = {'Core': (255, 0, 0), 'Neuritic' : (0, 0, 255), 'Diffuse': (0,255,0)}
-        self.result_save_dir= "../../reports/figures/"
+        self.class_to_colors = {'Core': (255, 0, 0), 'Neuritic' : (0, 0, 255), 'Diffuse': (0,255,0), 'CAA':(225, 255, 0)}
+        self.result_save_dir= "/mnt/new-nas/work/data/npsad_data/vivek/reports/figures/"
         self.colors = np.random.uniform(0, 255, size=(len(self.class_names), 3))
         self.column_names = ["image_name", "region", "region_mask", "label", "confidence", "brown_pixels", "centroid", "eccentricity", "area", "equivalent_diameter"]
         self.results_path = ""
@@ -453,8 +453,8 @@ class ExplainPredictions():
 if __name__ == "__main__":
 
     
-    input_path = '/home/vivek/Datasets/AmyB/amyb_wsi/test-data/'
-    model_input_path = '../../models/mrcnn_model_15.pth'
+    input_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test'
+    model_input_path = '/mnt/new-nas/work/data/npsad_data/vivek/models/mrcnn_model_50.pth'
 
     # Use the Run ID from train_model.py here if you want to add some visualizations after training has been done
     # with wandb.init(project="nps-ad", id = "17vl5roa", entity="hellovivek", resume="allow"):
