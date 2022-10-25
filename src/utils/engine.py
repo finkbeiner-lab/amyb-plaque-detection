@@ -10,6 +10,8 @@ from utils.coco_utils import get_coco_api_from_dataset
 import pdb
 import matplotlib.pyplot as plt
 import numpy as np
+import wandb
+from visualization.explain import ExplainPredictions
 
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch, wandb, print_freq, scaler=None):
@@ -64,15 +66,6 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, wandb, print_f
 
 
 def _get_iou_types(model):
-    #TODO Vivek commented this, to enable segm metrics
-    # model_without_ddp = model
-    # if isinstance(model, torch.nn.parallel.DistributedDataParallel):
-    #     model_without_ddp = model.module
-    # iou_types = ["bbox"]
-    # if isinstance(model_without_ddp, torchvision.models.detection.MaskRCNN):
-    #     iou_types.append("segm")
-    # if isinstance(model_without_ddp, torchvision.models.detection.KeypointRCNN):
-    #     iou_types.append("keypoints")
     iou_types = ["bbox", "segm"]
     return iou_types
 
@@ -90,8 +83,12 @@ def evaluate(run, model, data_loader, device):
     coco = get_coco_api_from_dataset(data_loader.dataset)
     iou_types = _get_iou_types(model)
     coco_evaluator = CocoEvaluator(coco, iou_types)
+    explain = ExplainPredictions(model_input_path = "", test_input_path="", detection_threshold=0.75, 
+                                wandb=wandb, save_result=True, ablation_cam=True, save_thresholds=False)
 
     for images, targets in metric_logger.log_every(data_loader, 100, header):
+
+       
         images = list(img.to(device) for img in images)
 
         if torch.cuda.is_available():
@@ -101,6 +98,21 @@ def evaluate(run, model, data_loader, device):
 
         outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
         model_time = time.time() - model_time
+
+        for i in range(len(images)):
+            log_results = []
+
+            img = images[i].detach().cpu().numpy()
+            img = img.transpose(1, 2, 0)
+        
+            masks, boxes, labels, scores = explain.get_outputs(images, model, 0.75)
+            result_img, result_masks = explain.draw_segmentation_map(img, masks, boxes, labels)
+
+            log_results.append(result_img)
+            log_results.append(result_masks)
+          
+            run.log({"Evaluation": [wandb.Image(image) for image in log_results]})
+
 
         res = {target["image_id"].item(): output for target, output in zip(targets, outputs)}
         # print(len(outputs))

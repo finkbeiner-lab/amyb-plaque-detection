@@ -45,11 +45,13 @@ class ExplainPredictions():
         self.save_result = save_result
         self.ablation_cam = ablation_cam
         self.save_thresholds = save_thresholds
-        self.class_names = ['Unknown', 'Core', 'Diffuse', 'Neuritic']
+        self.class_names = ['Unknown', 'Core', 'Diffuse', 'Neuritic', 'CAA']
         self.class_to_colors = {'Core': (255, 0, 0), 'Neuritic' : (0, 0, 255), 'Diffuse': (0,255,0), 'CAA':(225, 255, 0)}
         self.result_save_dir= "/mnt/new-nas/work/data/npsad_data/vivek/reports/figures/"
         self.colors = np.random.uniform(0, 255, size=(len(self.class_names), 3))
-        self.column_names = ["image_name", "region", "region_mask", "label", "confidence", "brown_pixels", "centroid", "eccentricity", "area", "equivalent_diameter"]
+        self.column_names = ["image_name", "region", "region_mask", "label", 
+                            "confidence", "brown_pixels", "centroid", 
+                            "eccentricity", "area", "equivalent_diameter"]
         self.results_path = ""
         self.masks_path = "" 
         self.detections_path = "" 
@@ -167,7 +169,7 @@ class ExplainPredictions():
             # draw the bounding boxes around the objects
             cv2.rectangle(image, boxes[i][0], boxes[i][1], color=rect_color, 
                         thickness=2)
-            # Get the centre coords of the rectangle
+            # Get the centre coords of the rectangle-plaque-detection/src/visualizat
             x1 = boxes[i][0][0]
             y1 = boxes[i][0][1]
             x2 = boxes[i][1][0]
@@ -253,7 +255,7 @@ class ExplainPredictions():
         if not os.path.exists(ablations_path):
             os.makedirs(ablations_path)
         
-        pixel_count_path = os.path.join("../../reports/", "pixel_count")
+        pixel_count_path = os.path.join(self.result_save_dir, "pixel_count")
         if not os.path.exists(pixel_count_path):
             os.makedirs(pixel_count_path)
         
@@ -327,6 +329,7 @@ class ExplainPredictions():
     def generate_results(self):
         # This will help us create a different color for each class
         # Load Trained 
+        pdb.set_trace()
         model = torch.load(self.model_input_path)
     
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -454,7 +457,7 @@ if __name__ == "__main__":
 
     
     input_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test'
-    model_input_path = '/mnt/new-nas/work/data/npsad_data/vivek/models/mrcnn_model_50.pth'
+    model_input_path = '/mnt/new-nas/work/data/npsad_data/vivek/models/northern-water-394_mrcnn_model_1.pth'
 
     # Use the Run ID from train_model.py here if you want to add some visualizations after training has been done
     # with wandb.init(project="nps-ad", id = "17vl5roa", entity="hellovivek", resume="allow"):

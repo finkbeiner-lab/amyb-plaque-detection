@@ -93,8 +93,8 @@ def train_one_epoch(
 
         log_metrics.append(dict(epoch=epoch, loss=loss.item(), metrics=metrics))
         # print(dict(epoch=epoch, loss=loss.item(), metrics=metrics))
-        print_logs = "epoch no : {epoch}, total loss : {loss},  classifier :{classifier}, mask: {mask} ==================="
-        print(print_logs.format(epoch=epoch, loss=loss.item(),  classifier=metrics['loss_classifier'], mask=metrics['loss_mask']))
+        print_logs = "epoch no : {epoch}, batch no : {batch_no}, total loss : {loss},  classifier :{classifier}, mask: {mask} ==================="
+        print(print_logs.format(epoch=epoch, batch_no=i, loss=loss.item(),  classifier=metrics['loss_classifier'], mask=metrics['loss_mask']))
         if (i % log_freq) == 0:
             yield log_metrics
             log_metrics = list()
@@ -135,7 +135,7 @@ if __name__ == '__main__':
     dataset_test_location = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test'
 
     train_config = dict(
-        epochs = 50,
+        epochs = 1,
         batch_size = 6,
         num_classes = 4,
         device_id = 0,
@@ -165,6 +165,8 @@ if __name__ == '__main__':
         group='runs',
         job_type='train',
     )
+
+    
 
 
     ## Dataset loading
@@ -200,6 +202,7 @@ if __name__ == '__main__':
     run = wandb.init(**wandb_config)
     assert run is wandb.run # run was successfully initialized, is not None
     run_id, run_dir = run.id, run.dir
+    exp_name = run.name
 
     artifact_name = f'{run_id}-logs'
 
@@ -224,5 +227,5 @@ if __name__ == '__main__':
         model.train(True)
 
     run.finish()
-    model_save_name = "display_list = []pytorch_mrcnn_model_{epoch}.pth"
-    torch.save(model, model_save_name.format(epoch=train_config['epochs']))
+    model_save_name = "/mnt/new-nas/work/data/npsad_data/vivek/models/{name}_mrcnn_model_{epoch}.pth"
+    torch.save(model, model_save_name.format(name=exp_name, epoch=train_config['epochs']))
