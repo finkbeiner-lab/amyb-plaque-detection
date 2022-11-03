@@ -46,7 +46,7 @@ class anchor_conf:
 
     def module(self) -> nn.Module:
         return torchvision.models.detection.anchor_utils.AnchorGenerator(
-            tuple([tuple(self.scales) for _ in range(self.levels)]),
+            tuple([tuple([self.size * (2 ** level) * scale for scale in self.scales]) for level in range(self.levels)]),
             tuple([tuple(self.ratios) for _ in range(self.levels)])
         )
 
@@ -219,19 +219,19 @@ class rcnn_conf:
     def __post_init__(self):
         if self.pretrained:
             self.backbone.backbone_norm_layer = torchvision.ops.misc.FrozenBatchNorm2d
-        
+
         keys = 'num_classes num_channels'.split()
         replace_keys(self, 'backbone', keys[1:])
         replace_keys(self, 'rpn', keys[1:])
         replace_keys(self, 'heads', keys)
-    
+
     def _module(self) -> nn.Module:
         return nn.Sequential(OrderedDict([
             ('backbone', self.backbone.module()),
             ('rpn', self.rpn.module()),
             ('roi_heads', self.heads.module()),
         ]))
-    
+
     def module(self, skip_submodules=None) -> nn.Module:
         model = self._module()
         if self.pretrained:
