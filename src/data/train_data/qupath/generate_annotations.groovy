@@ -1,3 +1,5 @@
+import javafx.stage.FileChooser
+
 import static qupath.lib.gui.scripting.QPEx.*
 import qupath.lib.objects.PathObjects
 import qupath.lib.roi.ROIs
@@ -22,25 +24,6 @@ filename = path.split("/")[-1]
 filename = filename.split(".mrxs")[0]
 
 
-def annotationsMap(annotations) {
-    def unlabeled = []
-    def labeled = [:]
-    
-    for (annotation in annotations) {
-        label = annotation.pathClass
-        if (label == null) {
-            unlabeled.add(annotation)
-        } else {
-            label = PathClassTools.splitNames(label)
-            if (labeled[label] == null) {
-                labeled.put(label, [])
-            }
-            labeled[label].add(annotation)
-        }
-    }
-    
-    return [unlabeled, labeled]
-}
 
 // Get pair containing: list of unlabeled annotation ROIs, dictionary of per-label lists of annotation ROIs
 def annotationsToROIsMap(annotations) {
@@ -87,7 +70,7 @@ def coordsToTiles(t, x, y, w, h) {
 }
 
 // Get ROI's bounds in x, y axis
-def ROIToCoords(roi) {
+def ROIToCoords(roi) { //
     coords = []
     bounds = ["boundsX", "boundsY", "boundsWidth", "boundsHeight"]
     for (bound in bounds) {
@@ -96,7 +79,7 @@ def ROIToCoords(roi) {
     return coords
 }
 
-def ROIToPoints(roi) {
+def ROIToPoints(roi) { //
     points = []
     dims = ["x", "y"]
     for (point in roi.allPoints) {
@@ -110,19 +93,12 @@ def ROIToPoints(roi) {
 }
 
 // Generate list of (t, x, y) tiles covered by the ROI's bounds
-def ROIToTiles(t, roi) {
+def ROIToTiles(t, roi) { //
     return coordsToTiles(t, *ROIToCoords(roi))
 }
 
-def ROIToTileROIs(t, roi, plane) {
-    def tileROIs = []
-    for (tile in ROIToTiles(t, roi)) {
-        tileROIs.add(tileToROI(t, *tile, plane))
-    }
-    return tileROIs
-}
 
-def ROIToTileDict(t, roi) {
+def ROIToTileDict(t, roi) { //
     def tiles = []
     for (tile in ROIToTiles(t, roi)) {
         tiles.add(tileToDict(t, *tile))
@@ -130,26 +106,9 @@ def ROIToTileDict(t, roi) {
     return tiles
 }
 
-// Generate list of (t, x, y) tiles, one per ROI
-def ROIsToTiles(t, rois) {
-    def allTiles = []
-    for (roi in rois) {
-        allTiles.add(ROIToTiles(t, roi))
-    }
-    return allTiles
-}
-
-def ROIsToTileROIs(t, rois, plane) {
-    def allTileROIs = []
-    for (roi in rois) {
-        allTileROIs.add(ROIToTileROIs(t, roi, plane))
-    }
-    return allTileROIs
-}
-
 
 // Generate dictionary of ROI keys, (t, x, y) tile values (as a list)
-def ROIsToTilesMap(t, rois) {
+def ROIsToTilesMap(t, rois) { //
     def allROIs = [:]
     for (roi in rois) {
         allROIs.put(roi, ROIToTiles(t, roi))
@@ -157,30 +116,8 @@ def ROIsToTilesMap(t, rois) {
     return allROIs
 }
 
-def ROIsToTileROIsMap(t, rois, plane) {
-    def allTileROIs = [:]
-    for (roi in rois) {
-        allTileROIs.put(roi, ROIToTileROIs(t, roi, plane))
-    }
-    return allTileROIs
-}
 
-// Generate dictionary of (t, x, y) tile keys, ROI values
-def ROIsToTilesInverseMap(t, rois) {
-    def allTiles = [:]
-    for (roiTile in ROIToTiles(t, roi)) {
-        if (allTiles[roiTile] == null) {
-            allTiles.put(roiTile, [roi])
-        } else {
-            allTiles[roiTile].add(roi)
-        }
-    }
-    return allTiles
-}
-
-
-
-def ROIToDict(t, roi) {
+def ROIToDict(t, roi) { //
     def roiDict = [:]
     def bounds = ROIToCoords(roi)
     def points = ROIToPoints(roi)
@@ -196,15 +133,6 @@ def ROIToDict(t, roi) {
     return roiDict
 }
 
-
-// Generate ROI(s)/Annotations given (t, x, y) tile(s)
-
-def tileToROI(t, x, y, plane) {
-print(t)
-print(x)
-print(y)
-    return qupath.lib.roi.ROIs.createRectangleROI(x * t, y * t, t, t, plane)
-}
 
 def tileToDict(t, x, y) {
     tileDict = [:]
@@ -226,17 +154,6 @@ def tileToDict(t, x, y) {
     return tileDict
 }
 
-def tileToAnnotation(t, x, y, plane) {
-    return qupath.lib.objects.PathObjects.createAnnotationObject(tileToROI(t, x, y, plane))
-}
-
-def tilesToAnnotations(t, tiles, plane) {
-    def annotations = []
-    for (tile in tiles) {
-        annotations.add(tileToAnnotation(t, *tile, plane))
-    }
-    return annotations
-}
 
 
 def viewer = qupath.lib.gui.scripting.QPEx.getCurrentViewer()
@@ -287,11 +204,15 @@ for (item in roisByType) {
     roi_count = roi_count + 1
 }
 
+//def out = gson.toJson(results)
+Platform.runLater({
+def newFile = (new FileChooser()).showSaveDialog()
+gson.toJson(results, new FileWriter(newFile))
+})
 
-
-savepath = "/mnt/new-nas/work/data/npsad_data/vivek/amy-def-mfg-jsons/" + filename + ".json"
-print(savepath)
-
-try (Writer writer = new FileWriter(savepath)) {
-        gson.toJson(results, writer);
-    }
+//savepath = "/mnt/new-nas/work/data/npsad_data/vivek/amy-def-mfg-jsons/" + filename + ".json"
+//print(savepath)
+//
+//try (Writer writer = new FileWriter(savepath)) {
+//        gson.toJson(results, writer);
+//    }
