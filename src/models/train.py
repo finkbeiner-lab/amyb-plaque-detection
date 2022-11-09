@@ -1,6 +1,7 @@
 import os
 import sys
 sys.path.append(os.path.join(os.getcwd(), *tuple(['..'])))
+import argparse
 
 from typing import Callable, Dict, List, Optional, Set
 from collections import OrderedDict
@@ -129,11 +130,20 @@ if __name__ == '__main__':
     #   - do ^^ via closures
     #   - experimental: add an API to collect params and bufs by on module and/or name; generate on-the-fly state_dicts, gradient_dicts, higher-order gradient_dicts, etc.
 
+    parser = argparse.ArgumentParser(description='Maskrcnn training')
+
+    parser.add_argument('dataset_train_location',
+                        help='Enter the path train dataset resides')
+    parser.add_argument('dataset_test_location',
+                        help='Enter the path where test dataset resides')
+    
+    args = parser.parse_args()
+
     ## CONFIGS ##
     collate_fn = lambda _: tuple(zip(*_)) # one-liner, no need to import
 
-    dataset_train_location = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/train'
-    dataset_test_location = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test'
+    dataset_train_location = args.dataset_train_location'/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/train'
+    dataset_test_location = args.dataset_test_location '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test'
 
     train_config = dict(
         epochs = 100,
