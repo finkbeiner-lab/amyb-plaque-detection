@@ -132,6 +132,7 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Maskrcnn training')
 
+    parser.add_argument('base_dir', help="Enter the base dir (NAS)")
     parser.add_argument('dataset_train_location',
                         help='Enter the path train dataset resides')
     parser.add_argument('dataset_test_location',
@@ -142,8 +143,9 @@ if __name__ == '__main__':
     ## CONFIGS ##
     collate_fn = lambda _: tuple(zip(*_)) # one-liner, no need to import
 
-    dataset_train_location = args.dataset_train_location'/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/train'
-    dataset_test_location = args.dataset_test_location '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test'
+    dataset_base_dir = args.base_dir
+    dataset_train_location = args.dataset_train_location
+    dataset_test_location = args.dataset_test_location
 
     train_config = dict(
         epochs = 100,
@@ -222,7 +224,7 @@ if __name__ == '__main__':
         # print(f'Epoch {epoch}=======================================>.')
 
         for logs in train_one_epoch(model, loss_fn, optimizer, train_data_loader, device, epoch=epoch, log_freq=1):
-            for log in logs:
+            for log in logs:/mnt/new-nas/work/data/npsad_data/vivek/
                 run.log(log)
 
         if epoch + 1 == train_config['epochs'] or epoch % train_config['ckpt_freq'] == 0:
@@ -240,7 +242,7 @@ if __name__ == '__main__':
 
 
     
-    model_save_name = "/mnt/new-nas/work/data/npsad_data/vivek/models/{name}_mrcnn_model_{epoch}.pth"
+    model_save_name = dataset_base_dir + "models/{name}_mrcnn_model_{epoch}.pth"
     torch.save(model.state_dict(), model_save_name.format(name=exp_name, epoch=train_config['epochs']))
 
 
