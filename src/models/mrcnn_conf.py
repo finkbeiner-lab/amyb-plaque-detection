@@ -8,14 +8,6 @@ from torch import nn, Tensor
 import torchvision
 
 
-# Dataclasses are a feature since Python 3 which allow treating classes as something in between a true class and a struct or dictionary
-# They are quite suitable as configuration method for torchvision models, as the present implementation (along with some additional semantic sugar in the form of the replace_keys/__post_init__ methods) can at once
-#   a) completely describe the interdependencies between configurations of a model's submodules
-#   b) house the methods that construct the modules from the configurations themselves, and
-#   c) store model weights and selectively load certain submodules' weights and/or freeze them during training
-# The dataclass paradigm allows for easy back-and-forth between a raw configuration dictionary and the model it describes, allowing rapid prototyping of and comparison of configurations while maintaining soundness and reproducibility
-
-
 def replace_keys(
     self: Any,
     field: str,
@@ -232,13 +224,17 @@ class rcnn_conf:
             ('roi_heads', self.heads.module()),
         ]))
 
-    def module(self, skip_submodules=None) -> nn.Module:
+    def module(self, freeze_submodules=None, skip_submodules=None) -> nn.Module:
         model = self._module()
         if self.pretrained:
             state_dict = self.weights.get_state_dict(progress=True)
             if skip_submodules is not None:
                 state_dict = load_submodule_params(model.state_dict(), state_dict, skip_submodules)
             model.load_state_dict(state_dict)
+        if freeze_submodules is not None:
+            for submodule in map(model.get_submodule, freeze_submodules):
+                for param in submodule.parameters():
+                    param.requires_grad_(False)
         return model
 
 
