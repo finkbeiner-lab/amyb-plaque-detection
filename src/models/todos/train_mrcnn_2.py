@@ -4,18 +4,18 @@ sys.path.append(os.path.join(os.getcwd(), *tuple(['..'] * 2)))
 
 from typing import Callable, Dict, List, Optional, Set
 from collections import OrderedDict
-
 import pdb
-
 import torch
 from torch import nn, Tensor
 import torch.optim
-
 import wandb
-
 from model_mrcnn import _default_mrcnn_config, build_default
 from features import build_features
 from features import transforms as T
+from utils.engine import evaluate
+import torchvision
+import matplotlib.pyplot as plt
+from visualization.explain import ExplainPredictions
 
 
 # Sets the behavior of calls such as
@@ -40,8 +40,28 @@ from features import transforms as T
 # underlying Tensor object itself would be required (i.e. a _to()), but this is not universally supported.
 torch.__future__.set_overwrite_module_params_on_conversion(True)
 
+def visualize_augmentations(images, targets):
 
+    plt.figure(figsize=(10,10)) # specifying the overall grid size
+    plt.suptitle('Data Augmentations')
+    plt.subplot(1,2, 1)
+    
 
+    for i in range(len(images)):
+        display_list = []
+        img = images[i].detach().cpu().numpy()
+        display_list.append(img)
+        mask = targets[i]['masks'].detach().cpu().numpy()
+        mask = mask.transpose(1, 2, 0)
+        display_list.append(mask)
+
+        for j in range(2):
+            plt.subplot(1,2,j+1)
+            plt.imshow(display_list[j])
+        
+        save_name = "../../../reports/figures/augmentation_{img_no}.png"
+
+        plt.savefig(save_name.format(img_no=i))
 
 
 def train_one_epoch(
@@ -51,8 +71,8 @@ def train_one_epoch(
     data_loader: torch.utils.data.DataLoader,
     device: torch.device,
     epoch: int = 1,
-    log_freq: int = 10,
-) -> None:
+    log_freq: int = 10,) -> None:
+
     assert model.training
     model_params = set(model.parameters())
     model_devices = set([p.device for p in model_params])
@@ -62,16 +82,20 @@ def train_one_epoch(
 
     log_metrics = list()
 
-    for i, (images, targets) in enumerate(data_loader):
+    for i, (images, targets) in enumerate(train_data_loader):
         images = [image.to(device) for image in images]
         targets = [dict([(k, v.to(device)) for k, v in target.items()]) for target in targets]
-
+        # visualize_augmentations(images , targets)
+        # pdb.set_trace()
         optimizer.zero_grad()
         loss, metrics = loss_fn(model.forward(images, targets))
         loss.backward()
         optimizer.step()
 
         log_metrics.append(dict(epoch=epoch, loss=loss.item(), metrics=metrics))
+        # print(dict(epoch=epoch, loss=loss.item(), metrics=metrics))
+        print_logs = "epoch no : {epoch}, batch no : {batch_no}, total loss : {loss},  classifier :{classifier}, mask: {mask} ==================="
+        print(print_logs.format(epoch=epoch, batch_no=i, loss=loss.item(),  classifier=metrics['loss_classifier'], mask=metrics['loss_mask']))
         if (i % log_freq) == 0:
             yield log_metrics
             log_metrics = list()
@@ -80,6 +104,7 @@ def train_one_epoch(
 
 
 def get_loss_fn(weights, default=0.):
+    
     def compute_loss_fn(losses):
         item = lambda k: (k, losses[k].item())
         metrics = OrderedDict(list(map(item, [k for k in weights.keys() if k in losses.keys()] + [k for k in losses.keys() if k not in weights.keys()])))
@@ -104,25 +129,34 @@ if __name__ == '__main__':
     #   - do ^^ via closures
     #   - experimental: add an API to collect params and bufs by on module and/or name; generate on-the-fly state_dicts, gradient_dicts, higher-order gradient_dicts, etc.
 
+    ## CONFIGS ##
     collate_fn = lambda _: tuple(zip(*_)) # one-liner, no need to import
 
-    dataset_location = '/gladstone/finkbeiner/steve/work/data/npsad_data/gennadi/amy-def/'
+    dataset_train_location = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/train'
+    dataset_test_location = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test'
+
     train_config = dict(
-        epochs=50,
-        batch_size=3,
-        num_classes=3,
-        device_id=0,
-        ckpt_freq=1,
+        epochs = 100,
+        batch_size = 6,
+        num_classes = 4,
+        device_id = 0,
+        ckpt_freq =500,
+        eval_freq = 20,
     )
+
+    test_config = dict(
+        batch_size = 1
+    )
+
     model_config = _default_mrcnn_config(num_classes=1 + train_config['num_classes']).config
     optim_config = dict(
         # cls=grad_optim.GradSGD,
         cls=torch.optim.SGD,
-        defaults=dict(lr=1. * (10. ** (-3)))
+        defaults=dict(lr=1. * (10. ** (-2)))  #-4 is too slow 
     )
     wandb_config = dict(
-        project='mrcnn_train',
-        entity='gladstone-npsad',
+        project='nps-ad-vivek',
+        entity='hellovivek',
         config=dict(
             train_config=train_config,
             model_config=model_config,
@@ -133,11 +167,23 @@ if __name__ == '__main__':
         job_type='train',
     )
 
-
-    dataset = build_features.AmyBDataset(dataset_location, T.Compose([T.ToTensor()]))
-    data_loader = torch.utils.data.DataLoader(dataset, batch_size=train_config['batch_size'], shuffle=True, num_workers=1, collate_fn=collate_fn)
+    
 
 
+    ## Dataset loading
+    train_dataset = build_features.AmyBDataset(dataset_train_location, T.Compose([T.ToTensor()]))
+    test_dataset = build_features.AmyBDataset(dataset_test_location, T.Compose([T.ToTensor()]))
+
+    train_data_loader = torch.utils.data.DataLoader(
+            train_dataset, batch_size=train_config['batch_size'], shuffle=True, num_workers=4,
+            collate_fn=collate_fn)
+    
+    test_data_loader = torch.utils.data.DataLoader(
+            test_dataset, batch_size=test_config['batch_size'], shuffle=False, num_workers=4,
+            collate_fn=collate_fn)
+
+    
+    # Model Building
     model = build_default(model_config, im_size=1024)
     device = torch.device('cpu')
     if torch.cuda.is_available():
@@ -157,16 +203,15 @@ if __name__ == '__main__':
     run = wandb.init(**wandb_config)
     assert run is wandb.run # run was successfully initialized, is not None
     run_id, run_dir = run.id, run.dir
-    # ckpt_dirname = 'ckpts'
-    # os.makedirs(os.path.join(run_dir, ckpt_dirname), exist_ok=False)
-
-    # entity, project = [wandb_config[k] for k in 'entity project'.split()]
-    # artifact_name = '/'.join([f'{wandb_config.get(k)}' for k in keys] + ['artifact:alias'])
+    exp_name = run.name
 
     artifact_name = f'{run_id}-logs'
+
+    # Train Data
     for epoch in range(train_config['epochs']):
-        print(f'Epoch {epoch} started.')
-        for logs in train_one_epoch(model, loss_fn, optimizer, data_loader, device, epoch=epoch, log_freq=1):
+        # print(f'Epoch {epoch}=======================================>.')
+
+        for logs in train_one_epoch(model, loss_fn, optimizer, train_data_loader, device, epoch=epoch, log_freq=1):
             for log in logs:
                 run.log(log)
 
@@ -177,21 +222,28 @@ if __name__ == '__main__':
                 torch.save(model.state_dict(), f)
             run.log_artifact(artifact)
 
-        print(f'Epoch {epoch} ended.')
+        if epoch % train_config['eval_freq'] == 0:
+            eval_res = evaluate(run, model, test_data_loader, device=device)
+        
+        model.train(True)
+
+
+
+    
+    model_save_name = "/mnt/new-nas/work/data/npsad_data/vivek/models/{name}_mrcnn_model_{epoch}.pth"
+    torch.save(model.state_dict(), model_save_name.format(name=exp_name, epoch=train_config['epochs']))
+
+
+    # print("\n =================The Model is Trained!====================")
+    # print("-----------------Visualizing Model predictions----------------")
+
+    # # TODO Testing is done on Individual WSI Folders
+    # input_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test'
+
+    # model = build_default(model_config, im_size=1024)
+   
+    # explain = ExplainPredictions(model, model_input_path = model_save_name.format(name=exp_name, epoch=train_config['epochs']), test_input_path=input_path, 
+    #                             detection_threshold=0.75, wandb=run, save_result=True, ablation_cam=True, save_thresholds=False)
+    # explain.generate_results()
 
     run.finish()
-
-
-    # ckpt_fname = os.path.join(run_dir, ckpt_dirname, f'{epoch}.pt')
-    #
-    # with open(ckpt_fname, 'wb') as fh:
-    #     torch.save(model.state_dict(), fh)
-    # torch.save(model.state_dict(), ckpt_fname)
-    # run.save(
-    #     glob_str=ckpt_fname,
-    #     base_path=run_dir, # keep subdirectory structure
-    #     policy='now', # sync immediatelly; allow removal afterward
-    # )
-    # os.remove(ckpt_fname)
-
-    # run.log_artifact(checkpoints)

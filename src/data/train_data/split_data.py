@@ -23,6 +23,9 @@ import matplotlib.pyplot as plt
 import multiprocessing
 from multiprocessing import Pool
 import shutil
+import albumentations as A
+import cv2
+import numpy as np
 
 __author__ = 'Vivek Gopal Ramaswamy'
 
@@ -40,10 +43,20 @@ class SplitData:
         self.cores = multiprocessing.cpu_count()
         self.image_input = "images"
         self.label_input = "labels"
+        self.transforms  = A.Compose([
+                            A.VerticalFlip(p=0.5),
+                            A.HorizontalFlip(p=0.5),
+                            A.Blur(blur_limit=3),
+                            A.OpticalDistortion(),
+                            A.HueSaturationValue(),
+                            A.RandomRotate90(),
+                            A.RandomBrightnessContrast(p=0.2),
+                        ])
+
 
 
     def generate_split_dirs(self):
-        '''Generate Proper Directory strucute with lables under train test
+        '''Generate Proper Directory strucute with labels under train test
         and val'''
 
         labeldirs = ['images', 'labels']
@@ -113,44 +126,10 @@ class SplitData:
         val_filenames_labels = label_filenames[split_3:split_4]
 
 
-        def wrapper_func(a, b, c):
-            print(a, b, c)
-
         # Step 4 : Copy the split contents to folders
         #Parallel Process - Images and Labels
         [self.copy_split_files_to_dataset(data_dict[fold][x], dst_directory, f'{fold}/{x}') for x in 'images labels'.split() for fold in 'train val test'.split()]
 
-        pdb.set_trace()
-
-        # self.copy_split_files_to_dataset(val_filenames_images, dst_directory, 'val/images')
-        # self.copy_split_files_to_dataset(train_filenames_images, dst_directory, 'train/images')
-        # self.copy_split_files_to_dataset(train_filenames_images, dst_directory, 'train/images')
-        # self.copy_split_files_to_dataset(train_filenames_images, dst_directory, 'train/images')
-        # self.copy_split_files_to_dataset(train_filenames_images, dst_directory, 'train/images')
-        #
-
-        pool = Pool(self.cores)
-        pool.map(copy_wrap, [(train_filenames_images, dst_directory,),
-                                                    (test_filenames_images, dst_directory,),
-                                                    (val_filenames_images),
-                                                    train_filenames_labels,
-                                                    test_filenames_labels,
-                                                    val_filenames_labels],
-                 [dst_directory, dst_directory, dst_directory, dst_directory,
-                  dst_directory, dst_directory],
-                 [os.path.join('train', 'images'), os.path.join('test', 'images'),
-                  os.path.join('val', 'images'), os.path.join('train', 'labels'),
-                  os.path.join('test', 'labels'), os.path.join('val', 'labels')])
-        pool.close()
-        pool.clear()
-
-        print("\ntrain images :", len(train_filenames_images))
-        print("test images : ", len(test_filenames_images))
-        print("val images : ", len(val_filenames_images))
-
-        print("\ntrain labels :", len(train_filenames_labels))
-        print("test labels : ", len(test_filenames_labels))
-        print("val labels : ", len(val_filenames_labels))
 
     def copy_split_files_to_dataset(self, filenames, dst_directory, dst_type):
         '''
@@ -206,7 +185,7 @@ class SplitData:
 
         return [random_image_file, random_label_file]
 
-    def upsample_dataset(self, random_filenames, file_type, variations):
+    def upsample_dataset(self, random_img_filenames, rand_label_filenames, variations):
         '''
         This Fn will upsample the images by performing data augmentation
 
@@ -220,48 +199,64 @@ class SplitData:
 
         '''
         i = 0
-        aug_files = []
-        random.seed(500)
+        aug_img_files = []
+        aug_mask_files = []
+        # random.seed(500)
 
         # Make dir where tha augmented file will reside
-        aug_dir = os.path.join(self.dataset_home, file_type)
-        if not os.path.exists(aug_dir):
-                os.makedirs(aug_dir)
-                print("Augmented Directory '%s' created" %aug_dir)
+        aug_img_dir = os.path.join(self.dataset_base_dir, "augmented_images")
+        if not os.path.exists(aug_img_dir):
+                os.makedirs(aug_img_dir)
+                print("Augmented Directory '%s' created" %aug_img_dir)
+        
+        aug_mask_dir = os.path.join(self.dataset_base_dir, "augmented_labels")
+        if not os.path.exists(aug_mask_dir):
+                os.makedirs(aug_mask_dir)
+                print("Augmented Directory '%s' created" %aug_mask_dir)
 
 
         print("\nData Augmentation in Progress ...")
-        total_imgs = len(random_filenames)
+        total_imgs = len(random_img_filenames)
 
         for i in trange(total_imgs):
-            random_file = random_filenames[i]
 
             # load the image
-            img = load_img(random_file)
-            data = img_to_array(img)
-            samples = expand_dims(data, 0)
-
-            datagen = ImageDataGenerator(horizontal_flip=True, vertical_flip=True)
-
-            data_it = datagen.flow(samples, batch_size=1, seed=10)
-
-            #To rename the file with prefix A_
-            filename = os.path.basename(random_file)
-            filepath = os.path.dirname(random_file)
+            img = Image.open(random_img_filenames[i]).convert("RGB")
+            img = np.array(img)
+            mask = Image.open(rand_label_filenames[i]).convert('P')
+            mask = np.array(mask)
 
             for j in range(variations):
-                 # generate batch of images
-                batch = data_it.next()
-                # convert to unsigned integers for viewing
-                image = batch[0].astype('uint8')
-                im = Image.fromarray(image)
-                aug_file_name = filepath + "/A_" + str(i) + "_" + str(j) + "_" + filename
-                new_file = os.path.join(self.dataset_home, file_type,
-                                        aug_file_name)
-                im.save(new_file)
-                aug_files.append(new_file)
+            
+                transformed = self.transforms(image=img, mask=mask)
 
-        return aug_files
+                transformed_img = transformed["image"]
+                transformed_img = Image.fromarray(transformed_img)
+
+
+                #To rename the file with prefix A_
+                filename = os.path.basename(random_img_filenames[i])
+                filepath = os.path.dirname(random_img_filenames[i])
+
+                aug_file_name = "A_" + str(i) + "_" + str(j) + "_" + filename
+                new_file = os.path.join(self.dataset_base_dir, "augmented_images",
+                                        aug_file_name)
+                transformed_img.save(new_file)
+                aug_img_files.append(new_file)
+
+                transformed_mask = transformed["mask"]
+                transformed_mask = Image.fromarray(transformed_mask)
+
+                #To rename the file with prefix A_
+                filename = os.path.basename(rand_label_filenames[i])
+                filepath = os.path.dirname(rand_label_filenames[i])
+                aug_file_name = "A_" + str(i) + "_" + str(j) + "_" + filename
+                new_file = os.path.join(self.dataset_base_dir, "augmented_labels",
+                                        aug_file_name)
+                transformed_mask.save(new_file)
+                aug_mask_files.append(new_file)
+                
+        return aug_img_files, aug_mask_files
 
     def preprocess_dataset(self, image_filenames, label_filenames):
         '''
@@ -288,10 +283,8 @@ class SplitData:
             rand_image_filenames, rand_label_filenames = self.get_randimages_dataug(self.aug_value,
                                                                                     image_filenames,
                                                                                     label_filenames)
-            augmented_image_files = self.upsample_dataset(rand_image_filenames, "augmented_images", 2)
-            augmented_label_files = self.upsample_dataset(rand_label_filenames, "augmented_labels", 2)
-
-
+            augmented_image_files, augmented_label_files = self.upsample_dataset(rand_image_filenames, rand_label_filenames, 3)
+          
             self.check_distribution("augmented_data", augmented_image_files, augmented_label_files)
             print("\n Total Data :", len(augmented_image_files) + len(image_filenames))
 
@@ -325,6 +318,6 @@ class SplitData:
 
 if __name__ == "__main__":
     #TODO Fix data aug - Not Running
-    WSI_path = '/gladstone/finkbeiner/steve/work/data/npsad_data/gennadi/amy-def/'
-    split_data = SplitData(WSI_path, False, 500)
+    base_WSI_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/'
+    split_data = SplitData(base_WSI_path, True, 100)
     split_data.prepare_dataset()

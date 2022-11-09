@@ -3,13 +3,18 @@ import pdb
 from torchvision.models.detection.faster_rcnn import TwoMLPHead, FastRCNNPredictor
 from torchvision.models.detection.mask_rcnn import MaskRCNNHeads, MaskRCNNPredictor
 from torchvision.models.detection.anchor_utils import AnchorGenerator
-from torchvision.models.detection.roi_heads import RoIHeads
+
+#from torchvision.models.detection.roi_heads import RoIHeads
+
+from utils.roiheads import RoIHeads
+
 from torchvision.models.detection.rpn import RPNHead, RegionProposalNetwork
 from torchvision.ops.poolers import MultiScaleRoIAlign
-
 from torchvision.models.detection import backbone_utils
 from torchvision.models.detection.generalized_rcnn import GeneralizedRCNN
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
+
+from generalized_rcnn import GeneralizedRCNN
 
 class _default_mrcnn_config:
     def __init__(
@@ -239,19 +244,24 @@ def build_default(config, im_size=1024, backbone=None, transform=None):
     rpn = build_rpn(**rpn_config)
     roi_heads = build_roi_heads(**roi_heads_config)
 
-
-    backbone = backbone_utils.resnet_fpn_backbone(
-        'resnet50',
-        pretrained=True,
-        trainable_layers=3
-    ) if backbone is None else backbone
-
-    transform = GeneralizedRCNNTransform(
-        min_size=im_size,
-        max_size=im_size,
-        image_mean=[0.485, 0.456, 0.406],
-        image_std=[0.229, 0.224, 0.225],
-    ) if transform is None else transform
+    if backbone is None:
+        backbone = backbone_utils.resnet_fpn_backbone(
+            'resnet50',
+            pretrained=True,
+            trainable_layers=3
+        )
+    else:
+        backbone 
+    
+    if transform is None:
+        transform = GeneralizedRCNNTransform(
+            min_size=im_size,
+            max_size=im_size,
+            image_mean=[0.485, 0.456, 0.406],
+            image_std=[0.229, 0.224, 0.225],
+        )
+    else:
+        transform
 
     return GeneralizedRCNN(backbone, rpn, roi_heads, transform)
 

@@ -167,7 +167,6 @@ if __name__ == "main":
         torch.save(model, model_save_name.format(epoch=config['num_epochs']))
 
         print("\n =================The Model is Trained!====================")
-
         print("-----------------Visualizing Model predictions----------------")
 
         # TODO Testing is done on Individual WSI Folders

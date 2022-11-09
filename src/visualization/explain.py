@@ -30,6 +30,9 @@ import wandb
 from tqdm import tqdm
 from skimage import data
 from skimage.color import rgb2hed, hed2rgb
+import sys
+sys.path.insert(0, '../')
+from models.todos.model_mrcnn import _default_mrcnn_config, build_default
 
 
 
@@ -37,7 +40,8 @@ from skimage.color import rgb2hed, hed2rgb
 class ExplainPredictions():
     
     # TODO fix the visualization flags
-    def __init__(self, model_input_path, test_input_path, detection_threshold, wandb, save_result, ablation_cam, save_thresholds):
+    def __init__(self, model, model_input_path, test_input_path, detection_threshold, wandb, save_result, ablation_cam, save_thresholds):
+        self.model = model
         self.model_input_path = model_input_path
         self.test_input_path = test_input_path
         self.detection_threshold = detection_threshold
@@ -45,11 +49,13 @@ class ExplainPredictions():
         self.save_result = save_result
         self.ablation_cam = ablation_cam
         self.save_thresholds = save_thresholds
-        self.class_names = ['Unknown', 'Core', 'Diffuse', 'Neuritic']
-        self.class_to_colors = {'Core': (255, 0, 0), 'Neuritic' : (0, 0, 255), 'Diffuse': (0,255,0)}
-        self.result_save_dir= "../../reports/figures/"
+        self.class_names = ['Unknown', 'Core', 'Diffuse', 'Neuritic', 'CAA']
+        self.class_to_colors = {'Core': (255, 0, 0), 'Neuritic' : (0, 0, 255), 'Diffuse': (0,255,0), 'CAA':(225, 255, 0)}
+        self.result_save_dir= "/mnt/new-nas/work/data/npsad_data/vivek/reports/figures/"
         self.colors = np.random.uniform(0, 255, size=(len(self.class_names), 3))
-        self.column_names = ["image_name", "region", "region_mask", "label", "confidence", "brown_pixels", "centroid", "eccentricity", "area", "equivalent_diameter"]
+        self.column_names = ["image_name", "region", "region_mask", "label", 
+                            "confidence", "brown_pixels", "centroid", 
+                            "eccentricity", "area", "equivalent_diameter"]
         self.results_path = ""
         self.masks_path = "" 
         self.detections_path = "" 
@@ -167,7 +173,7 @@ class ExplainPredictions():
             # draw the bounding boxes around the objects
             cv2.rectangle(image, boxes[i][0], boxes[i][1], color=rect_color, 
                         thickness=2)
-            # Get the centre coords of the rectangle
+            # Get the centre coords of the rectangle-plaque-detection/src/visualizat
             x1 = boxes[i][0][0]
             y1 = boxes[i][0][1]
             x2 = boxes[i][1][0]
@@ -236,6 +242,8 @@ class ExplainPredictions():
 
     def make_result_dirs(self, folder_name):
 
+
+        folder_name = self.wandb.name + "_" + folder_name
         save_path = os.path.join(self.result_save_dir, folder_name)
         results_path = os.path.join(save_path, "results")
         if not os.path.exists(results_path):
@@ -253,7 +261,7 @@ class ExplainPredictions():
         if not os.path.exists(ablations_path):
             os.makedirs(ablations_path)
         
-        pixel_count_path = os.path.join("../../reports/", "pixel_count")
+        pixel_count_path = os.path.join(self.result_save_dir, "pixel_count")
         if not os.path.exists(pixel_count_path):
             os.makedirs(pixel_count_path)
         
@@ -316,8 +324,8 @@ class ExplainPredictions():
                                                                'core': total_core_plaques, 'neuritic': total_neuritic_plaques, 'diffuse': total_diffused_plaques,
                                                                'centroid': props.centroid, 'eccentricity': props.eccentricity, 
                                                                'area': props.area, 'equivalent_diameter': props.equivalent_diameter}])
-                    wandb_result.append([img_name, self.wandb.Image(cropped_img), self.wandb.Image(cropped_img_mask), labels[i], scores[i], 
-                                         props.centroid, props.eccentricity, props.area, props.equivalent_diameter])
+                    wandb_result.append([img_name, wandb.Image(cropped_img), wandb.Image(cropped_img_mask), labels[i], scores[i], 
+                                         total_brown_pixels, props.centroid, props.eccentricity, props.area, props.equivalent_diameter])
 
                     df = pd.concat([df, data_record], ignore_index=True)
                    
@@ -327,10 +335,11 @@ class ExplainPredictions():
     def generate_results(self):
         # This will help us create a different color for each class
         # Load Trained 
-        model = torch.load(self.model_input_path)
+        
+        self.model.load_state_dict(torch.load(self.model_input_path))
     
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        model.eval().to(device)
+        self.model.eval().to(device)
 
         test_folders = glob.glob(os.path.join(self.test_input_path, "*"))
         
@@ -342,7 +351,7 @@ class ExplainPredictions():
             print("\n", test_folder)
             folder_name = os.path.basename(test_folder)
 
-            if folder_name == "XE07-047_1_AmyB_1":
+            if folder_name == "labels":
                 continue
 
             # make all necessary folders
@@ -370,7 +379,7 @@ class ExplainPredictions():
                     image = image[:,:, :3]
 
                 input_tensor, image_float_np = self.prepare_input(image)
-                masks, boxes, labels, scores = self.get_outputs(input_tensor, model, self.detection_threshold)
+                masks, boxes, labels, scores = self.get_outputs(input_tensor, self.model, self.detection_threshold)
                 
                 result_img, result_masks = self.draw_segmentation_map(image, masks, boxes, labels)
 
@@ -445,21 +454,30 @@ class ExplainPredictions():
 
             print("Total area of brown pixel", (total_brown_pixels/ total_image_pixels)*100)
             df.to_csv(self.quantify_path, index=False)
-            test_table = self.wandb.Table(data=wandb_result, columns=self.column_names)
+            test_table = wandb.Table(data=wandb_result, columns=self.column_names)
             # self.wandb.log({'quantifications': test_table})
-          
+
                 
         
 if __name__ == "__main__":
 
     
-    input_path = '/home/vivek/Datasets/AmyB/amyb_wsi/test-data/'
-    model_input_path = '../../models/mrcnn_model_15.pth'
+    input_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test1'
+    model_input_path = '/mnt/new-nas/work/data/npsad_data/vivek/models/vibrant-yogurt-428_mrcnn_model_50.pth'
+
+    test_config = dict(
+        batch_size = 1,
+        num_classes = 4
+    )
+
+    model_config = _default_mrcnn_config(num_classes=1 + test_config['num_classes']).config
+    model = build_default(model_config, im_size=1024)
 
     # Use the Run ID from train_model.py here if you want to add some visualizations after training has been done
-    # with wandb.init(project="nps-ad", id = "17vl5roa", entity="hellovivek", resume="allow"):
+    # with wandb.init(project="nps-ad", id = "17vl5roa", entity="hellovivek", resume="allow"):\
+     
     
-    with wandb.init(project="nps-ad",  entity="hellovivek"):
-        explain = ExplainPredictions(model_input_path = model_input_path, test_input_path=input_path, 
-                                     detection_threshold=0.75, wandb=wandb, save_result=True, ablation_cam=True, save_thresholds=False)
-        explain.generate_results()
+    run = wandb.init(project="nps-ad-vivek",  entity="hellovivek")
+    explain = ExplainPredictions(model, model_input_path = model_input_path, test_input_path=input_path, 
+                                    detection_threshold=0.75, wandb=run, save_result=True, ablation_cam=True, save_thresholds=False)
+    explain.generate_results()
