@@ -1,6 +1,6 @@
 import os
 import sys
-sys.path.append(os.path.join(os.getcwd(), *tuple(['..'] * 2)))
+sys.path.append(os.path.join(os.getcwd(), *tuple(['..'])))
 
 from typing import Callable, Dict, List, Optional, Set
 from collections import OrderedDict

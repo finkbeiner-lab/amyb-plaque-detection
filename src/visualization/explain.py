@@ -32,7 +32,7 @@ from skimage import data
 from skimage.color import rgb2hed, hed2rgb
 import sys
 sys.path.insert(0, '../')
-from models.todos.model_mrcnn import _default_mrcnn_config, build_default
+from models.model_mrcnn import _default_mrcnn_config, build_default
 
 
 
