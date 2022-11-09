@@ -224,7 +224,7 @@ if __name__ == '__main__':
         # print(f'Epoch {epoch}=======================================>.')
 
         for logs in train_one_epoch(model, loss_fn, optimizer, train_data_loader, device, epoch=epoch, log_freq=1):
-            for log in logs:/mnt/new-nas/work/data/npsad_data/vivek/
+            for log in logs:
                 run.log(log)
 
         if epoch + 1 == train_config['epochs'] or epoch % train_config['ckpt_freq'] == 0:
