@@ -15,6 +15,7 @@ from features import transforms as T
 from utils.engine import evaluate
 import torchvision
 import matplotlib.pyplot as plt
+from visualization.explain import ExplainPredictions
 
 
 # Sets the behavior of calls such as
@@ -135,12 +136,12 @@ if __name__ == '__main__':
     dataset_test_location = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test'
 
     train_config = dict(
-        epochs = 1,
+        epochs = 100,
         batch_size = 6,
         num_classes = 4,
         device_id = 0,
-        ckpt_freq =100,
-        eval_freq = 5,
+        ckpt_freq =500,
+        eval_freq = 20,
     )
 
     test_config = dict(
@@ -151,7 +152,7 @@ if __name__ == '__main__':
     optim_config = dict(
         # cls=grad_optim.GradSGD,
         cls=torch.optim.SGD,
-        defaults=dict(lr=1. * (10. ** (-2)))
+        defaults=dict(lr=1. * (10. ** (-2)))  #-4 is too slow 
     )
     wandb_config = dict(
         project='nps-ad-vivek',
@@ -226,6 +227,23 @@ if __name__ == '__main__':
         
         model.train(True)
 
-    run.finish()
+
+
+    
     model_save_name = "/mnt/new-nas/work/data/npsad_data/vivek/models/{name}_mrcnn_model_{epoch}.pth"
-    torch.save(model, model_save_name.format(name=exp_name, epoch=train_config['epochs']))
+    torch.save(model.state_dict(), model_save_name.format(name=exp_name, epoch=train_config['epochs']))
+
+
+    # print("\n =================The Model is Trained!====================")
+    # print("-----------------Visualizing Model predictions----------------")
+
+    # # TODO Testing is done on Individual WSI Folders
+    # input_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test'
+
+    # model = build_default(model_config, im_size=1024)
+   
+    # explain = ExplainPredictions(model, model_input_path = model_save_name.format(name=exp_name, epoch=train_config['epochs']), test_input_path=input_path, 
+    #                             detection_threshold=0.75, wandb=run, save_result=True, ablation_cam=True, save_thresholds=False)
+    # explain.generate_results()
+
+    run.finish()
