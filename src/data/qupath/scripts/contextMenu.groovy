@@ -70,7 +70,38 @@ class CustomPathPrefs {
 }
 
 
-class PathClassIntensity {
+class PathClassSetter {
+    static boolean setClass(PathObject po, PathClass pc) {
+        PathClass pcOld = po.getPathClass();
+        po.setPathClass(pc);
+        return po.getPathClass() != pcOld;
+    }
+
+    static List<PathObject> setClassChanged(List<PathObject> pos, PathClass pc) {
+        List<PathObject> changed = new ArrayList<>();
+        for (PathObject po: pos) {
+            if (setClass(po, pc))
+                changed.add(po);
+        }
+        return changed;
+    }
+
+    static void setSelectedAnnotationsClass(QuPathGUI instance, QuPathViewer viewer, PathClass pc) {
+        if (viewer != null) {
+            PathObjectHierarchy hier = viewer.getHierarchy();
+            PathObjectSelectionModel sel = hier.getSelectionModel();
+            List<PathObject> change = new ArrayList<>();
+            for (PathObject po: hier.getAnnotationObjects()) {
+                if (sel.isSelected(po))
+                    change.add(po);
+            }
+            hier.fireObjectClassificationsChangedEvent(instance, setClassChanged(change, pc));
+        }
+    }
+}
+
+
+class PathClassIntensitySetter {
     static PathClass createIntensityClass(PathClass pc, int intensity) {
         pc = PathClassTools.getNonIntensityAncestorClass(pc);
         if (intensity == 0)
@@ -147,7 +178,15 @@ class PathClassIntensityContextMenu {
             return
         }
 
-        this.menuSetIntensity.getItems().clear()
+        List<MenuItem> itemList = gui.getAvailablePathClasses().collect({it ->
+            final PathClass pc = it.getName() == null ? null : it
+            String pcName = pc == null ? "None" : pc.toString()
+            Action action = new Action(pcName, e -> {PathClassSetter.setSelectedAnnotationsClass(this.gui, this.viewer, pc)})
+            MenuItem item = ActionUtils.createMenuItem(action)
+            return item
+        })
+
+        this.menuSetClass.getItems().setAll(itemList)
     }
 
     def setIntensityMenuItems() {
@@ -159,7 +198,7 @@ class PathClassIntensityContextMenu {
         List<String> names = ["None", "Negative", "1+", "2+", "3+", "Positive"]
         List<MenuItem> itemList = names.withIndex().collect({name, idx ->
             final int i = idx - 1
-            Action action = new Action(name, e -> {PathClassIntensity.setSelectedAnnotationsIntensityClass(this.gui, this.viewer, i)})
+            Action action = new Action(name, e -> {PathClassIntensitySetter.setSelectedAnnotationsIntensityClass(this.gui, this.viewer, i)})
             MenuItem item = ActionUtils.createMenuItem(action)
             return item
         })
@@ -201,7 +240,20 @@ class PathClassIntensityContextMenu {
 }
 
 
+class ContextMenuApp implements Runnable {
+    QuPathGUI gui
+    PathClassIntensityContextMenu contextMenu
+
+    def ContextMenuApp(QuPathGUI gui) {
+        this.gui = gui
+    }
+
+    void run() {
+        this.gui.getViewers().each({(new PathClassIntensityContextMenu(gui, it).build())})
+    }
+}
+
+
 
 def gui = QPEx.getQuPath().getInstance()
-def viewer = gui.getViewer()
-new PathClassIntensityContextMenu(gui, viewer).build()
+def menu = gui.installCommand("Extended Context Menu", new ContextMenuApp(gui))
