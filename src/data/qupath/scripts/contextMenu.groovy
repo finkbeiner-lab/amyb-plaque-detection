@@ -249,6 +249,9 @@ class ContextMenuApp implements Runnable {
     }
 
     void run() {
+        CustomPathPrefs prefs = new CustomPathPrefs(CustomPathPrefs.defaultRootNodeName + "/" + PathClassIntensityContextMenu.prefsNodeName, true)
+        prefs.rootNode.keys().each({prefs.rootNode.remove(it)})
+        
         this.gui.getViewers().each({(new PathClassIntensityContextMenu(gui, it).build())})
     }
 }
