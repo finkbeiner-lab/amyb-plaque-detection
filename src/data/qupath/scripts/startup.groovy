@@ -35,6 +35,19 @@ def loadContextMenu(QuPathGUI gui) {
     contextMenu.run()
 }
 
+def loadPathClasses(QuPathGUI gui, Map<String, List<Integer>> defaultPathClasses) {
+    (new ScriptLoader()).getScript("setPathClasses.groovy").putPathClasses(gui, defaultPathClasses)
+}
+
+
 def gui = QPEx.getQuPath().getInstance()
+def defaultPathClasses = [
+    Neuritic: [0, 255, 0],
+    Diffuse: [0, 255, 255],
+    Core: [255, 153, 102],
+    CAA: [150, 79, 239],
+]
+
 loadTileManager(gui)
 loadContextMenu(gui)
+loadPathClasses(gui, defaultPathClasses)
