@@ -2,4 +2,5 @@ scripts/annotationManager.groovy
 scripts/projectManager.groovy
 scripts/tileManager.groovy
 scripts/contextMenu.groovy
+scripts/setPathClasses.groovy
 scripts/startup.groovy
