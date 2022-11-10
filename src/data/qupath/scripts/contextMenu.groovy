@@ -20,7 +20,12 @@ import qupath.lib.gui.viewer.QuPathViewer
 import qupath.lib.gui.tools.GuiTools
 import qupath.lib.gui.tools.MenuTools
 
+import qupath.lib.objects.PathObject
 import qupath.lib.objects.PathAnnotationObject
+import qupath.lib.objects.classes.PathClass
+import qupath.lib.objects.classes.PathClassFactory
+import qupath.lib.objects.classes.PathClassTools
+import qupath.lib.objects.hierarchy.PathObjectHierarchy
 import qupath.lib.objects.hierarchy.events.PathObjectSelectionModel
 
 
@@ -248,15 +253,16 @@ class ContextMenuApp implements Runnable {
         this.gui = gui
     }
 
+    static ContextMenuApp getInstance(QuPathGUI gui) {
+        return new ContextMenuApp(gui)
+    }
+
     void run() {
         CustomPathPrefs prefs = new CustomPathPrefs(CustomPathPrefs.defaultRootNodeName + "/" + PathClassIntensityContextMenu.prefsNodeName, true)
         prefs.rootNode.keys().each({prefs.rootNode.remove(it)})
-        
+
         this.gui.getViewers().each({(new PathClassIntensityContextMenu(gui, it).build())})
     }
 }
 
-
-
-def gui = QPEx.getQuPath().getInstance()
-def menu = gui.installCommand("Extended Context Menu", new ContextMenuApp(gui))
+return ContextMenuApp
