@@ -1,6 +1,37 @@
 import groovy.transform.InheritConstructors
 
+import java.io.BufferedReader
+import java.io.FileReader
+import java.io.File
+
+import java.util.concurrent.Callable
+import java.util.concurrent.FutureTask
+
+import javafx.application.Platform
+import javafx.concurrent.Task
+import javafx.scene.control.Alert
+import javafx.scene.control.Alert.AlertType
+import javafx.scene.control.ButtonType
+import javafx.scene.control.Dialog
+import javafx.scene.control.DialogPane
+import javafx.scene.control.CheckBox
+import javafx.scene.control.ChoiceBox
+import javafx.scene.control.Label
+import javafx.scene.control.TextArea
+import javafx.scene.control.TextField
+import javafx.scene.layout.GridPane
+import javafx.stage.Modality
+import javafx.stage.FileChooser
+import javafx.stage.DirectoryChooser
+import javafx.util.StringConverter
+
+import org.json.*
+import org.apache.commons.io.FileUtils;
+
 import qupath.lib.gui.scripting.QPEx
+import qupath.lib.gui.QuPathGUI
+
+import qupath.lib.geom.Point2
 
 import qupath.lib.objects.PathObject
 import qupath.lib.objects.PathRootObject
@@ -31,38 +62,6 @@ import qupath.lib.roi.ROIs
 import qupath.lib.roi.RoiTools
 
 import qupath.lib.io.GsonTools
-
-import javafx.application.Platform
-import javafx.concurrent.Task
-import javafx.scene.control.Alert
-import javafx.scene.control.Alert.AlertType
-import javafx.scene.control.ButtonType
-import javafx.scene.control.Dialog
-import javafx.scene.control.DialogPane
-import javafx.scene.control.CheckBox
-import javafx.scene.control.ChoiceBox
-import javafx.scene.control.Label
-import javafx.scene.control.TextArea
-import javafx.scene.control.TextField
-import javafx.scene.layout.GridPane
-import javafx.stage.Modality
-import javafx.stage.FileChooser
-import javafx.stage.DirectoryChooser
-import javafx.util.StringConverter
-
-import java.io.BufferedReader
-import java.io.FileReader
-import java.io.File
-
-
-import java.util.concurrent.Callable
-import java.util.concurrent.FutureTask
-
-import org.json.*
-import org.apache.commons.io.FileUtils;
-
-
-import qupath.lib.geom.Point2
 
 
 // TODO:
@@ -614,8 +613,14 @@ class TileObjects implements Runnable {
             FXUtils.alertCallable("No ImageData available").call()
         }
     }
+
+    static TileObjects getInstance(QuPathGUI gui) {
+        return new TileObjects(gui)
+    }
 }
 
 
-def gui = QPEx.getQuPath().getInstance()
-gui.installCommand("Tile Manager", new TileObjects(gui))
+// def gui = QPEx.getQuPath().getInstance()
+// gui.installCommand("Tile Manager", new TileObjects(gui))
+
+return TileObjects
