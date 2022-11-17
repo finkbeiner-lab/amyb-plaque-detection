@@ -246,7 +246,7 @@ def annotations = hierarchy.annotationObjects
 def (unlabeled, labeled) = annotationsToROIsMap(annotations)
 
 
-def roiTypes = ["Core", "Neuritic", "Diffuse", "CAA"]
+def roiTypes = ["Pre", "Mature", "Ghost"]
 def roisByType = [:]
 roiTypes.each({
     for (k in labeled.keySet()) {
@@ -289,7 +289,7 @@ for (item in roisByType) {
 
 
 
-savepath = "/mnt/new-nas/work/data/npsad_data/vivek/amy-def-mfg-jsons/" + filename + ".json"
+savepath = "/mnt/new-nas/work/data/npsad_data/vivek/tau-jsons/" + filename + ".json"
 print(savepath)
 
 try (Writer writer = new FileWriter(savepath)) {

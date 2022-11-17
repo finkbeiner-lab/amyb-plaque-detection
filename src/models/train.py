@@ -123,12 +123,6 @@ def get_resp(prompt, prompt_fn=None, resps='n y'.split()):
 
 
 if __name__ == '__main__':
-    # TODO:
-    #   - add functionality for calling backward with create_graph, i.e. for higher-order derivatives
-    #   - switch to support for standard torchvision-bundled transforms (i.e. instead of `features.transforms as T` try `torchvision.transforms.transforms` or `torchvision.transforms.functional`)
-    #   - complete feature: add grad_optimizer support transparently (so that usage is the same for users and train_one_epoch interface whether torch.optim or grad_optim is selected, i.e. log grads automatically)
-    #   - do ^^ via closures
-    #   - experimental: add an API to collect params and bufs by on module and/or name; generate on-the-fly state_dicts, gradient_dicts, higher-order gradient_dicts, etc.
 
     parser = argparse.ArgumentParser(description='Maskrcnn training')
 
@@ -148,7 +142,7 @@ if __name__ == '__main__':
     dataset_test_location = args.dataset_test_location
 
     train_config = dict(
-        epochs = 100,
+        epochs = 50,
         batch_size = 6,
         num_classes = 4,
         device_id = 0,
@@ -224,7 +218,7 @@ if __name__ == '__main__':
         # print(f'Epoch {epoch}=======================================>.')
 
         for logs in train_one_epoch(model, loss_fn, optimizer, train_data_loader, device, epoch=epoch, log_freq=1):
-            for log in logs:/mnt/new-nas/work/data/npsad_data/vivek/
+            for log in logs:
                 run.log(log)
 
         if epoch + 1 == train_config['epochs'] or epoch % train_config['ckpt_freq'] == 0:
@@ -242,7 +236,7 @@ if __name__ == '__main__':
 
 
     
-    model_save_name = dataset_base_dir + "models/{name}_mrcnn_model_{epoch}.pth"
+    model_save_name = dataset_base_dir + "models/tau/{name}_mrcnn_model_{epoch}.pth"
     torch.save(model.state_dict(), model_save_name.format(name=exp_name, epoch=train_config['epochs']))
 
 

@@ -28,10 +28,10 @@ import pyvips as Vips
 ID_MASK_SHAPE = (1024, 1024)
 
 # Color Coding
-lablel2id = {'Core':'50', 'Diffuse':'100',
-             'Neuritic':'150', 'CAA': '200', 'Unknown':'0'}
+lablel2id = {'Pre':'50', 'Mature':'100',
+             'Ghost':'150', 'Unknown':'0'}
 
-DATASET_PATH = "/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi"
+DATASET_PATH = "/mnt/new-nas/work/data/npsad_data/vivek/Datasets/tau_wsi"
 
 def save_img(img, file_name, tileX, tileY, save_dir, label="mask"):
     im = Image.fromarray(img)
@@ -113,7 +113,7 @@ def process_json(WSI_path, json_path,  visualize=False):
 
     imagenames = glob.glob(os.path.join(WSI_path, "*.mrxs"))
     imagenames = sorted(imagenames)
-    plaque_dict = {'Core': 0, 'Neuritic': 0, 'Diffuse': 0, 'CAA': 0, 'Unknown': 0}
+    plaque_dict = {'Pre': 0, 'Mature': 0, 'Ghost': 0, 'Unknown': 0}
 
     for img in imagenames:
         # Read the WSI image

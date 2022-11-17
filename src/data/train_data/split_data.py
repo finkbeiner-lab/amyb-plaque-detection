@@ -318,6 +318,6 @@ class SplitData:
 
 if __name__ == "__main__":
     #TODO Fix data aug - Not Running
-    base_WSI_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/'
-    split_data = SplitData(base_WSI_path, True, 100)
+    base_WSI_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/tau_wsi/'
+    split_data = SplitData(base_WSI_path, True, 500)
     split_data.prepare_dataset()

@@ -49,9 +49,9 @@ class ExplainPredictions():
         self.save_result = save_result
         self.ablation_cam = ablation_cam
         self.save_thresholds = save_thresholds
-        self.class_names = ['Unknown', 'Core', 'Diffuse', 'Neuritic', 'CAA']
-        self.class_to_colors = {'Core': (255, 0, 0), 'Neuritic' : (0, 0, 255), 'Diffuse': (0,255,0), 'CAA':(225, 255, 0)}
-        self.result_save_dir= "/mnt/new-nas/work/data/npsad_data/vivek/reports/figures/"
+        self.class_names = ['Unknown', 'Pre', 'Mature', 'Ghost']
+        self.class_to_colors = {'Pre': (255, 0, 0), 'Mature' : (0, 0, 255), 'Ghost': (0,255,0)}
+        self.result_save_dir= "/mnt/new-nas/work/data/npsad_data/vivek/reports/figures/tau"
         self.colors = np.random.uniform(0, 255, size=(len(self.class_names), 3))
         self.column_names = ["image_name", "region", "region_mask", "label", 
                             "confidence", "brown_pixels", "centroid", 
@@ -462,8 +462,8 @@ class ExplainPredictions():
 if __name__ == "__main__":
 
     
-    input_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test1'
-    model_input_path = '/mnt/new-nas/work/data/npsad_data/vivek/models/vibrant-yogurt-428_mrcnn_model_50.pth'
+    input_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/tau_wsi/test'
+    model_input_path = '/mnt/new-nas/work/data/npsad_data/vivek/models/tau/dry-waterfall-442_mrcnn_model_50.pth'
 
     test_config = dict(
         batch_size = 1,

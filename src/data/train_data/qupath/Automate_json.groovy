@@ -10,22 +10,8 @@ import qupath.lib.regions.ImageRegion
 import qupath.lib.io.GsonTools
 import qupath.lib.objects.classes.PathClassTools
 
-File folder = new File('/mnt/new-nas/work/data/npsad_data/vivek/QuPath')
+File folder = new File('/mnt/new-nas/work/data/npsad_data/vivek/QuPath-Tau')
 project = ""
-
-//folder.eachFileRecurse FileType.FILES,  { file ->
-//
-//    // do nothing if the file ends with a .txt extension
-//    if (file.name.endsWith(".qpproj")) {
-//        println "Processing file ${file.absolutePath}"
-//        
-//        if(file.isFile())
-//        
-//            Project<BufferedImage> project = ProjectIO.loadProject(file, BufferedImage.class)
-//            print(project)
-//        
-//    }
-//}
 
 File new_file = new File('/mnt/new-nas/work/data/npsad_data/vivek/QuPath/XE10-053_1_AmyB_1/project.qpproj')
 
@@ -333,7 +319,7 @@ for (item in roisByType) {
 
 
 
-savepath = "/mnt/new-nas/work/data/npsad_data/vivek/amy-def-mfg-jsons/" + filename + ".json"
+savepath = "/mnt/new-nas/work/data/npsad_data/vivek/tau-jsons/" + filename + ".json"
 print(savepath)
 
 try (Writer writer = new FileWriter(savepath)) {
