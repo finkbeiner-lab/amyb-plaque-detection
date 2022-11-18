@@ -1,7 +1,9 @@
 import os
 import pdb
 import sys
-sys.path.append(os.path.join(os.getcwd()))
+__pkg = os.path.abspath(os.path.join(__file__, *('..'.split() * 2)))
+if __pkg not in sys.path:
+    sys.path.append(__pkg)
 
 from collections import OrderedDict
 
