@@ -70,7 +70,7 @@ class JsonDataset(Dataset):
 
         return dict(
             labels=torch.as_tensor(labels).to(dtype=torch.long),
-            boxes=torch.as_tensor(bboxes).to(dtype=torch.long),
+            boxes=torch.as_tensor(bboxes).to(dtype=torch.float),
             masks=torch.as_tensor(masks).to(dtype=torch.bool),
         )
 

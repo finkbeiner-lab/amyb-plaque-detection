@@ -25,7 +25,7 @@ def train(model, optimizer, device, loader, progress=False):
         for k, v in loss.items():
             summary.setdefault(k, list()).append(v.item())
 
-        disp = OrderedDict([(k, f'{v.item():.4f}') for k, v in loss.items()])
+        disp = OrderedDict([(k[5:], f'{v.item():.4f}') for k, v in loss.items()])
         if progress:
             bar.set_postfix(disp)
             bar.update()
@@ -34,7 +34,7 @@ def train(model, optimizer, device, loader, progress=False):
             print('\n'.join([f'  {name}: {val}' for name, val in disp.items()]))
             print()
 
-    summary = OrderedDict([(k, f'{torch.tensor(v).mean().item():.4f}') for k, v in summary.items()])
+    summary = OrderedDict([(k[5:], f'{torch.tensor(v).mean().item():.4f}') for k, v in summary.items()])
     if progress:
         bar.set_postfix(summary)
         bar.close()

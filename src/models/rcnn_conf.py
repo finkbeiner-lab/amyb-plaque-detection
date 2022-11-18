@@ -1,3 +1,10 @@
+import os
+import pdb
+import sys
+__pkg = os.path.abspath(os.path.join(__file__, *('..'.split() * 2)))
+if __pkg not in sys.path:
+    sys.path.append(__pkg)
+
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 from collections import OrderedDict
 from dataclasses import dataclass, field, asdict, is_dataclass, replace, InitVar
@@ -6,6 +13,10 @@ import torch
 from torch import nn, Tensor
 
 import torchvision
+
+import models
+from models.rcnn import RCNN
+from models.rcnn_transform import RCNNTransform
 
 
 def replace_keys(
@@ -197,6 +208,20 @@ class backbone_conf:
 
 
 @dataclass
+class transform_conf:
+    mean: List[float] = field(default_factory=lambda: [0.485, 0.456, 0.406])
+    std: List[float] = field(default_factory=lambda: [0.229, 0.224, 0.225])
+    divisor: int = 32
+
+    def module(self) -> nn.Module:
+        return RCNNTransform(
+            mean=self.mean,
+            std=self.std,
+            divisor=self.divisor,
+        )
+
+
+@dataclass
 class rcnn_conf:
     num_classes: int = 91
     num_channels: int = 256
@@ -205,6 +230,7 @@ class rcnn_conf:
     backbone: backbone_conf = field(default_factory=backbone_conf)
     rpn: rpn_conf = field(default_factory=rpn_conf)
     heads: heads_conf = field(default_factory=heads_conf)
+    transform: transform_conf = field(default_factory=transform_conf)
 
     weights: object = torchvision.models.detection.mask_rcnn.MaskRCNN_ResNet50_FPN_Weights.COCO_V1
 
@@ -218,11 +244,18 @@ class rcnn_conf:
         replace_keys(self, 'heads', keys)
 
     def _module(self) -> nn.Module:
-        return nn.Sequential(OrderedDict([
-            ('backbone', self.backbone.module()),
-            ('rpn', self.rpn.module()),
-            ('roi_heads', self.heads.module()),
-        ]))
+        # return nn.Sequential(OrderedDict([
+        #     ('backbone', self.backbone.module()),
+        #     ('rpn', self.rpn.module()),
+        #     ('roi_heads', self.heads.module()),
+        #     ('transform', self.transform.module()),
+        # ]))
+        return RCNN(
+            self.backbone.module(),
+            self.rpn.module(),
+            self.heads.module(),
+            self.transform.module(),
+        )
 
     def module(self, freeze_submodules=None, skip_submodules=None) -> nn.Module:
         model = self._module()
