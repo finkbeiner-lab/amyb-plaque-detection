@@ -385,9 +385,14 @@ class COCOeval:
         Compute and display summary metrics for evaluation results.
         Note this functin can *only* be applied on the default parameter setting
         '''
+        # define List to store metric names
+        metric_names = []
+        # define List to store metric values
+        metric_values = []
         def _summarize( ap=1, iouThr=None, areaRng='all', maxDets=100 ):
             p = self.params
             iStr = ' {:<18} {} @[ IoU={:<9} | area={:>6s} | maxDets={:>3d} ] = {:0.3f}'
+            iStr2 = ' {:<18} {} @[ IoU={:<9} | area={:>6s} | maxDets={:>3d} ]'
             titleStr = 'Average Precision' if ap == 1 else 'Average Recall'
             typeStr = '(AP)' if ap==1 else '(AR)'
             iouStr = '{:0.2f}:{:0.2f}'.format(p.iouThrs[0], p.iouThrs[-1]) \
@@ -415,10 +420,12 @@ class COCOeval:
             else:
                 mean_s = np.mean(s[s>-1])
             print(iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets, mean_s))
-            results = {iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets, mean_s): mean_s }
-            # x = pd.DataFrame(results)
+            result = {iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets,mean_s): mean_s }
+            # Adding metric names to the list
+            metric_names.append(iStr2.format(titleStr, typeStr, iouStr, areaRng, maxDets))
+            # Adding metric values to the list
+            metric_values.append(mean_s)
             self.table.add_data(iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets, mean_s)) 
-            
             return mean_s
 
         def _summarizeDets():
@@ -444,8 +451,8 @@ class COCOeval:
         if iouType == 'segm' or iouType == 'bbox':
             summarize = _summarizeDets
         self.stats = summarize()
-       
-
+        return pd.DataFrame({"metric_name":metric_names, "metric_value":metric_values})
+    
     def __str__(self):
         self.summarize(run)
 

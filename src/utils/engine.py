@@ -131,6 +131,7 @@ def evaluate(run, model, data_loader, device):
 
     # accumulate predictions from all images
     coco_evaluator.accumulate()
-    coco_evaluator.summarize(run)
+    # summary of avg precision/recall at various IOU is saved as dataframe in "results"
+    results = coco_evaluator.summarize(run)
     torch.set_num_threads(n_threads)
-    return coco_evaluator
+    return coco_evaluator, results
