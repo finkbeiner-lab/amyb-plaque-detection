@@ -61,10 +61,11 @@ if __name__ == '__main__':
     datasets = [(torch.utils.data.Subset(dataset, list(range(8, len(dataset)))), torch.utils.data.Subset(dataset, list(range(0, 8)))) for dataset in datasets]
     dataset = CombinedVipsDataset([_[0] for _ in datasets])
     dataset_test = CombinedVipsDataset([_[1] for _ in datasets])
-    # dataset, dataset_test = torch.utils.data.Subset(dataset, list(range(9, len(dataset)))), torch.utils.data.Subset(dataset, list(range(0, 9)))
     loader = torch.utils.data.DataLoader(dataset, batch_size=2, shuffle=True, collate_fn=lambda _: tuple(zip(*_)))
 
     device = torch.device('cuda', 0)
+    epochs = 35
+    freq = 5
 
     model_conf = rcnn_v2_conf(pretrained=True, num_classes=4)
     model = model_conf.module(
@@ -72,3 +73,14 @@ if __name__ == '__main__':
         skip_submodules=['roi_heads.box_predictor', 'roi_heads.mask_predictor.mask_fcn_logits']
     ).to(device)
     optimizer = torch.optim.SGD(model.parameters(), **dict(lr=2e-4, momentum=9e-2, weight_decay=1e-5,))
+
+    for epoch in range(1, epochs + 1):
+        print(f'Epoch {epoch}')
+        train(model, optimizer, device, loader, progress=True)
+
+        grid = torchvision.utils.make_grid([show(image, eval(model, device, image, thresh=0.5, mask_thresh=0.5)) for image, _ in dataset_test], nrow=4)
+        if epoch % freq == 0 or epoch == epochs:
+            torchvision.transforms.ToPILImage()(grid).save(f'/home/gryan/projects/amyb-plaque-detection/reports/eval/{epoch}.png')
+
+
+
