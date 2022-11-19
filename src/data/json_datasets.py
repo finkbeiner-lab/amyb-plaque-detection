@@ -75,10 +75,10 @@ class JsonDataset(Dataset):
         )
 
 class VipsDataset(JsonDataset):
-    def __init__(self, vips_img_name, json_name, **kwargs):
+    def __init__(self, vips_img_name, json_name, transform=None, **kwargs):
         super().__init__(json_name, **kwargs)
         self.vips_img = pyvips.Image.new_from_file(vips_img_name, level=0)
-        self.transform = ToTensor()
+        self.transform = transform
 
     @staticmethod
     def vips_crop(vips_img, x, y, w, h, bands=3):
@@ -87,7 +87,7 @@ class VipsDataset(JsonDataset):
         return np.ndarray(buffer=vips_crop.write_to_memory(), dtype=np.uint8, shape=(vips_crop.height, vips_crop.width, vips_crop.bands))
 
     def __getitem__(self, idx):
-        return self.transform(VipsDataset.vips_crop(self.vips_img, *[(coord * stride) + offset for coord, stride, offset in zip(list(self.tiles.keys())[idx], self.stride, self.offset)], *self.size, bands=3)), super().__getitem__(idx)
+        return self.transform(VipsDataset.vips_crop(self.vips_img, *[(coord * stride) + offset for coord, stride, offset in zip(list(self.tiles.keys())[idx], self.stride, self.offset)], *self.size, bands=3), super().__getitem__(idx))
 
 
 if __name__ == '__main__':
