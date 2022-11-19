@@ -13,8 +13,7 @@ import models
 from models.rcnn import RCNN
 from models.rcnn_transform import RCNNTransform
 from models.rcnn_conf import rcnn_v2_conf
-from models.model_utils import train, eval, show, show_stacked_pil
-# from models.modules.mrcnn_transform import RCNNTransform
+from models.model_utils import train, eval, show
 
 import data
 from data.json_datasets import VipsDataset
@@ -74,13 +73,9 @@ if __name__ == '__main__':
     ).to(device)
     optimizer = torch.optim.SGD(model.parameters(), **dict(lr=2e-4, momentum=9e-2, weight_decay=1e-5,))
 
-    for epoch in range(1, epochs + 1):
-        print(f'Epoch {epoch}')
-        train(model, optimizer, device, loader, progress=True)
-
-        grid = torchvision.utils.make_grid([show(image, eval(model, device, image, thresh=0.5, mask_thresh=0.5)) for image, _ in dataset_test], nrow=4)
-        if epoch % freq == 0 or epoch == epochs:
-            torchvision.transforms.ToPILImage()(grid).save(f'/home/gryan/projects/amyb-plaque-detection/reports/eval/{epoch}.png')
-
-
-
+    # for epoch in range(1, epochs + 1):
+    #     train(model, optimizer, device, loader, epoch=epoch, progress=False,)
+    #
+    #     grid = torchvision.utils.make_grid([show(image, eval(model, device, image, thresh=0.5, mask_thresh=0.5)) for image, _ in dataset_test], nrow=4)
+    #     if epoch % freq == 0 or epoch == epochs:
+    #         torchvision.transforms.ToPILImage()(grid).save(f'/home/gryan/projects/amyb-plaque-detection/reports/eval/{epoch}.png')

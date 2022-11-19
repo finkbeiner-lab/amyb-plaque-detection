@@ -7,12 +7,19 @@ from torch import nn, Tensor
 import torchvision
 
 
-def train(model, optimizer, device, loader, progress=False):
+def train(model, optimizer, device, loader, epoch=None, progress=False):
+    def clear(lines, prefix=None):
+        if prefix is not None:
+            print(prefix)
+        print('\n'.join(lines))
+        return f'\x1b[{len(lines)}A' + '\n'.join([' ' * len(line) for line in lines]) + f'\x1b[{len(lines)}A'
+
+
     model.train(True)
 
-    losses = list()
-    summary = OrderedDict(list())
+    summary = OrderedDict()
     bar = tqdm.tqdm(total=len(loader)) if progress else None
+    clear_str = None
 
     for step, (images, targets) in enumerate(loader):
         images = [image.to(device) for image in images]
@@ -25,22 +32,21 @@ def train(model, optimizer, device, loader, progress=False):
         for k, v in loss.items():
             summary.setdefault(k, list()).append(v.item())
 
-        disp = OrderedDict([(k[5:], f'{v.item():.4f}') for k, v in loss.items()])
+        disp = OrderedDict([(k, f'{v.item():.4f}') for k, v in loss.items()])
         if progress:
             bar.set_postfix(disp)
             bar.update()
         else:
-            print(f'Step: {step}')
-            print('\n'.join([f'  {name}: {val}' for name, val in disp.items()]))
-            print()
+            lines = [f'Step: {step + 1}/{len(loader)}'] + [f'  {name}: {val}' for name, val in disp.items()]
+            clear_str = clear(lines, clear_str)
 
-    summary = OrderedDict([(k[5:], f'{torch.tensor(v).mean().item():.4f}') for k, v in summary.items()])
+    summary = OrderedDict([(k, f'{torch.tensor(v).mean().item():.4f}') for k, v in summary.items()])
     if progress:
         bar.set_postfix(summary)
         bar.close()
     else:
-        print(f'Epoch:')
-        print('\n'.join([f'  {name}: {val}' for name, val in summary.items()]))
+        lines = [f'Epoch{str() if epoch is None else (" " + str(epoch))}:'] + [f'  {name}: {val}' for name, val in summary.items()]
+        clear(lines, clear_str)
         print()
 
 
@@ -55,18 +61,11 @@ def eval(model, device, image, thresh=None, mask_thresh=None):
     return out
 
 
-def show(image, target):
+def show(image, target, label_names=None, label_colors=None,):
     image = (image * 255).to(torch.uint8)
-    labels = [f'{label.item()}: {target["scores"][i].item():.2f}' if 'scores' in target.keys() else f'{label.item()}' for i, label in enumerate(target['labels'])]
-    image = torchvision.utils.draw_bounding_boxes(image, target['boxes'], labels)
+    labels = [f'{label}: {target["scores"][i].item():.2f}' if 'scores' in target.keys() else f'{label}' for i, label in enumerate(target['labels'] if label_names is None else [label_names[label - 1] for label in target['labels']])]
+    colors = None if label_colors is None else [label_colors[label - 1] for label in target['labels']]
+    image = torchvision.utils.draw_bounding_boxes(image, target['boxes'], labels=labels, colors=colors)
     if 'masks' in target.keys():
-        image = torchvision.utils.draw_segmentation_masks(image, target['masks'].to(torch.bool), alpha=0.5, colors=(['red'] * target['boxes'].size()[0]))
+        image = torchvision.utils.draw_segmentation_masks(image, target['masks'].to(torch.bool), alpha=0.5, colors=(['red'] * len(target['labels'])))
     return image
-
-def show_stacked_pil(image, targets):
-    images = list()
-    for target in targets:
-        images.append(show(image, target))
-    return torchvision.transforms.ToPILImage()(torch.cat(images, dim=2))
-
-# images.append(show(image, eval(model, device, image, 0.5)))
