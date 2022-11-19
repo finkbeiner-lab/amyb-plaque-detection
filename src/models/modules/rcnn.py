@@ -1,12 +1,13 @@
 from collections import OrderedDict
 from typing import List, Mapping, Optional, Tuple
+import pdb
 
 import torch
 from torch import nn, Tensor
 
 import torchvision
 from torchvision.models.detection.image_list import ImageList
-from torchvision.models.detection.roi_heads import paste_masks_in_image
+from torchvision.models.detection.roi_heads import paste_mask_in_image, paste_masks_in_image
 
 
 class RCNN(nn.Module):
@@ -73,7 +74,7 @@ class RCNNTransform(nn.Module):
             return image, target
         if target is not None:
             if 'boxes' in target.keys():
-                target['boxes'] *= torch.tensor([*size] * 2).to(target['boxes']) / torch.tensor([*tuple(image.size())[-2:]] * 2).to(target['boxes'])
+                target['boxes'] *= torch.tensor([*size[::-1]] * 2).to(target['boxes']) / torch.tensor([*tuple(image.size())[-2:][::-1]] * 2).to(target['boxes'])
                 if 'masks' in target.keys():
                     target['masks'] = nn.functional.interpolate(target['masks'][:, None, ...].to(torch.uint8), size=size, mode='nearest')[:, 0, ...].to(torch.bool)
         return nn.functional.interpolate(image[None, ...], size=size, mode='bilinear')[0, ...], target
@@ -95,8 +96,10 @@ class RCNNTransform(nn.Module):
     ) -> List[Mapping[str, Tensor]]:
         for i, (size, original_size) in enumerate(zip(sizes, original_sizes)):
             if 'boxes' in targets[i].keys():
-                targets[i]['boxes'] *= torch.tensor([*original_size] * 2).to(targets[i]['boxes']) / torch.tensor([*size] * 2).to(targets[i]['boxes'])
+                targets[i]['boxes'] *= torch.tensor([*original_size[::-1]] * 2).to(targets[i]['boxes']) / torch.tensor([*size[::-1]] * 2).to(targets[i]['boxes'])
                 if 'masks' in targets[i].keys():
+                    # masks = [paste_mask_in_image(mask[0], box, *original_size) for box, mask in zip(targets[i]['boxes'].to(torch.int), targets[i]['masks'])]
+                    # targets[i]['masks'] = (torch.stack(masks, dim=0) if len(masks) > 0 else targets[i]['masks'].new_empty((0, *original_size)))[:, None]
                     targets[i]['masks'] = paste_masks_in_image(targets[i]['masks'], targets[i]['boxes'], original_size)
         return targets
 
