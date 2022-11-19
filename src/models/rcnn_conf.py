@@ -15,7 +15,7 @@ from torch import nn, Tensor
 import torchvision
 
 import models
-from models.rcnn import RCNN, RCNNTransform
+from models.modules.rcnn import RCNN, RCNNTransform
 
 
 def replace_keys(
