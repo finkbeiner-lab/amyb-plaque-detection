@@ -9,24 +9,32 @@ import qupath.lib.gui.tools.GuiTools
 import qupath.lib.gui.viewer.OverlayOptions
 
 
-// def pathClassMap = [
-//     "Neuritic": [0, 255, 0],
-//     "Diffuse": [0, 255, 255],
-//     "Core": [255, 153, 102],
-//     "CAA": [150, 79, 239],
-// ]
-def pathClassMap = [
-    "Pre": [0, 255, 0],
-    "Mature": [0, 255, 255],
-    "Ghost": [255, 153, 102],
+def pathClassGroup = "plaque"
+def pathClassMaps = [
+    "plaque": [
+        "Neuritic": [0, 255, 0],
+        "Diffuse": [0, 255, 255],
+        "Core": [255, 153, 102],
+        "CAA": [150, 79, 239],
+    ],
+
+    "tangle": [
+        "Pre": [0, 255, 0],
+        "Mature": [0, 255, 255],
+        "Ghost": [255, 153, 102],
+    ],
 ]
-def gridPrefMap = [
+
+def prefMap = [
     "gridScaleMicrons": (boolean) false,
     "gridSpacingX": (double) 1024,
     "gridSpacingY": (double) 1024,
     "gridStartX": (double) 0,
     "gridStartY": (double) 0,
+
+    "multipointTool": (boolean) false,
 ]
+
 def overlayOptionsMap = [
     "fillDetections": (boolean) true,
     "opacity": (float) 1,
@@ -45,19 +53,24 @@ class ScriptLoader {
         assert this.scriptsPath.isDirectory()
     }
 
-    def getScriptText(String path) {
-        def scriptPath = new File(this.scriptsPath, path)
-        assert scriptPath.isFile()
-        return scriptPath.getText()
+    def getScriptFile(String path) {
+        return new File(this.scriptsPath, path)
     }
 
     def getScript(String path) {
-        return Eval.me(this.getScriptText(path))
+        def scriptFile = this.getScriptFile(path)
+        assert scriptFile.isFile()
+        return Eval.me(scriptFile.getText())
+    }
+
+    def getScriptOptional(String path) {
+        def scriptFile = this.getScriptFile(path)
+        return scriptFile.isFile() ? Eval.me(scriptFile.getText()) : null
     }
 }
 
 
-def setGridPrefs(Map<String, Object> map) {
+def setPrefs(Map<String, Object> map) {
     return map
         .collectEntries({[it.key, PathPrefs.@"${it.key}"]})
         .findAll({it.value.get() != map.get(it.key)})
@@ -92,19 +105,21 @@ def loadContextMenu(QuPathGUI gui) {
     def contextMenu = (new ScriptLoader()).getScript("contextMenu.groovy").getInstance(gui)
     gui.installCommand("Custom context menu", contextMenu)
     contextMenu.run()
+    return true
 }
 
 def loadTileManager(QuPathGUI gui) {
     def tileManager = (new ScriptLoader()).getScript("tileManager.groovy").getInstance(gui)
     gui.installCommand("Tile Manager", tileManager)
+    return true
 }
 
 
 def gui = QPEx.getQuPath().getInstance()
 
-setGridPrefs(gridPrefMap)
+setPrefs(prefMap)
 setOverlayOptions(gui.getOverlayOptions(), overlayOptionsMap)
-setPathClasses(gui, pathClassMap)
+setPathClasses(gui, pathClassMaps.get(pathClassGroup))
 
 loadContextMenu(gui)
 loadTileManager(gui)
