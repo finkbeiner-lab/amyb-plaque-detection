@@ -90,6 +90,35 @@ class VipsDataset(JsonDataset):
         return self.transform(VipsDataset.vips_crop(self.vips_img, *[(coord * stride) + offset for coord, stride, offset in zip(list(self.tiles.keys())[idx], self.stride, self.offset)], *self.size, bands=3), super().__getitem__(idx))
 
 
+class VipsEvalDataset(Dataset):
+    def __init__(self, vips_img_name, transform=None, tiles=None, size=(1024, 1024,), stride=(1024, 1024,), offset=(0, 0,),):
+        self.vips_img = pyvips.Image.new_from_file(vips_img_name, level=0)
+        self.transform = ToTensor()
+        if transform is not None:
+            self.transform = transform
+
+        self.set_tiles(tiles)
+        self.size, self.stride, self.offset = size, stride, offset
+
+    @staticmethod
+    def vips_crop(vips_img, x, y, w, h, bands=3):
+        x, y = tuple(map(sum, zip((x, y), [int(vips_img.get(f'openslide.bounds-{coord}')) for coord in 'x y'.split()])))
+        vips_crop = vips_img[:bands].crop(x, y, w, h)
+        return np.ndarray(buffer=vips_crop.write_to_memory(), dtype=np.uint8, shape=(vips_crop.height, vips_crop.width, vips_crop.bands))
+
+    def set_tiles(self, tiles=None):
+        self.tiles = list()
+        if tiles is not None:
+            self.tiles.extend(tiles)
+
+    def __len__(self):
+        return len(self.tiles)
+
+    def __getitem__(self, idx):
+        return self.transform(VipsDataset.vips_crop(self.vips_img, *[(coord * stride) + offset for coord, stride, offset in zip(self.tiles[idx], self.stride, self.offset)], *self.size, bands=3))
+
+
+
 if __name__ == '__main__':
     label_names = 'Pre Mature Ghost'.split()
 

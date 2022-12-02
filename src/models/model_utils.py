@@ -61,11 +61,13 @@ def eval(model, device, image, thresh=None, mask_thresh=None):
     return out
 
 
-def show(image, target, label_names=None, label_colors=None,):
+def show(image, target, label_names=None, label_colors=None, pil=False):
     image = (image * 255).to(torch.uint8)
     labels = [f'{label}: {target["scores"][i].item():.2f}' if 'scores' in target.keys() else f'{label}' for i, label in enumerate(target['labels'] if label_names is None else [label_names[label - 1] for label in target['labels']])]
     colors = None if label_colors is None else [label_colors[label - 1] for label in target['labels']]
     image = torchvision.utils.draw_bounding_boxes(image, target['boxes'], labels=labels, colors=colors)
     if 'masks' in target.keys():
         image = torchvision.utils.draw_segmentation_masks(image, target['masks'].to(torch.bool), alpha=0.5, colors=(['red'] * len(target['labels'])))
+    if pil:
+        return torchvision.transforms.ToPILImage()(image)
     return image

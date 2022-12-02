@@ -113,7 +113,7 @@ def get_slide_tiles(slide_vips, slide_level, tile_size, tile_cond=None, interact
     print(f'Total of {len(contours)} contours found at threshold value {thresh}.')
     contours = contours[:top_n]
     selected_contours = list()
-    
+
     if interactive:
         print(f'Select from among {len(contours)} contours.')
         for contour in contours:
@@ -194,7 +194,8 @@ def get_resp(prompt, responses=('n', 'y')):
 
 
 if __name__ == '__main__':
-    base_dir = '/Users/gennadiryan/Documents/gladstone/projects/slide_utils/slides/mrxs'
-    save_dir = base_dir + '_out'
-
-    process_slides(base_dir, save_dir)
+    pass
+    # base_dir = '/Users/gennadiryan/Documents/gladstone/projects/slide_utils/slides/mrxs'
+    # save_dir = base_dir + '_out'
+    #
+    # process_slides(base_dir, save_dir)
