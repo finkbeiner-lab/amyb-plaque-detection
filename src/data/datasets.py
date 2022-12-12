@@ -123,7 +123,20 @@ class JsonDataset(TileDataset):
         label_names: List[str],
         **kwargs,
     ) -> None:
-        pass
+        # super().__init__(**kwargs)
+        with open(json_name, 'r') as f:
+            self.json_obj = json.loads(f.read())
+        self.annotation_obj = self.json_obj.get('annotations')
+        self.tile_obj = self.json_obj.get('tiles')
+
+    @staticmethod
+    def read_json(json_obj, label_names):
+        label = np.array(1 + label_names.index(json_obj.get('pathClasses')[0])).astype(np.intc)
+        points = [np.array(json_obj.get(ax)).astype(np.intc) for ax in 'xy']
+        bbox = [f(ax) for f in (np.amin, np.amax) for ax in points]
+        mask = np.zeros((bbox[2:] - bbox[:2])[::-1]).astype(np.uint8)
+
+        
 
 
 if __name__ == '__main__':
