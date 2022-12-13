@@ -37,6 +37,12 @@ def tiles_per_box(
     xs, ys = [list(range(i1, i2 + 1)) for i1, i2 in [overlap(*_) for _ in zip(box[:2], box[2:], step, size, offset)]]
     return [(x, y) for x in xs for y in ys]
 
+def tile_separation(
+    step: Tuple[int, int],
+    size: Tuple[int, int],
+) -> List[Tuple[int, int]]:
+    return tuple([(_size + _step - 1) // _step for _step, _size in zip(step, size)])
+
 def get_tile(
     tile: Tuple[int, int],
     step: Tuple[int, int],
@@ -209,8 +215,25 @@ if __name__ == '__main__':
     vips_img_fnames = [os.path.join(vips_img_dir, f'XE{vips_img_name}_1_AmyB_1.mrxs') for vips_img_name in vips_img_names]
     json_fnames = [os.path.join(json_dir, f'{vips_img_name}.json') for vips_img_name in vips_img_names]
 
-    step, size = [tuple([1024] * 2)] * 2
+    # step, size = [tuple([1024] * 2)] * 2
+    # ds = JsonDataset(json_fnames[0], label_names, step=step, size=size)
+    # vds = VipsDataset(vips_img_fnames[0], ds.step, ds.size, ds.offset)
+    # vds.tiles = ds.tiles
 
-    ds = JsonDataset(json_fnames[0], label_names, step=step, size=size)
-    vds = VipsDataset(vips_img_fnames[0], ds.step, ds.size, ds.offset)
-    vds.tiles = ds.tiles
+    tile_size = 1024
+    ds_train = JsonDataset(json_fnames[0], label_names, step=(tile_size // 2, tile_size // 2), size=(tile_size, tile_size))
+    ds_test = JsonDataset(json_fnames[0], label_names, step=(tile_size, tile_size), size=(tile_size, tile_size))
+
+    # ds_test_tiles = np.array(ds_test.tiles)
+    # ds_test_tiles = list(map(tuple, ds_test_tiles[np.random.permutation(np.arange(ds_test_tiles.shape[0]))]))
+    # test_tiles = ds_test_tiles[:10]
+    test_tiles = [(71, 65), (73, 68), (68, 39), (61, 32), (25, 102), (74, 64), (63, 75), (71, 66), (72, 67), (67, 66)]
+
+    test_boxes = [get_tile(tile, ds_test.step, ds_test.size, ds_test.offset) for tile in test_tiles]
+    train_tiles = list(set(sum([tiles_per_box(box, ds_train.step, ds_train.size, ds_train.offset) for box in test_boxes], start=list())))
+
+    test_idxs = [i for i, tile in enumerate(ds_test.tiles) if tile in test_tiles]
+    train_idxs = [i for i, tile in enumerate(ds_train.tiles) if tile not in train_tiles]
+
+    ds_train = torch.utils.data.dataset.Subset(ds_train, train_idxs)
+    ds_test = torch.utils.data.dataset.Subset(ds_test, test_idxs)
