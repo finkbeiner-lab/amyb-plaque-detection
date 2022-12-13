@@ -68,6 +68,20 @@ def get_clipped(
 
     return clipped, offset
 
+def get_clipped_mask(
+    tile: np.ndarray,
+    box: np.ndarray,
+    mask: np.ndarray,
+) -> Tuple[np.ndarray, np.ndarray]:
+    clipped = box.copy()
+    clipped[:2] = np.maximum(tile[:2], clipped[:2]) - tile[:2]
+    clipped[2:] = np.minimum(tile[2:], clipped[2:]) - tile[:2]
+
+    offset = clipped + np.concatenate([tile[:2] - box[:2]] * 2)
+    mask = mask[offset[1]:offset[3] + 1, offset[0]:offset[2] + 1]
+
+    return clipped, mask
+
 
 class TileDataset(Dataset):
     def __init__(
@@ -149,11 +163,14 @@ class JsonDataset(TileDataset):
             self.json = json.loads(f.read())
 
         self.labels, self.boxes, self.masks = zip(*map(lambda _: JsonDataset.read_json(_, label_names), self.json.get('annotations')))
+        self.labels = np.array(self.labels)
+        self.boxes = np.array(self.boxes)
 
         self.tile_map = OrderedDict()
         for i, (box, mask) in enumerate(zip(self.boxes, self.masks)):
             for tile in tiles_per_box(box, self.step, self.size, self.offset):
-                self.tile_map.setdefault(tile, list()).append(i)
+                if get_clipped_mask(get_tile(tile, self.step, self.size, self.offset), box, mask)[1].sum() > 0:
+                    self.tile_map.setdefault(tile, list()).append(i)
         self.tiles = list(self.tile_map.keys())
 
     @staticmethod
@@ -176,14 +193,32 @@ class JsonDataset(TileDataset):
         self,
         idx: int,
     ) -> Any:
-        tile, id = super().__getitem__(idx), self.tiles[idx]
+        tile, bounds = self.tiles[idx], super().__getitem__(idx)
+        ids = self.tile_map[tile]
 
-        labels, boxes, masks = list(), list(), list()
-        for label, box, mask in [[a[i] for a in [self.labels, self.boxes, self.masks]] for i in self.tile_map[id]]:
-            labels.append(label)
-            box_clipped, box_offset = get_clipped(tile, box)
-            boxes.append(box_clipped)
-            masks.append(mask[box_offset[1]:box_offset[3] + 1, box_offset[0]:box_offset[2] + 1])
+        labels, boxes, masks = np.zeros((len(ids),)), np.zeros((len(ids), 4)), np.zeros([len(ids), *((bounds[2:] - bounds[:2]) + 1)])
+        for i, (label, box, mask) in enumerate(zip(self.labels[ids], self.boxes[ids], [self.masks[id] for id in ids])):
+            box, mask = get_clipped_mask(bounds, box, mask)
+            labels[i] = label
+            boxes[i] = box
+            masks[i, box[1]:box[3] + 1, box[0]:box[2] + 1] = mask
+
+        return dict(
+            labels=torch.as_tensor(labels).to(dtype=torch.long),
+            boxes=torch.as_tensor(boxes).to(dtype=torch.float),
+            masks=torch.as_tensor(masks).to(dtype=torch.bool),
+        )
+
+
+
+
+
+        # labels, boxes, masks = list(), list(), list()
+        # for label, box, mask in [[a[i] for a in [self.labels, self.boxes, self.masks]] for i in self.tile_map[id]]:
+        #     labels.append(label)
+        #     box_clipped, box_offset = get_clipped(tile, box)
+        #     boxes.append(box_clipped)
+        #     masks.append(mask[box_offset[1]:box_offset[3] + 1, box_offset[0]:box_offset[2] + 1])
 
         return labels, boxes, masks
 
@@ -214,6 +249,11 @@ class JsonDataset(TileDataset):
         # return tile, clip, offsets, box
 
 
+def show(i, t):
+    i = (ToTensor()(i) * 255).to(torch.uint8)
+    i = torchvision.utils.draw_bounding_boxes(i, t['boxes'])
+    i = torchvision.utils.draw_segmentation_masks(i, t['masks'])
+    return i
 
 
 
@@ -231,7 +271,13 @@ if __name__ == '__main__':
     step, size = [tuple([1024] * 2)] * 2
 
     ds = JsonDataset(json_fnames[0], label_names, step=step, size=size)
+    vds = VipsDataset(vips_img_fnames[0], ds.step, ds.size, ds.offset)
+    vds.tiles = ds.tiles
 
+    # im, tar = vds[0], ds[0]
+    # im = (ToTensor()(im) * 255).to(torch.uint8)
+    # im = torchvision.utils.draw_bounding_boxes(im, tar['boxes'])
+    # im = torchvision.utils.draw_segmentation_masks(im, tar['masks'])
 
     # @staticmethod
     # def vips_crop(vips_img, x, y, w, h, bands=3):
