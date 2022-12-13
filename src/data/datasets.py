@@ -153,7 +153,7 @@ class JsonDataset(TileDataset):
         self.tile_map = OrderedDict()
         for i, (box, mask) in enumerate(zip(self.boxes, self.masks)):
             for tile in tiles_per_box(box, self.step, self.size, self.offset):
-                if get_clipped_mask(get_tile(tile, self.step, self.size, self.offset), box, mask)[1].sum() > 0:
+                if get_clipped_mask(get_tile(tile, self.step, self.size, self.offset), box, mask)[1].sum() > 100:
                     self.tile_map.setdefault(tile, list()).append(i)
         self.tiles = list(self.tile_map.keys())
 
@@ -194,6 +194,36 @@ class JsonDataset(TileDataset):
         )
 
 
+class VipsJsonDataset(JsonDataset):
+    def __init__(
+        self,
+        vips_img_name: str,
+        json_name: str,
+        label_names: List[str],
+        bands: Optional[int] = 3,
+        **kwargs,
+    ) -> None:
+        self.vips_img = pyvips.Image.new_from_file(vips_img_name, level=0)[:bands]
+        self.vips_offset = tuple(map(lambda axis: int(self.vips_img.get(f'openslide.bounds-{axis}')), 'xy'))
+        super().__init__(
+            json_name,
+            label_names,
+            **kwargs,
+        )
+
+    @staticmethod
+    def read_vips(vips_img, tile):
+        x, y = tile[:2]
+        w, h = (tile[2:] - tile[:2]) + 1
+        return vips_img.crop(x, y, w, h).numpy()
+
+    def __getitem__(
+        self,
+        idx: int,
+    ) -> Any:
+        tile = get_tile(self.tiles[idx], self.step, self.size, tuple(map(sum, zip(self.vips_offset, self.offset))))
+        return ToTensor()(VipsDataset.read_vips(self.vips_img, tile)), super().__getitem__(idx)
+
 
 
 def show(i, t):
@@ -220,20 +250,21 @@ if __name__ == '__main__':
     # vds = VipsDataset(vips_img_fnames[0], ds.step, ds.size, ds.offset)
     # vds.tiles = ds.tiles
 
+
     tile_size = 1024
     ds_train = JsonDataset(json_fnames[0], label_names, step=(tile_size // 2, tile_size // 2), size=(tile_size, tile_size))
     ds_test = JsonDataset(json_fnames[0], label_names, step=(tile_size, tile_size), size=(tile_size, tile_size))
-
-    # ds_test_tiles = np.array(ds_test.tiles)
-    # ds_test_tiles = list(map(tuple, ds_test_tiles[np.random.permutation(np.arange(ds_test_tiles.shape[0]))]))
-    # test_tiles = ds_test_tiles[:10]
+    
+    # # ds_test_tiles = np.array(ds_test.tiles)
+    # # ds_test_tiles = list(map(tuple, ds_test_tiles[np.random.permutation(np.arange(ds_test_tiles.shape[0]))]))
+    # # test_tiles = ds_test_tiles[:10]
     test_tiles = [(71, 65), (73, 68), (68, 39), (61, 32), (25, 102), (74, 64), (63, 75), (71, 66), (72, 67), (67, 66)]
-
+    
     test_boxes = [get_tile(tile, ds_test.step, ds_test.size, ds_test.offset) for tile in test_tiles]
     train_tiles = list(set(sum([tiles_per_box(box, ds_train.step, ds_train.size, ds_train.offset) for box in test_boxes], start=list())))
-
+    
     test_idxs = [i for i, tile in enumerate(ds_test.tiles) if tile in test_tiles]
     train_idxs = [i for i, tile in enumerate(ds_train.tiles) if tile not in train_tiles]
-
+    
     ds_train = torch.utils.data.dataset.Subset(ds_train, train_idxs)
     ds_test = torch.utils.data.dataset.Subset(ds_test, test_idxs)
