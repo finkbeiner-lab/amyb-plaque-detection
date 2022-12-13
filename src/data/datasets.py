@@ -37,17 +37,6 @@ def tiles_per_box(
     xs, ys = [list(range(i1, i2 + 1)) for i1, i2 in [overlap(*_) for _ in zip(box[:2], box[2:], step, size, offset)]]
     return [(x, y) for x in xs for y in ys]
 
-def boxes_per_tiles(
-    boxes: List[Tuple[int, int, int, int]],
-    step: Tuple[int, int],
-    size: Tuple[int, int],
-    offset: Tuple[int, int],
-) -> Mapping[Tuple[int, int], int]:
-    tiles = OrderedDict()
-    for i, t in enumerate(map(lambda box: tiles_per_box(box, step, size, offset), boxes)):
-        tiles.setdefault(t, list()).append(i)
-    return tiles
-
 def get_tile(
     tile: Tuple[int, int],
     step: Tuple[int, int],
@@ -106,7 +95,6 @@ class TileDataset(Dataset):
         idx: int,
     ) -> np.ndarray:
         return get_tile(self.tiles[idx], self.step, self.size, self.offset)
-        # return np.array(get_tile(self.tiles[idx], self.step, self.size, self.offset))
 
 
 class VipsDataset(TileDataset):
@@ -139,16 +127,6 @@ class VipsDataset(TileDataset):
         idx: int,
     ) -> Any:
         return VipsDataset.read_vips(self.vips_img, super().__getitem__(idx))
-        # tile = super().__getitem__(idx)
-        # x, y = tile[:2]
-        # w, h = (tile[2:] - tile[:2]) + 1
-        # vips_crop = self.vips_img.crop(x, y, w, h)
-        # return vips_crop.numpy()
-        # return np.ndarray(
-        #     buffer=vips_crop.write_to_memory(),
-        #     dtype=np.uint8,
-        #     shape=(vips_crop.height, vips_crop.width, vips_crop.bands),
-        # )
 
 
 class JsonDataset(TileDataset):
@@ -212,43 +190,6 @@ class JsonDataset(TileDataset):
 
 
 
-
-        # labels, boxes, masks = list(), list(), list()
-        # for label, box, mask in [[a[i] for a in [self.labels, self.boxes, self.masks]] for i in self.tile_map[id]]:
-        #     labels.append(label)
-        #     box_clipped, box_offset = get_clipped(tile, box)
-        #     boxes.append(box_clipped)
-        #     masks.append(mask[box_offset[1]:box_offset[3] + 1, box_offset[0]:box_offset[2] + 1])
-
-        return labels, boxes, masks
-
-
-
-    # def tiles_for_box(self, box):
-    #     return tiles_per_box(box, self.step, self.size, self.offset)
-    #
-    # def tiles_for_mask(self, box, mask):
-    #     tiles = self.tiles_for_box(box)
-    #     if len(tiles) == 0:
-    #         return None
-    #
-    #     for tile in tiles:
-    #         clipped, offset = get_clipped(tile, box)
-    #         x1, y1, x2, y2 = offset
-    #         mask[y1:y2 + 1, x1:x2 + 1]
-        # tile = np.array(get_tile(tiles[0], self.step, self.size, self.offset))
-        #
-        # clip, offsets = [box.copy() for _ in range(2)]
-        # clip[:2] = np.maximum(tile[:2], clip[:2]) - tile[:2]
-        # clip[2:] = np.minimum(tile[2:], clip[2:]) - tile[:2]
-        # offsets[:2] = tile[:2] + clip[:2] - box[:2]
-        # offsets[2:] = box[:2] + clip[2:] - clip[:2]
-        # # box_offsets[:2] = tile[:2] + box[:2] - box_offsets[:2]
-        # # box_offsets[2:] = box[2:] - box[:2] + box_offsets[:2]
-        #
-        # return tile, clip, offsets, box
-
-
 def show(i, t):
     i = (ToTensor()(i) * 255).to(torch.uint8)
     i = torchvision.utils.draw_bounding_boxes(i, t['boxes'])
@@ -273,19 +214,3 @@ if __name__ == '__main__':
     ds = JsonDataset(json_fnames[0], label_names, step=step, size=size)
     vds = VipsDataset(vips_img_fnames[0], ds.step, ds.size, ds.offset)
     vds.tiles = ds.tiles
-
-    # im, tar = vds[0], ds[0]
-    # im = (ToTensor()(im) * 255).to(torch.uint8)
-    # im = torchvision.utils.draw_bounding_boxes(im, tar['boxes'])
-    # im = torchvision.utils.draw_segmentation_masks(im, tar['masks'])
-
-    # @staticmethod
-    # def vips_crop(vips_img, x, y, w, h, bands=3):
-    #     x, y = tuple(map(sum, zip((x, y), [int(vips_img.get(f'openslide.bounds-{coord}')) for coord in 'x y'.split()])))
-    #     vips_crop = vips_img[:bands].crop(x, y, w, h)
-    #     return np.ndarray(buffer=vips_crop.write_to_memory(), dtype=np.uint8, shape=(vips_crop.height, vips_crop.width, vips_crop.bands))
-
-# class VipsDataset(Dataset):
-#     def __init__(
-#         self,
-#     )
