@@ -4,6 +4,7 @@ __pkg = os.path.abspath(os.path.join(__file__, *('..'.split() * 2)))
 if __pkg not in sys.path:
     sys.path.append(__pkg)
 
+from functools import reduce
 import numpy as np
 
 import torch
@@ -19,9 +20,21 @@ import features
 from features.torch_transforms import _ToTensor, _Compose, _RandomHorizontalFlip, _RandomVerticalFlip
 
 import models
-from models.rcnn_conf import rcnn_v2_conf
+from models.rcnn_conf import rcnn_v2_conf, transform_conf
 from models.model_utils import train, eval, show
 
+def norm(x: Tensor):
+    dims = tuple(range(1, len(x.size())))
+    n = reduce(lambda a, b: a * b, x.size()[1:], 1)
+    s1, s2 = [(x ** (i + 1)).sum(dim=tuple(range(1, len(x.size())))) for i in range(2)]
+    return torch.as_tensor(n), s1 / n, s2 / n
+
+def summarize(norms):
+    n, s1, s2 = map(torch.stack, zip(*norms))
+    factors = (n / n.sum()).unsqueeze(1)
+    mean = (s1 * factors).sum(dim=0)
+    std = ((s2 * factors).sum(dim=0) - (mean ** 2)).sqrt()
+    return mean, std
 
 if __name__ == '__main__':
     label_names = 'Core Diffuse Neuritic CAA'.split()
@@ -59,7 +72,16 @@ if __name__ == '__main__':
     epochs = 4
     freq = 1
 
-    model_conf = rcnn_v2_conf(pretrained=True, num_classes=4)
+    mean, std = [0.8976, 0.9043, 0.8963], [0.1121, 0.1156, 0.1359]
+
+    model_conf = rcnn_v2_conf(
+        pretrained=True,
+        num_classes=4,
+        transform=transform_conf(
+            mean=mean,
+            std=std,
+        )
+    )
     model = model_conf.module(
         # freeze_submodules=['backbone.body.conv1', 'backbone.body.bn1', 'backbone.body.layer1'],
         skip_submodules=['roi_heads.box_predictor', 'roi_heads.mask_predictor.mask_fcn_logits']

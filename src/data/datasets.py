@@ -153,7 +153,7 @@ class JsonDataset(TileDataset):
         self.tile_map = OrderedDict()
         for i, (box, mask) in enumerate(zip(self.boxes, self.masks)):
             for tile in tiles_per_box(box, self.step, self.size, self.offset):
-                if get_clipped_mask(get_tile(tile, self.step, self.size, self.offset), box, mask)[1].sum() > 100:
+                if get_clipped_mask(get_tile(tile, self.step, self.size, self.offset), box, mask)[1].sum() >= 100:
                     self.tile_map.setdefault(tile, list()).append(i)
         self.tiles = list(self.tile_map.keys())
 
@@ -254,17 +254,17 @@ if __name__ == '__main__':
     tile_size = 1024
     ds_train = JsonDataset(json_fnames[0], label_names, step=(tile_size // 2, tile_size // 2), size=(tile_size, tile_size))
     ds_test = JsonDataset(json_fnames[0], label_names, step=(tile_size, tile_size), size=(tile_size, tile_size))
-    
+
     # # ds_test_tiles = np.array(ds_test.tiles)
     # # ds_test_tiles = list(map(tuple, ds_test_tiles[np.random.permutation(np.arange(ds_test_tiles.shape[0]))]))
     # # test_tiles = ds_test_tiles[:10]
     test_tiles = [(71, 65), (73, 68), (68, 39), (61, 32), (25, 102), (74, 64), (63, 75), (71, 66), (72, 67), (67, 66)]
-    
+
     test_boxes = [get_tile(tile, ds_test.step, ds_test.size, ds_test.offset) for tile in test_tiles]
     train_tiles = list(set(sum([tiles_per_box(box, ds_train.step, ds_train.size, ds_train.offset) for box in test_boxes], start=list())))
-    
+
     test_idxs = [i for i, tile in enumerate(ds_test.tiles) if tile in test_tiles]
     train_idxs = [i for i, tile in enumerate(ds_train.tiles) if tile not in train_tiles]
-    
+
     ds_train = torch.utils.data.dataset.Subset(ds_train, train_idxs)
     ds_test = torch.utils.data.dataset.Subset(ds_test, test_idxs)
