@@ -9,7 +9,7 @@ import tqdm
 import pdb
 
 
-def get_mask_contours(x):
+def get_mask_contours(x, method='otsu', blurred=True):
     """
     Args:
         x: np.ndarray
@@ -18,6 +18,12 @@ def get_mask_contours(x):
         mask: np.ndarray (thresholded mask)
         contours: List[np.ndarray] (list of contours enclosing mask in order of area)
     """
+
+    thresh_methods = dict(
+        otsu=cv2.THRESH_OTSU,
+        triangle=cv2.THRESH_TRIANGLE,
+    )
+
     assert x.dtype == np.uint8
     if len(x.shape) == 3:
         if x.shape[-1] == 1:
@@ -28,7 +34,10 @@ def get_mask_contours(x):
     else:
         assert len(x.shape) == 2
 
-    thresh, mask = cv2.threshold(x, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_TRIANGLE)
+    if blurred:
+        x = cv2.GaussianBlur(x, (7, 7), 0)
+
+    thresh, mask = cv2.threshold(x, 0, 255, cv2.THRESH_BINARY_INV + thresh_methods[method])
     contours, _ = cv2.findContours(mask.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
     return int(thresh), mask, list(map(lambda t: t[0], sorted([(contour, cv2.contourArea(contour)) for contour in contours], key=lambda t: -t[1])))
@@ -86,13 +95,14 @@ def visualize_rois(rois, fill, shape, dtype):
         getROI(fill_rois, roi).fill(np.array(fill, dtype))
     return fill_rois
 
-def get_slide_tiles(slide_vips, slide_level, tile_size, tile_cond=None, interactive=False, top_n=1, visualize=False):
+def get_slide_tiles(slide_vips, slide_level, tile_size, tile_cond=None, use_contours=True, interactive=False, top_n=1, visualize=False):
     """
     Args:
         slide_vips: vips image of the slide
         slide_level: slide_vips is downsampled slide at scale 2 ** slide_level
         tile_size: tile size wrt. the original slide
         tile_cond: a boolean-returning callable which filters the tiles in the slide masks' ROI into background and foreground
+        use_contours: if false, skip contour generation and use thresholded mask
         interactive: allow users to interactively select the most accurate slide contour masks
         top_n: only keep top_n of the contour masks (precedes interactive selection)
         visualize: return additional visualizations (note: the function only incurs visualization overhead if this option is selected)
@@ -109,27 +119,28 @@ def get_slide_tiles(slide_vips, slide_level, tile_size, tile_cond=None, interact
     slide_arr = cv2.cvtColor(slide_arr, cv2.COLOR_RGB2GRAY)
     shape, dtype, fill, ratio = slide_arr.shape, slide_arr.dtype, 255, 2 ** slide_level
 
-    thresh, _, contours = get_mask_contours(slide_arr)
-    print(f'Total of {len(contours)} contours found at threshold value {thresh}.')
-    contours = contours[:top_n]
-    selected_contours = list()
+    thresh, fill_mask, contours = get_mask_contours(slide_arr)
+    if use_contours:
+        print(f'Total of {len(contours)} contours found at threshold value {thresh}.')
+        contours = contours[:top_n]
+        selected_contours = list()
 
-    if interactive:
-        print(f'Select from among {len(contours)} contours.')
-        for contour in contours:
-            fill_contour = np.zeros(shape, dtype)
-            cv2.drawContours(fill_contour, [contour], -1, fill, -1)
-            Image.fromarray(fill_contour).show()
-            if get_resp('Select this contour (y/n): '):
-                selected_contours.append(contour)
-            if get_resp('Done selecting contours (y/n): '):
-                break
-        contours = selected_contours
-        print(f'Total of {len(contours)} contours selected.')
+        if interactive:
+            print(f'Select from among {len(contours)} contours.')
+            for contour in contours:
+                fill_contour = np.zeros(shape, dtype)
+                cv2.drawContours(fill_contour, [contour], -1, fill, -1)
+                Image.fromarray(fill_contour).show()
+                if get_resp('Select this contour (y/n): '):
+                    selected_contours.append(contour)
+                if get_resp('Done selecting contours (y/n): '):
+                    break
+            contours = selected_contours
+            print(f'Total of {len(contours)} contours selected.')
 
 
-    fill_mask = np.zeros(shape, dtype)
-    cv2.drawContours(fill_mask, contours, -1, fill, -1)
+        fill_mask = np.zeros(shape, dtype)
+        cv2.drawContours(fill_mask, contours, -1, fill, -1)
 
     mask_roi = np.array([[f(a) for f in [np.amin, np.amax]] for a in fill_mask.nonzero()])
     tile_roi, tiles = roi_to_tiles(mask_roi, tile_size, ratio=ratio)
@@ -144,7 +155,7 @@ def get_slide_tiles(slide_vips, slide_level, tile_size, tile_cond=None, interact
         fill_tiles = visualize_rois(selected_rois // ratio, fill, shape, dtype)
         visuals = np.concatenate([a[..., None] for a in [fill_mask, fill_roi, fill_tiles]], axis=-1)
 
-    return selected_tiles, selected_rois, thresh, visuals
+    return selected_tiles, selected_rois, thresh, fill_mask, visuals
 
 
 
