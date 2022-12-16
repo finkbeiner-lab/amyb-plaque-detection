@@ -52,6 +52,7 @@ if __name__ == '__main__':
     json_dir = '/home/gryan/projects/qupath/annotations/amyloid'
     viz_dir = '/home/gryan/Pictures'
     vips_img_names = ['07-056', '09-063', '10-033']
+    vips_img_names = '12-010 12-011 12-012 16-002'.split()
 
     vips_img_fnames = [os.path.join(vips_img_dir, f'XE{vips_img_name}_1_AmyB_1.mrxs') for vips_img_name in vips_img_names]
     json_fnames = [os.path.join(json_dir, f'{vips_img_name}.json') for vips_img_name in vips_img_names]
@@ -63,7 +64,7 @@ if __name__ == '__main__':
     for fname, viz_fname in zip(vips_img_fnames, viz_fnames):
         slide = pyvips.Image.new_from_file(fname, level=level)
 
-        tiles, _, thresh, mask, _ = get_slide_tiles(slide, 0, tile_size, use_contours=True, top_n=1)
+        tiles, _, thresh, mask, _ = get_slide_tiles(slide, 0, tile_size, use_contours=False, top_n=1)
 
         ht, wt = np.array(mask.shape) // tile_size
         ts = np.array([(y, x) for x in range(wt + 1) for y in range(ht + 1)])
@@ -74,7 +75,7 @@ if __name__ == '__main__':
         for y1, x1, y2, x2 in ts_neg:
             im[y1:y2, x1:x2, ...] = 0
 
-        im.save(ToPILImage()(viz_fname))
+        ToPILImage()(im).save(viz_fname)
 
 
 

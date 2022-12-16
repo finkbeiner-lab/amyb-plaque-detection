@@ -36,6 +36,7 @@ def get_mask_contours(x, method='otsu', blurred=True):
 
     if blurred:
         x = cv2.GaussianBlur(x, (7, 7), 0)
+        # x = cv2.medianBlur(x, 7)
 
     thresh, mask = cv2.threshold(x, 0, 255, cv2.THRESH_BINARY_INV + thresh_methods[method])
     contours, _ = cv2.findContours(mask.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
