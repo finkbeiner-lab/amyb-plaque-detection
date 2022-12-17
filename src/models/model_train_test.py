@@ -69,8 +69,8 @@ if __name__ == '__main__':
     # exit()
 
     device = torch.device('cuda', 0)
-    epochs = 4
-    freq = 1
+    epochs = 40
+    freq = 5
 
     mean, std = [0.8976, 0.9043, 0.8963], [0.1121, 0.1156, 0.1359]
 
@@ -87,12 +87,12 @@ if __name__ == '__main__':
         skip_submodules=['roi_heads.box_predictor', 'roi_heads.mask_predictor.mask_fcn_logits']
     ).to(device)
     optimizer = torch.optim.SGD(model.parameters(), **dict(lr=2e-4, momentum=9e-2, weight_decay=1e-5,))
-    loader = torch.utils.data.DataLoader(ds_train, batch_size=2, shuffle=True, collate_fn=lambda _: tuple(zip(*_)))
+    loader = torch.utils.data.DataLoader(ds_train, batch_size=3, shuffle=True, collate_fn=lambda _: tuple(zip(*_)))
 
-    for epoch in range(1, epochs + 1):
-        train(model, optimizer, device, loader, epoch=epoch, progress=False,)
-
-        grid = torchvision.utils.make_grid([show(image, eval(model, device, image, thresh=0.5, mask_thresh=0.5,), label_names=label_names, label_colors=label_colors,) for image, _ in ds_test], nrow=4)
-        if epoch % freq == 0 or epoch == epochs:
-            ToPILImage()(grid).save(f'/home/gryan/projects/amyb-plaque-detection/reports/eval/{epoch}.png')
-            torch.save(model.state_dict(), f'/home/gryan/projects/amyb-plaque-detection/reports/eval/{epoch}.pt')
+    # for epoch in range(1, epochs + 1):
+    #     train(model, optimizer, device, loader, epoch=epoch, progress=False,)
+    #
+    #     grid = torchvision.utils.make_grid([show(image, eval(model, device, image, thresh=0.5, mask_thresh=0.5,), label_names=label_names, label_colors=label_colors,) for image, _ in ds_test], nrow=4)
+    #     if epoch % freq == 0 or epoch == epochs:
+    #         ToPILImage()(grid).save(f'/home/gryan/projects/amyb-plaque-detection/reports/eval/{epoch}.png')
+    #         torch.save(model.state_dict(), f'/home/gryan/projects/amyb-plaque-detection/reports/eval/{epoch}.pt')
