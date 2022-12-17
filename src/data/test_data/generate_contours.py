@@ -38,8 +38,16 @@ def get_mask_contours(x, method='otsu', blurred=True):
         x = cv2.GaussianBlur(x, (7, 7), 0)
         # x = cv2.medianBlur(x, 7)
 
-    thresh, mask = cv2.threshold(x, 0, 255, cv2.THRESH_BINARY_INV + thresh_methods[method])
-    contours, _ = cv2.findContours(mask.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
+    if method == 'both':
+        thresh, mask = cv2.threshold(x, 0, 255, cv2.THRESH_BINARY_INV | thresh_methods['triangle'])
+        # x = ((np.minimum(x, thresh) / thresh) * 255).astype(np.uint8)
+        # x = (255 - (((255 - x) / 255) * mask)).astype(np.uint8)
+        x = (255 - ((255 - (np.minimum(x, thresh) / thresh)) * mask)).astype(np.uint8)
+        thresh, mask = cv2.threshold(x, 0, 255, cv2.THRESH_BINARY_INV | thresh_methods['otsu'])
+    else:
+        thresh, mask = cv2.threshold(x, 0, 255, cv2.THRESH_BINARY_INV | thresh_methods[method])
+        mask = cv2.morphologyEx(mask, cv2.MORPH_DILATE, np.ones((8, 8)), iterations=64)
+    contours, _ = cv2.findContours(mask.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
 
     return int(thresh), mask, list(map(lambda t: t[0], sorted([(contour, cv2.contourArea(contour)) for contour in contours], key=lambda t: -t[1])))
 
