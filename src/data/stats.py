@@ -78,22 +78,21 @@ if __name__ == '__main__':
     label_colors = 'red green blue black'.split()
 
     vips_img_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/amy-def-mfg-test'
-    json_dir = '/home/gryan/projects/qupath/annotations/amyloid'
-    viz_dir = '/home/gryan/Pictures/test'
-    vips_img_names = ['07-056', '09-063', '10-033']
+    out_dir = '/home/gryan/Pictures/outputs'
+
+    vips_img_names = '07-056 09-063 10-033'.split()
     vips_img_names = '12-010 12-011 12-012 16-002'.split()
 
     vips_img_fnames = [os.path.join(vips_img_dir, f'XE{vips_img_name}_1_AmyB_1.mrxs') for vips_img_name in vips_img_names]
-    json_fnames = [os.path.join(json_dir, f'{vips_img_name}.json') for vips_img_name in vips_img_names]
-    viz_fnames = [os.path.join(viz_dir, f'{name}.png') for name in vips_img_names]
 
     tile_size = 128
     level = 3
     k1, i1, r1 = 9, 4, .01
     k2, i2 = 9, 4
 
-    for idx in range(3):
-        fname, viz_fname = list(zip(vips_img_fnames, viz_fnames))[idx]
+    for fname in vips_img_fnames:
+        name = os.path.join(out_dir, '.'.join(os.path.split(fname)[1].split('.')[:-1]))
+        tile_name, mask_name, viz_name = [f'{name}.{suffix}' for suffix in ('tiles.npy', 'mask.png', 'viz.png')]
 
         slide = pyvips.Image.new_from_file(fname, level=level)
         slide = get_cropped(slide, level)
@@ -109,11 +108,16 @@ if __name__ == '__main__':
         contours = mask_contours(filled_mask)
         filled_mask = fill_contours(contours[:1], filled_mask.shape)
 
-        tiles_neg = tile_mask(filled_mask, f=lambda _: _.sum() == 0)
+        tiles_pos, tiles_neg = [tile_mask(filled_mask, f=f) for f in (lambda _: _.sum() > 0, lambda _: _.sum() == 0)]
+
         for y1, x1, y2, x2 in tiles_neg:
             im[y1:y2, x1:x2] = 0
-        pil = ToPILImage()(im)
-        pil.save(viz_fname)
+        mask_out = ToPILImage()(filled_mask)
+        viz_out = ToPILImage()(im)
+
+        np.save(tile_name, tiles_pos, allow_pickle=False)
+        mask_out.save(mask_name)
+        viz_out.save(viz_name)
 
 
     # blurred = cv2.GaussianBlur(gray, (7, 7), 0)
