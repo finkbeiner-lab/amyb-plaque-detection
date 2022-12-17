@@ -16,13 +16,6 @@ from torch import nn, Tensor
 import torchvision
 from torchvision.transforms import ToPILImage
 
-import data
-from data.datasets import VipsJsonDataset, VipsDataset, get_tile, tiles_per_box
-from data.test_data.generate_contours import get_slide_tiles
-
-# import features
-# from features.torch_transforms import _ToTensor, _Compose, _RandomHorizontalFlip, _RandomVerticalFlip
-
 
 def norm(x: Tensor):
     dims = tuple(range(1, len(x.size())))
