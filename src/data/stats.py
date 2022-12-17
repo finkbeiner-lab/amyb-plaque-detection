@@ -52,9 +52,10 @@ def tile_mask(mask, f=None):
 
     ht, wt = np.array(mask.shape) // tile_size
     ts = np.array([(y, x) for x in range(wt + 1) for y in range(ht + 1)])
-    ts = np.concatenate([ts + i for i in range(2)], axis=1) * tile_size
+    coords = np.concatenate([ts + i for i in range(2)], axis=1) * tile_size
 
-    return np.array([(y1, x1, y2, x2) for y1, x1, y2, x2 in ts if f(mask[y1:y2, x1:x2])])
+    keep = np.array([i for i, (y1, x1, y2, x2) in enumerate(coords) if f(mask[y1:y2, x1:x2])])
+    return coords[keep], ts[keep][:, [1, 0]]
 
 def fill_mask(mask, k, r=0):
     mask = cv2.blur(mask, (k, k))
@@ -74,14 +75,13 @@ def fill_contours(contours, shape):
 
 
 if __name__ == '__main__':
-    label_names = 'Core Diffuse Neuritic CAA'.split()
-    label_colors = 'red green blue black'.split()
-
     vips_img_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/amy-def-mfg-test'
-    out_dir = '/home/gryan/Pictures/outputs'
+    out_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/slide_masks'
 
-    vips_img_names = '07-056 09-063 10-033'.split()
-    vips_img_names = '12-010 12-011 12-012 16-002'.split()
+    vips_img_skip = '07-057 08-018 09-006 09-041 10-005 10-006 10-009 10-018 10-019 10-020 10-021 10-026 11-008 11-018 11-025 11-029 12-009 12-023 12-031 12-036 13-028 14-033 16-027'
+    vips_img_names = next(os.walk(vips_img_dir))[2]
+    vips_img_names = [file[2:2 + 6] for file in vips_img_names]
+    vips_img_names = sorted(list(set(vips_img_names).difference(vips_img_skip)))
 
     vips_img_fnames = [os.path.join(vips_img_dir, f'XE{vips_img_name}_1_AmyB_1.mrxs') for vips_img_name in vips_img_names]
 
@@ -95,7 +95,7 @@ if __name__ == '__main__':
         tile_name, mask_name, viz_name = [f'{name}.{suffix}' for suffix in ('tiles.npy', 'mask.png', 'viz.png')]
 
         slide = pyvips.Image.new_from_file(fname, level=level)
-        slide = get_cropped(slide, level)
+        # slide = get_cropped(slide, level)
 
         im = slide.numpy()[..., :3]
         gray = cv2.cvtColor(im, cv2.COLOR_RGB2GRAY)
@@ -108,9 +108,10 @@ if __name__ == '__main__':
         contours = mask_contours(filled_mask)
         filled_mask = fill_contours(contours[:1], filled_mask.shape)
 
-        tiles_pos, tiles_neg = [tile_mask(filled_mask, f=f) for f in (lambda _: _.sum() > 0, lambda _: _.sum() == 0)]
+        f_pos, f_neg = lambda _: _.sum() > 0, lambda _: _.sum() == 0
+        tiles_pos, coords_neg = tile_mask(filled_mask, f=f_pos)[1], tile_mask(filled_mask, f=f_neg)[0]
 
-        for y1, x1, y2, x2 in tiles_neg:
+        for y1, x1, y2, x2 in coords_neg:
             im[y1:y2, x1:x2] = 0
         mask_out = ToPILImage()(filled_mask)
         viz_out = ToPILImage()(im)
@@ -118,62 +119,3 @@ if __name__ == '__main__':
         np.save(tile_name, tiles_pos, allow_pickle=False)
         mask_out.save(mask_name)
         viz_out.save(viz_name)
-
-
-    # blurred = cv2.GaussianBlur(gray, (7, 7), 0)
-    # thresh, mask = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
-    # closed = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((7, 7)), iterations=10)
-    # tiles_neg = tile_mask(closed, f=lambda _: _.sum() == 0)
-
-
-    # for fname, viz_fname in zip(vips_img_fnames, viz_fnames):
-    #     slide = pyvips.Image.new_from_file(fname, level=level)
-    #     slide = get_cropped(slide, level)
-    #
-    #     _, _, thresh, mask, _ = get_slide_tiles(slide, 0, tile_size, use_contours=True, top_n=1)
-    #
-    #     ht, wt = np.array(mask.shape) // tile_size
-    #     ts = np.array([(y, x) for x in range(wt + 1) for y in range(ht + 1)])
-    #     ts = np.concatenate([ts + i for i in range(2)], axis=1) * tile_size
-    #     ts_neg = [(y1, x1, y2, x2) for y1, x1, y2, x2 in ts if mask[y1:y2, x1:x2].sum() == 0]
-    #     ts_neg = tile_mask(mask, f=lambda _: _.sum() == 0)
-    #
-    #     im = slide.numpy()[..., :3]
-    #     for y1, x1, y2, x2 in ts_neg:
-    #         im[y1:y2, x1:x2, ...] = 0
-    #
-    #     ToPILImage()(im).save(viz_fname)
-
-
-
-
-
-    # for x, y in invalid_tiles:
-    #     x *= tile_size
-    #     y *= tile_size
-    #     x //= (2 ** level)
-    #     y //= (2 ** level)
-    #     d = tile_size
-    #     d //= (2 ** level)
-    #
-    #     im[y:y + d, x:x + d, ...] = 0
-
-
-
-    # tile_size = 1024
-    # ds_train = VipsJsonDataset(vips_img_fnames[0], json_fnames[0], label_names, step=(tile_size // 2, tile_size // 2), size=(tile_size, tile_size))
-    # ds_test = VipsJsonDataset(vips_img_fnames[0], json_fnames[0], label_names, step=(tile_size, tile_size), size=(tile_size, tile_size))
-    #
-    # # ds_test_tiles = np.array(ds_test.tiles)
-    # # ds_test_tiles = list(map(tuple, ds_test_tiles[np.random.permutation(np.arange(ds_test_tiles.shape[0]))]))
-    # # test_tiles = ds_test_tiles[:16]
-    # test_tiles = [(60, 70), (65, 66), (64, 29), (61, 32), (63, 70), (61, 69), (65, 28), (66, 66), (72, 66), (57, 12), (66, 36), (62, 21), (65, 29), (74, 68), (71, 66), (62, 69)]
-    #
-    # test_boxes = [get_tile(tile, ds_test.step, ds_test.size, ds_test.offset) for tile in test_tiles]
-    # train_tiles = list(set(sum([tiles_per_box(box, ds_train.step, ds_train.size, ds_train.offset) for box in test_boxes], start=list())))
-    #
-    # test_idxs = [i for i, tile in enumerate(ds_test.tiles) if tile in test_tiles]
-    # train_idxs = [i for i, tile in enumerate(ds_train.tiles) if tile not in train_tiles]
-    #
-    # ds_train = torch.utils.data.dataset.Subset(ds_train, train_idxs)
-    # ds_test = torch.utils.data.dataset.Subset(ds_test, test_idxs)
