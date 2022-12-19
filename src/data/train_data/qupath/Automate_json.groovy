@@ -1,10 +1,54 @@
 import static qupath.lib.gui.scripting.QPEx.*
+import groovy.io.FileType
+import javafx.application.Platform
+import qupath.lib.projects.Project;
+import static qupath.lib.gui.scripting.QPEx.*
 import qupath.lib.objects.PathObjects
 import qupath.lib.roi.ROIs
 import qupath.lib.regions.ImagePlane
 import qupath.lib.regions.ImageRegion
 import qupath.lib.io.GsonTools
 import qupath.lib.objects.classes.PathClassTools
+
+File folder = new File('/mnt/new-nas/work/data/npsad_data/vivek/QuPath')
+project = ""
+
+//folder.eachFileRecurse FileType.FILES,  { file ->
+//
+//    // do nothing if the file ends with a .txt extension
+//    if (file.name.endsWith(".qpproj")) {
+//        println "Processing file ${file.absolutePath}"
+//        
+//        if(file.isFile())
+//        
+//            Project<BufferedImage> project = ProjectIO.loadProject(file, BufferedImage.class)
+//            print(project)
+//        
+//    }
+//}
+
+File new_file = new File('/mnt/new-nas/work/data/npsad_data/vivek/QuPath/XE10-053_1_AmyB_1/project.qpproj')
+
+ Project<BufferedImage> project = ProjectIO.loadProject(new_file, BufferedImage.class)
+ describe(project)
+ def image_list = project.getImageList()[0]
+ def image_data = image_list.readImageData()
+ describe(image_data)
+ 
+ PathObjectHierarchy heirarchy = image_data.getHierarchy()
+ Collection annotations = heirarchy.getAnnotationObjects()
+ print(annotations)
+
+//def imageData = QPEx.getCurrentImageData()
+//def server = imageData.getServer()
+
+
+
+
+//***********************
+
+
+
 
 
 //TODO:
@@ -239,10 +283,10 @@ def tilesToAnnotations(t, tiles, plane) {
 }
 
 
-def viewer = qupath.lib.gui.scripting.QPEx.getCurrentViewer()
-def hierarchy = viewer.hierarchy
-
-def annotations = hierarchy.annotationObjects
+//def viewer = qupath.lib.gui.scripting.QPEx.getCurrentViewer()
+//def hierarchy = viewer.hierarchy
+//
+//def annotations = hierarchy.annotationObjects
 def (unlabeled, labeled) = annotationsToROIsMap(annotations)
 
 
@@ -258,7 +302,7 @@ roiTypes.each({
     }
 })
 
-def plane = viewer.imagePlane
+//def plane = viewer.imagePlane
 def gson = GsonTools.getInstance(true)
 
 def results = []
@@ -295,3 +339,6 @@ print(savepath)
 try (Writer writer = new FileWriter(savepath)) {
         gson.toJson(results, writer);
     }
+
+
+

@@ -7,7 +7,8 @@ import pycocotools.mask as mask_util
 import torch
 from utils import utils
 from pycocotools.coco import COCO
-from pycocotools.cocoeval import COCOeval
+# from pycocotools.cocoeval import COCOeval
+from utils.cocoeval import COCOeval
 import pdb
 
 
@@ -19,6 +20,8 @@ class CocoEvaluator:
 
         self.iou_types = iou_types
         self.coco_eval = {}
+
+        #Instantiating COCOeval class for different ioutypes
         for iou_type in iou_types:
             self.coco_eval[iou_type] = COCOeval(coco_gt, iouType=iou_type)
 
@@ -50,18 +53,18 @@ class CocoEvaluator:
         for coco_eval in self.coco_eval.values():
             coco_eval.accumulate()
 
-    def summarize(self):
+    def summarize(self, run):
         for iou_type, coco_eval in self.coco_eval.items():
             print(f"IoU metric: {iou_type}")
-            coco_eval.summarize()
+            coco_eval.summarize(run, iou_type)
 
     def prepare(self, predictions, iou_type):
         if iou_type == "bbox":
             return self.prepare_for_coco_detection(predictions)
         if iou_type == "segm":
             return self.prepare_for_coco_segmentation(predictions)
-        if iou_type == "keypoints":
-            return self.prepare_for_coco_keypoint(predictions)
+        
+        #TODO Vivek remove keypoints
         raise ValueError(f"Unknown iou type {iou_type}")
 
     def prepare_for_coco_detection(self, predictions):
@@ -122,32 +125,7 @@ class CocoEvaluator:
             )
         return coco_results
 
-    def prepare_for_coco_keypoint(self, predictions):
-        coco_results = []
-        for original_id, prediction in predictions.items():
-            if len(prediction) == 0:
-                continue
-
-            boxes = prediction["boxes"]
-            boxes = convert_to_xywh(boxes).tolist()
-            scores = prediction["scores"].tolist()
-            labels = prediction["labels"].tolist()
-            keypoints = prediction["keypoints"]
-            keypoints = keypoints.flatten(start_dim=1).tolist()
-
-            coco_results.extend(
-                [
-                    {
-                        "image_id": original_id,
-                        "category_id": labels[k],
-                        "keypoints": keypoint,
-                        "score": scores[k],
-                    }
-                    for k, keypoint in enumerate(keypoints)
-                ]
-            )
-        return coco_results
-
+#TODO vivek remove keypoints
 
 def convert_to_xywh(boxes):
     xmin, ymin, xmax, ymax = boxes.unbind(1)

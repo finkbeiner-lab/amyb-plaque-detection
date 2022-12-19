@@ -8,6 +8,7 @@ the json annotation file for segmentation
 
 """
 import os
+from os.path import exists
 import glob
 import json
 import pdb
@@ -20,7 +21,7 @@ from skimage import measure
 from tqdm import tqdm
 from PIL import Image
 import pyvips as Vips
-import openslide
+# import openslide
 
 # Mask size should be same as image size
 # TODO Remove hardcoding
@@ -28,7 +29,9 @@ ID_MASK_SHAPE = (1024, 1024)
 
 # Color Coding
 lablel2id = {'Core':'50', 'Diffuse':'100',
-             'Neuritic':'150', 'Unknown':'0'}
+             'Neuritic':'150', 'CAA': '200', 'Unknown':'0'}
+
+DATASET_PATH = "/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi"
 
 def save_img(img, file_name, tileX, tileY, save_dir, label="mask"):
     im = Image.fromarray(img)
@@ -85,7 +88,7 @@ def get_vips_info(vips_img):
     return vfields
 
 
-def process_json(WSI_path, visualize=False):
+def process_json(WSI_path, json_path,  visualize=False):
     """This function is used to read and process the json files
     and generate save generated masks
 
@@ -98,21 +101,19 @@ def process_json(WSI_path, visualize=False):
 
 
     # Mask Folder
-    mask_save_dir = os.path.join(WSI_path, "masks")
+    mask_save_dir = os.path.join(DATASET_PATH, "labels")
     if not os.path.exists(mask_save_dir):
         os.makedirs(mask_save_dir)
 
     # Image Folder
-    image_save_dir = os.path.join(WSI_path, "images")
+    image_save_dir = os.path.join(DATASET_PATH, "images")
     if not os.path.exists(image_save_dir):
         os.makedirs(image_save_dir)
 
 
     imagenames = glob.glob(os.path.join(WSI_path, "*.mrxs"))
-
-    # TODO Remove this hardcoding later
-    imagenames = ["/home/vivek/Datasets/AmyB/amyb_wsi/XE19-010_1_AmyB_1.mrxs"]
-    plaque_dict = {}
+    imagenames = sorted(imagenames)
+    plaque_dict = {'Core': 0, 'Neuritic': 0, 'Diffuse': 0, 'CAA': 0, 'Unknown': 0}
 
     for img in imagenames:
         # Read the WSI image
@@ -121,16 +122,22 @@ def process_json(WSI_path, visualize=False):
 
         # Get the corresponding json file
         json_file_name = os.path.basename(img).split(".mrxs")[0] + ".json"
-        json_file_name = os.path.join(os.path.dirname(img), json_file_name)
-        json_file_list = [json_file_name, "/home/vivek/Datasets/AmyB/amyb_wsi/XE19-010_1_AmyB_1_1.json"]
-        merge_json(json_file_list, "/home/vivek/Datasets/AmyB/amyb_wsi/test.json")
+        json_file_name = os.path.join(json_path, json_file_name)
+        # json_file_list = [json_file_name, "/home/vivek/Datasets/AmyB/amyb_wsi/XE19-010_1_AmyB_1_1.json"]
+        # merge_json(json_file_list, "/home/vivek/Datasets/AmyB/amyb_wsi/test.json")
         # json_file_name = os.path.join(os.path.dirname(img), "XE19-010_1_AmyB_1_37894x_177901y_image.png[--series, 0].json")
 
-        json_file_name = "/home/vivek/Datasets/AmyB/amyb_wsi/test.json"
+        # json_file_name = "/home/vivek/Datasets/AmyB/amyb_wsi/test.json"
+        
+        
+        if not exists(json_file_name):
+            continue
+        
         print("file name : ", json_file_name)
+
         with open(json_file_name) as f:
             data = json.load(f)
-
+        
         for ele in tqdm(data):
 
             # Reset ids for each annotation
@@ -142,8 +149,7 @@ def process_json(WSI_path, visualize=False):
             region_id = 0
             prev_label = ""
             i = 0
-
-            plaque_dict[ele['label']] = len(ele['region_attributes'])
+            plaque_dict[ele['label']] = plaque_dict[ele['label']] + len(ele['region_attributes'])
 
             for region in ele['region_attributes']:
 
@@ -157,9 +163,6 @@ def process_json(WSI_path, visualize=False):
                 # get the bound-x and bounds-y, offset as Vips crops the empty spaces. Qupath does not
                 tileX = (tileX * tileWidth) + int(vinfo['bounds-x'])
                 tileY = (tileY * tileHeight) + int(vinfo['bounds-y'])
-
-                # if tileX == 38918 and tileY==178925:
-                #     pdb.set_trace()
 
                 vips_img_crop = vips_img.crop(tileX, tileY,tileWidth, tileHeight)
 
@@ -247,10 +250,12 @@ if __name__ == '__main__':
     print(result)
 
     parser = argparse.ArgumentParser(description='Generate Mask')
-
+    
     parser.add_argument('WSI_path',
                         help='Enter the path where WSI resides')
-
+    parser.add_argument('json_path',
+                        help='Enter the path where json annotation resides')
+    
     args = parser.parse_args()
 
-    process_json(args.WSI_path)
+    process_json(args.WSI_path, args.json_path)
