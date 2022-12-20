@@ -35,17 +35,17 @@ def get_cropped(slide, level):
     x, y = [int(slide.get(f'openslide.bounds-{_}')) // (2 ** level) for _ in 'xy']
     return slide.crop(x, y, slide.width - x, slide.height - y)
 
-def get_tiles(h, w, tile_size, level):
-    return [(y, x) for x in range(((w * (2 ** level)) // tile_size) + 1) for y in range(((h * (2 ** level)) // tile_size) + 1)]
+def get_tiles(h, w, size, level):
+    return [(y, x) for x in range(((w * (2 ** level)) // size) + 1) for y in range(((h * (2 ** level)) // size) + 1)]
 
 
-def tile_mask(mask, f=None):
+def tile_mask(mask, size, f=None):
     if f is None:
         f = lambda a: a.sum() > 0
 
-    ht, wt = np.array(mask.shape) // tile_size
+    ht, wt = np.array(mask.shape) // size
     ts = np.array([(y, x) for x in range(wt + 1) for y in range(ht + 1)])
-    coords = np.concatenate([ts + i for i in range(2)], axis=1) * tile_size
+    coords = np.concatenate([ts + i for i in range(2)], axis=1) * size
 
     keep = np.array([i for i, (y1, x1, y2, x2) in enumerate(coords) if f(mask[y1:y2, x1:x2])])
     return coords[keep], ts[keep][:, [1, 0]]
@@ -102,7 +102,7 @@ if __name__ == '__main__':
         filled_mask = fill_contours(contours[:1], filled_mask.shape)
 
         f_pos, f_neg = lambda _: _.sum() > 0, lambda _: _.sum() == 0
-        tiles_pos, coords_neg = tile_mask(filled_mask, f=f_pos)[1], tile_mask(filled_mask, f=f_neg)[0]
+        tiles_pos, coords_neg = tile_mask(filled_mask, tile_size, f=f_pos)[1], tile_mask(filled_mask, tile_size, f=f_neg)[0]
 
         for y1, x1, y2, x2 in coords_neg:
             im[y1:y2, x1:x2] = 0

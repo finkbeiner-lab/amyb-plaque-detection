@@ -9,6 +9,45 @@ import tqdm
 import pdb
 
 
+def get_cropped(slide, level):
+    x, y = [int(slide.get(f'openslide.bounds-{_}')) // (2 ** level) for _ in 'xy']
+    return slide.crop(x, y, slide.width - x, slide.height - y)
+
+def get_tiles(h, w, tile_size, level):
+    return [(y, x) for x in range(((w * (2 ** level)) // tile_size) + 1) for y in range(((h * (2 ** level)) // tile_size) + 1)]
+
+
+def tile_mask(mask, size, f=None):
+    if f is None:
+        f = lambda a: a.sum() > 0
+
+    ht, wt = np.array(mask.shape) // tile_size
+    ts = np.array([(y, x) for x in range(wt + 1) for y in range(ht + 1)])
+    coords = np.concatenate([ts + i for i in range(2)], axis=1) * tile_size
+
+    keep = np.array([i for i, (y1, x1, y2, x2) in enumerate(coords) if f(mask[y1:y2, x1:x2])])
+    return coords[keep], ts[keep][:, [1, 0]]
+
+def fill_mask(mask, k, i=1, r=0):
+    for _ in range(i):
+        mask = cv2.blur(mask, (k, k))
+        mask = (mask > (255 * r)).astype(np.uint8) * 255
+    return mask
+
+def close_mask(mask, k, i=1):
+    return cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((k, k)), iterations=i)
+
+def mask_contours(mask):
+    contours, _ = cv2.findContours(mask.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    return list(map(lambda t: t[0], sorted([(contour, cv2.contourArea(contour)) for contour in contours], key=lambda t: -t[1])))
+
+def fill_contours(contours, shape):
+    fill = np.zeros(shape, dtype=np.uint8)
+    cv2.drawContours(fill, contours, -1, 255, -1)
+    return fill
+
+
+
 def get_mask_contours(x):
     """
     Args:
@@ -86,6 +125,15 @@ def visualize_rois(rois, fill, shape, dtype):
         getROI(fill_rois, roi).fill(np.array(fill, dtype))
     return fill_rois
 
+def get_slide_tiles(slide_vips, slide_level, tile_size, top_n=1):
+    slide_arr = slide_vips[:3].numpy()
+
+    gray = cv2.cvtColor(slide_arr, cv2.COLOR_RGB2GRAY)
+    thresh, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
+
+    filled_mask = mask
+    filled_mask = fill_mask(filled_mask, )
+
 def get_slide_tiles(slide_vips, slide_level, tile_size, tile_cond=None, interactive=False, top_n=1, visualize=False):
     """
     Args:
@@ -113,7 +161,7 @@ def get_slide_tiles(slide_vips, slide_level, tile_size, tile_cond=None, interact
     print(f'Total of {len(contours)} contours found at threshold value {thresh}.')
     contours = contours[:top_n]
     selected_contours = list()
-    
+
     if interactive:
         print(f'Select from among {len(contours)} contours.')
         for contour in contours:
