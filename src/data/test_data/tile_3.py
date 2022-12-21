@@ -84,6 +84,28 @@ def slide_tile_map(slide_name, slide_dir, tile_dir, size, f=None):
     return f(slide, tiles)
 
 
+def read_metrics(metrics_file):
+    with open(metrics_file, 'r') as f:
+        lines = f.read().split('\n')[1:-1]
+    lines = [line.split(',') for line in lines]
+
+    slides = [line[0] for line in lines]
+    norms_each = [line[-3:] for line in lines]
+    norms_each = [(torch.as_tensor(int(n)), *[torch.as_tensor(list(map(float, s.split(' ')))) for s in (s1, s2)]) for n, s1, s2 in norms_each]
+    norms = norm_merge(norms_each)
+
+    summary_each = [norm_summarize(norm_values) for norm_values in norms_each]
+    summary = norm_summarize(norms)
+    return summary_each, summary
+
+def write_metrics(slide_name, slide_dir, tile_dir, metrics_file, tile_size):
+    num_tiles, norm_values = slide_tile_map(slide_name, slide_dir, tile_dir, tile_size, f=norm_lambda)
+    with open(os.path.join(metrics_file, 'a')) as f:
+        f.write(f'{slide_name},{num_tiles},{norm_to_str(norm_values)}\n')
+
+
+
+
 
 if __name__ == '__main__':
     slide_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/amy-def-mfg-test'
@@ -94,12 +116,14 @@ if __name__ == '__main__':
 
     slide_names = ['.'.join(file.split('.')[:-1]) for file in next(os.walk(slide_dir))[2]]
 
-    with open(os.path.join(out_dir, f'metrics.txt'), 'w') as f:
+    metrics_file = os.path.join(out_dir, f'metrics.txt')
+    with open(metrics_file, 'w') as f:
         f.write('slide_name,num_tiles,num_pixels,mean,std\n')
     for slide_name in slide_names:
-        num_tiles, norm_values = slide_tile_map(slide_name, slide_dir, tile_dir, tile_size, f=norm_lambda)
-        with open(os.path.join(out_dir, f'metrics.txt'), 'a') as f:
-            f.write(f'{slide_name},{num_tiles},{norm_to_str(norm_values)}\n')
+        write_metrics(slide_name, slide_dir, tile_dir, metrics_file, tile_size)
+        # num_tiles, norm_values = slide_tile_map(slide_name, slide_dir, tile_dir, tile_size, f=norm_lambda)
+        # with open(os.path.join(out_dir, f'metrics.txt'), 'a') as f:
+        #     f.write(f'{slide_name},{num_tiles},{norm_to_str(norm_values)}\n')
 
 
     # slide, tiles = slide_tile_map(slide_names[0], slide_dir, tile_dir, tile_size)
