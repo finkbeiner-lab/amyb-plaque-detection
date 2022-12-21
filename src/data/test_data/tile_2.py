@@ -22,7 +22,7 @@ def norm(x: Tensor):
     dims = tuple(range(1, len(x.size())))
     n = reduce(lambda a, b: a * b, x.size()[1:], 1)
     s1, s2 = [(x ** (i + 1)).sum(dim=tuple(range(1, len(x.size())))) for i in range(2)]
-    return torch.as_tensor(n), s1 / n, s2 / n
+    return torch.as_tensor(n).to(x.device), s1 / n, s2 / n
 
 def norm_merge(norms: List[Tuple[Tensor, Tensor, Tensor]]):
     n, s1, s2 = map(torch.stack, zip(*norms))
@@ -39,13 +39,18 @@ def norm_summarize(norm: Tuple[Tensor, Tensor, Tensor]):
     return mean, std
 
 def tile_as_tensor(slide, tile):
-    return torch.as_tensor(slide.crop(*tile).numpy()).permute(2, 0, 1) / 255
+    device = torch.device('cuda', 0)
+    return (torch.as_tensor(slide.crop(*tile).numpy()).permute(2, 0, 1) / 255).to(device)
 
 def norm_lambda(slide, tiles):
     norms = [norm(tile_as_tensor(slide, tile)) for tile in tiles]
-    n = len(norms)
-    merged = norm_merge(norms)
-    return n, merged
+    return len(norms), norm_merge(norms)
+
+def norm_to_str(norm):
+    n, s1, s2 = norm
+    n, s1, s2 = (n.item(), *[list(map(lambda _: _.item(), s)) for s in (s1, s2)])
+    n, s1, s2 = (str(n), *map(lambda s: ' '.join(map(str, s)), (s1, s2)))
+    return ','.join((n, s1, s2))
 
 
 def crop_tile(slide, out_dir, tile, ext='png'):
@@ -69,10 +74,12 @@ def slide_tile_map(slide_name, slide_dir, tile_dir, size, f=None):
     tile_path = os.path.join(tile_dir, f'{slide_name}.tiles.npy')
 
     slide = pyvips.Image.new_from_file(slide_path, level=0)[:3]
+
     tiles = np.load(tile_path, allow_pickle=False)
-    tiles = np.concatenate([tiles + i for i in range(2)], axis=1)
-    tiles *= np.concatenate([size] * 2)
+    tiles = np.concatenate([tiles + i for i in range(2)], axis=1) * np.array(size * 2)
+    tiles = np.minimum(np.maximum(tiles, 0), np.array([slide.width, slide.height] * 2))
     tiles[:, 2:] -= tiles[:, :2]
+    assert (tiles[:, :2] >= 0).all() and (tiles[:, 2:] > 0).all()
 
     return f(slide, tiles)
 
@@ -81,14 +88,21 @@ def slide_tile_map(slide_name, slide_dir, tile_dir, size, f=None):
 if __name__ == '__main__':
     slide_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/amy-def-mfg-test'
     tile_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/slide_masks'
-    out_dir = '/home/gryan/Pictures/stats/tile_dump'
+    out_dir = '/home/gryan/Pictures/stats'
     # out_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/test/images'
     tile_size = (1024, 1024)
 
     slide_names = ['.'.join(file.split('.')[:-1]) for file in next(os.walk(slide_dir))[2]]
 
+    with open(os.path.join(out_dir, f'metrics.txt'), 'w') as f:
+        f.write('slide_name,num_tiles,num_pixels,mean,std\n')
+    for slide_name in slide_names:
+        num_tiles, norm = slide_tile_map(slide_name, slide_dir, tile_dir, tile_size, f=norm_lambda)
+        with open(os.path.join(out_dir, f'metrics.txt'), 'a') as f:
+            f.write(f'{slide_name},{num_tiles},{norm_to_str(norm)}\n')
+
+
     # slide, tiles = slide_tile_map(slide_names[0], slide_dir, tile_dir, tile_size)
-    out = slide_tile_map(slide_names[0], slide_dir, tile_dir, tile_size, f=norm_lambda)
 
     # for slide_name in slide_names:
     #     num_tiles = slide_tile_map(slide_name, slide_dir, tile_dir, tile_size, crop_lambda(out_dir, slide_name))
