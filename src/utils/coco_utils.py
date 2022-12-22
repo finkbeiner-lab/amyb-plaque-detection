@@ -154,6 +154,7 @@ def convert_to_coco_api(ds):
         # targets = ds.get_annotations(img_idx)
         img, targets = ds[img_idx]
         image_id = targets["image_id"].item()
+        #image_id = targets["image_id"].item()
         img_dict = {}
         img_dict["id"] = image_id
         img_dict["height"] = img.shape[-2]
@@ -172,7 +173,7 @@ def convert_to_coco_api(ds):
         if "masks" in targets:
             masks = targets["masks"]
 
-            # make masks Fortran contiguous for coco_mask - Since it is changed to N, H, W format
+           # make masks Fortran contiguous for coco_mask - Since it is changed to N, H, W format
             masks = masks.permute(0, 2, 1).contiguous().permute(0, 2, 1)
         
         num_objs = len(bboxes)
@@ -189,7 +190,7 @@ def convert_to_coco_api(ds):
                 ann["segmentation"] = coco_mask.encode(masks[i].numpy())
             dataset["annotations"].append(ann)
             ann_id += 1
-    dataset["categories"] = [{"id": i} for i in sorted(categories)]
+        dataset["categories"] = [{"id": i} for i in sorted(categories)]
     coco_ds.dataset = dataset
     coco_ds.createIndex()
     return coco_ds
@@ -216,6 +217,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         img, target = super().__getitem__(idx)
         image_id = self.ids[idx]
         target = dict(image_id=image_id, annotations=target)
+       
         if self._transforms is not None:
             img, target = self._transforms(img, target)
         return img, target

@@ -71,7 +71,7 @@ def _get_iou_types(model):
 
 
 @torch.inference_mode()
-def evaluate(run, model, data_loader, device):
+def evaluate(run, model, data_loader, KFold_Eval, device):
     n_threads = torch.get_num_threads()
     # FIXME remove this and make paste_masks_in_image run on the GPU
     torch.set_num_threads(1)
@@ -132,6 +132,11 @@ def evaluate(run, model, data_loader, device):
     # accumulate predictions from all images
     coco_evaluator.accumulate()
     # summary of avg precision/recall at various IOU is saved as dataframe in "results"
-    results = coco_evaluator.summarize(run)
     torch.set_num_threads(n_threads)
-    return coco_evaluator, results
+    if KFold_Eval==True:
+        results = coco_evaluator.summarize(run)
+        return coco_evaluator, results
+    else:
+        coco_evaluator.summarize(run)
+        return coco_evaluator
+
