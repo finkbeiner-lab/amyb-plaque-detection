@@ -90,13 +90,21 @@ def read_metrics(metrics_file):
     lines = [line.split(',') for line in lines]
 
     slides = [line[0] for line in lines]
-    norms_each = [line[-3:] for line in lines]
+    norms_each = [line[2:] for line in lines]
     norms_each = [(torch.as_tensor(int(n)), *[torch.as_tensor(list(map(float, s.split(' ')))) for s in (s1, s2)]) for n, s1, s2 in norms_each]
     norms = norm_merge(norms_each)
 
-    summary_each = [norm_summarize(norm_values) for norm_values in norms_each]
-    summary = norm_summarize(norms)
+    summary_each = [(norm_values[0], *norm_summarize(norm_values)) for norm_values in norms_each]
+    summary_each = [(n.item(), *[list(map(lambda _: _.item(), m)) for m in (mean, std)]) for n, mean, std in summary_each]
+    summary_each = sorted(list(zip(slides, summary_each)), key=lambda _: _[0])
+
+    summary = [(n.item(), *[list(map(lambda _: _.item(), m)) for m in (mean, std)]) for n, mean, std in [(norms[0], *norm_summarize(norms))]][0]
+
     return summary_each, summary
+
+def format_metrics(metrics):
+    slide_name, (num_pixels, mean, std) = metrics
+    return f'{slide_name} ({num_pixels} px):\n  mean: {mean}\n  std: {std}\n'
 
 def write_metrics(slide_name, slide_dir, tile_dir, metrics_file, tile_size):
     num_tiles, norm_values = slide_tile_map(slide_name, slide_dir, tile_dir, tile_size, f=norm_lambda)
@@ -110,20 +118,31 @@ def write_metrics(slide_name, slide_dir, tile_dir, metrics_file, tile_size):
 if __name__ == '__main__':
     slide_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/amy-def-mfg-test'
     tile_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/slide_masks'
-    out_dir = '/home/gryan/Pictures/stats'
-    # out_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/test/images'
+    out_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/test/images'
     tile_size = (1024, 1024)
 
     slide_names = ['.'.join(file.split('.')[:-1]) for file in next(os.walk(slide_dir))[2]]
 
-    metrics_file = os.path.join(out_dir, f'metrics.txt')
-    with open(metrics_file, 'w') as f:
-        f.write('slide_name,num_tiles,num_pixels,mean,std\n')
     for slide_name in slide_names:
-        write_metrics(slide_name, slide_dir, tile_dir, metrics_file, tile_size)
-        # num_tiles, norm_values = slide_tile_map(slide_name, slide_dir, tile_dir, tile_size, f=norm_lambda)
-        # with open(os.path.join(out_dir, f'metrics.txt'), 'a') as f:
-        #     f.write(f'{slide_name},{num_tiles},{norm_to_str(norm_values)}\n')
+        num_tiles = slide_tile_map(slide_name, slide_dir, tile_dir, tile_size, f=crop_lambda(out_dir, slide_name))
+        print(f'{slide_name}: {num_tiles} tiles')
+
+
+    # # Metrics
+    # out_dir = '/home/gryan/Pictures/stats'
+    # metrics_file = os.path.join(out_dir, f'metrics.txt')
+    #
+    # with open(metrics_file, 'w') as f:
+    #     f.write('slide_name,num_tiles,num_pixels,mean,std\n')
+    # for slide_name in slide_names:
+    #     write_metrics(slide_name, slide_dir, tile_dir, metrics_file, tile_size)
+    #
+    # metrics, metrics_total = read_metrics(metrics_file)
+    # out = '\n'.join(map(format_metrics, metrics))
+    # out += '\n' * 2
+    # out += format_metrics(('Total', metrics_total))
+    # out += '\n'
+
 
 
     # slide, tiles = slide_tile_map(slide_names[0], slide_dir, tile_dir, tile_size)
