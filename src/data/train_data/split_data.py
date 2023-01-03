@@ -95,12 +95,13 @@ class SplitData:
 
         # Step 3 : Create 80 - 10 - 10 Split
         split_1 = int(0.8 * len(image_filenames))
-        split_2 = int(0.9 * len(image_filenames))
+        split_2 = int(1 * len(image_filenames))
 
         split_3 = int(0.8 * len(label_filenames))
-        split_4 = int(0.9 * len(label_filenames))
+        split_4 = int(1 * len(label_filenames))
 
-        print("\n\nSplitting dataset into Train,Test and Val for  Images ...")
+        print("\n Splitting dataset into Train and Val for  Images ...")
+
         data_dict = dict(
             train=dict(
                 images=image_filenames[:split_1],
@@ -109,26 +110,21 @@ class SplitData:
             val=dict(
                 images=image_filenames[split_1:split_2],
                 labels=label_filenames[split_1:split_2],
-            ),
-            test=dict(
-                images=image_filenames[split_2:],
-                labels=label_filenames[split_2:]
             )
         )
 
         train_filenames_images = image_filenames[:split_1]
-        test_filenames_images = image_filenames[split_2:]
         val_filenames_images = image_filenames[split_1:split_2]
 
-        print("\n\nSplitting dataset into Train,Test and Val for Labels ...")
+        print("\n\nSplitting dataset into Train and Val for Labels ...")
+
         train_filenames_labels = label_filenames[:split_3]
-        test_filenames_labels = label_filenames[split_4:]
         val_filenames_labels = label_filenames[split_3:split_4]
 
 
         # Step 4 : Copy the split contents to folders
         #Parallel Process - Images and Labels
-        [self.copy_split_files_to_dataset(data_dict[fold][x], dst_directory, f'{fold}/{x}') for x in 'images labels'.split() for fold in 'train val test'.split()]
+        [self.copy_split_files_to_dataset(data_dict[fold][x], dst_directory, f'{fold}/{x}') for x in 'images labels'.split() for fold in 'train val'.split()]
 
 
     def copy_split_files_to_dataset(self, filenames, dst_directory, dst_type):
@@ -319,5 +315,5 @@ class SplitData:
 if __name__ == "__main__":
     #TODO Fix data aug - Not Running
     base_WSI_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/'
-    split_data = SplitData(base_WSI_path, True, 100)
+    split_data = SplitData(base_WSI_path, True, 1000)
     split_data.prepare_dataset()

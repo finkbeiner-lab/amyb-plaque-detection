@@ -7,6 +7,8 @@ from PIL import Image
 import pyvips
 import tqdm
 import pdb
+from tqdm import tqdm
+import skimage.io as io
 
 
 def get_mask_contours(x):
@@ -103,7 +105,7 @@ def get_slide_tiles(slide_vips, slide_level, tile_size, tile_cond=None, interact
         visuals: an optional binary (0/255) RGB array showing the overlaps of the main slide masks, the slide masks' ROI, and the selected tiles
     """
     if tile_cond is None:
-        tile_cond = lambda a, r: getROI(a, r).sum() > 0
+        tile_cond = lambda a, r: getROI(a, r).sum() > 100
 
     slide_arr = np.ndarray(buffer=slide_vips.write_to_memory(), dtype=np.uint8, shape=tuple(map(lambda k: slide_vips.get(k), 'height width bands'.split())))[..., :3]
     slide_arr = cv2.cvtColor(slide_arr, cv2.COLOR_RGB2GRAY)
@@ -147,6 +149,14 @@ def get_slide_tiles(slide_vips, slide_level, tile_size, tile_cond=None, interact
     return selected_tiles, selected_rois, thresh, visuals
 
 
+def getVipsInfo(vips_img):
+        # # Get bounds-x and bounds-y offeset
+        vfields = [f.split('.') for f in vips_img.get_fields()]
+        vfields = [f for f in vfields if f[0] == 'openslide']
+        vfields = dict([('.'.join(k[1:]), vips_img.get('.'.join(k))) for k in vfields])
+        
+        return vfields
+
 
 def process_slides(base_dir, save_dir, slide_level=4, tile_size=1024):
     """
@@ -162,12 +172,31 @@ def process_slides(base_dir, save_dir, slide_level=4, tile_size=1024):
     file_names = sorted(glob.glob(os.path.join(base_dir, '*.mrxs')))
     selected_tiles = list()
 
-    for file_name in file_names[:1]:
+    for file_name in tqdm(file_names[:2]):
+
+        
+
         img_name = os.path.split(file_name)[1]
         img_name = '.'.join(img_name.split('.')[:-1])
         img_vips, img_vips_ds = [pyvips.Image.new_from_file(file_name, level=level) for level in (0, slide_level,)]
+        vinfo = getVipsInfo(img_vips)
+        orig_w, orig_h = int(vinfo['level[0].width']), int(vinfo['level[0].height'])
 
-        tiles, _, thresh, visuals = get_slide_tiles(img_vips_ds, slide_level, tile_size, interactive=True, visualize=True, top_n=3)
+        tiles, _, thresh, visuals = get_slide_tiles(img_vips_ds, slide_level, tile_size, interactive=False, visualize=True, top_n=1)
+
+        file_name = os.path.basename(file_name)
+        file_name = file_name.split('.mrxs')[0]
+        savesubdir = os.path.join(save_dir, file_name)
+        if not os.path.exists(savesubdir):
+            os.makedirs(savesubdir, exist_ok=False)
+            print("Subdir '%s' created" %savesubdir)
+
+        for tile_no in enumerate(tiles):
+            x = tile_no[1][0]  * 1024
+            y = tile_no[1][1]  * 1024
+            
+            crop_process(x, y, img_vips, savesubdir, file_name, orig_w, orig_h)
+
 
         tile_selection = '\n'.join([','.join(map(str, t)) for t in tiles])
         with open(os.path.join(save_dir, f'{img_name}_tiles.txt'), 'w') as fh:
@@ -191,10 +220,32 @@ def get_resp(prompt, responses=('n', 'y')):
         resp = input(prompt)
     return responses.index(resp)
 
+def crop_process(x, y, vips_orig_img, savesubdir, file_name, orig_w, orig_h):
+        
+    savecroppath = os.path.join(savesubdir, f'{file_name}_x_{x}_y_{y}.png')
+
+    # row is y, col is x
+    if y + 1024 < orig_h and x + 1024 < orig_w:
+        # TODO change to vips cropping
+        crop = vips_orig_img.crop(x, y, 1024, 1024)
+        crop.write_to_file(savecroppath)
+        # x = io.imread(savecroppath)
+        # light_pixels = np.count_nonzero(x >=250)
+
+        # if light_pixels > 4000000:
+        #     os.remove(savecroppath)
+
+
+
 
 
 if __name__ == '__main__':
-    base_dir = '/Users/gennadiryan/Documents/gladstone/projects/slide_utils/slides/mrxs'
-    save_dir = base_dir + '_out'
+    base_dir = '/mnt/new-nas/work/data/npsad_data/vivek/amy-def-mfg-test'
+    save_dir = '/mnt/new-nas/work/data/npsad_data/vivek/' + 'test-data'
+
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+        print("Directory '%s' created" %save_dir)
+
 
     process_slides(base_dir, save_dir)

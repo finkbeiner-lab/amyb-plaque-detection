@@ -88,7 +88,30 @@ def get_vips_info(vips_img):
     return vfields
 
 
-def process_json(WSI_path, json_path,  visualize=False):
+def create_patient_specific_dirs(img):
+
+    # Image Folder
+    img_file_name = os.path.basename(img).split(".mrxs")[0] + ".json"
+    file_name = os.path.join(img_file_name, "images")
+    
+    image_save_dir = os.path.join(DATASET_PATH, file_name)
+    
+    if not os.path.exists(image_save_dir):
+        os.makedirs(image_save_dir)
+    
+    # Mask Folder
+    file_name = os.path.join(img_file_name, "labels")
+    mask_save_dir = os.path.join(DATASET_PATH, file_name)
+
+    if not os.path.exists(mask_save_dir):
+        os.makedirs(mask_save_dir)
+    
+    return image_save_dir, mask_save_dir
+
+
+
+
+def process_json(WSI_path, json_path,  visualize=False, is_patient_specific=True):
     """This function is used to read and process the json files
     and generate save generated masks
 
@@ -97,6 +120,7 @@ def process_json(WSI_path, json_path,  visualize=False):
     json_path : path to json file
     save_dir : dir where the generated masks will be saved
     visualize : True , if you want to see the mask generated
+    
     """
 
 
@@ -115,10 +139,14 @@ def process_json(WSI_path, json_path,  visualize=False):
     imagenames = sorted(imagenames)
     plaque_dict = {'Core': 0, 'Neuritic': 0, 'Diffuse': 0, 'CAA': 0, 'Unknown': 0}
 
-    for img in imagenames:
+    for img in tqdm(imagenames):
         # Read the WSI image
         vips_img = Vips.Image.new_from_file(img, level=0)
         vinfo = get_vips_info(vips_img)
+
+
+        if is_patient_specific:
+            image_save_dir, mask_save_dir =  create_patient_specific_dirs(img)
 
         # Get the corresponding json file
         json_file_name = os.path.basename(img).split(".mrxs")[0] + ".json"
@@ -255,7 +283,10 @@ if __name__ == '__main__':
                         help='Enter the path where WSI resides')
     parser.add_argument('json_path',
                         help='Enter the path where json annotation resides')
+                        
+    parser.add_argument('is_patient_specific',
+                        help='True for generating patient specific training data or else False')
     
     args = parser.parse_args()
 
-    process_json(args.WSI_path, args.json_path)
+    process_json(args.WSI_path, args.json_path, False, args.is_patient_specific)

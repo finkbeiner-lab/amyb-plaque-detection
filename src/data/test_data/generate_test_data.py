@@ -134,10 +134,13 @@ class GenerateTestData:
         dark_pixels = np.count_nonzero(x < int(intensity_threshold))
 
         light_pixels = np.count_nonzero(x > int(intensity_threshold))
+
+        print("light_pixels", light_pixels)
         
 
         # 1024 * 1024 *3 / 96 percent white
         if light_pixels > 3019898:
+            print(" TRUE light_pixels", light_pixels)
             os.remove(tile_img)
             del_img_count = del_img_count + 1
                     
@@ -182,15 +185,15 @@ class GenerateTestData:
         if not os.path.exists(threshold_dir):
                 os.makedirs(threshold_dir)
 
-        start = timer()
-        # Normalization
-        normalizer = self.normalization()
-        end = timer()
-        print("Time Taken for Ref Normalization (minutes): ", (end - start) /60) # Time in seconds, e.g. 5.38091952400282
+        # start = timer()
+        # # Normalization
+        # normalizer = self.normalization()
+        # end = timer()
+        # print("Time Taken for Ref Normalization (minutes): ", (end - start) /60) # Time in seconds, e.g. 5.38091952400282
 
         imagenames = sorted(glob.glob(os.path.join(self.wsi_home_dir, '*.mrxs')))
         plt.figure(figsize=(10,10))
-        plt.title("Threholding")
+        plt.title("Thresholding")
 
         for imagename in tqdm(imagenames):
 
@@ -203,10 +206,11 @@ class GenerateTestData:
 
             # # Test
             vips_img = Vips.Image.new_from_file(imagename, level=self.slide_level)
-            start = timer()
-            vips_norm = normalizer.transform(vips_img)
-            end = timer()
-            print("Time Taken for Normalization: ", (end - start)/60)
+            # start = timer()
+            vips_norm = vips_img 
+            # normalizer.transform(vips_img)
+            # end = timer()
+            # print("Time Taken for Normalization: ", (end - start)/60)
 
             vips_img_orig = Vips.Image.new_from_file(imagename, level=0)
             vinfo = self.getVipsInfo(vips_img_orig)
@@ -220,13 +224,14 @@ class GenerateTestData:
             gray = cv2.cvtColor(vips_array, cv2.COLOR_RGB2GRAY)
             gray = cv2.GaussianBlur(gray, (5, 5), 0)
             
-            thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV+ cv2.THRESH_OTSU)
+            thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
 
             # Dialtion to fill holes
             thresh_dilation = 0
             for k in range(0, 3):
                 thresh_dilation = cv2.dilate(thresh[1], None, iterations=k + 1)
             result_img = [vips_array, thresh_dilation]
+
 
             for j in range(2):
                 plt.subplot(1, 2, j+1)

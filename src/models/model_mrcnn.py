@@ -14,7 +14,7 @@ from torchvision.models.detection import backbone_utils
 from torchvision.models.detection.generalized_rcnn import GeneralizedRCNN
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
 
-from generalized_rcnn import GeneralizedRCNN
+from .generalized_rcnn import GeneralizedRCNN
 
 class _default_mrcnn_config:
     def __init__(

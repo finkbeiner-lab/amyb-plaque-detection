@@ -4,6 +4,7 @@ from pickletools import uint8
 from turtle import pd
 import torchvision
 import torch
+import h5py
 
 
 import os
@@ -61,7 +62,17 @@ class ExplainPredictions():
         self.detections_path = "" 
         self.ablations_path = ""
         self.quantify_path = ""
-      
+        self.features = {}
+        self.test_img_features = []
+ 
+    
+
+    # helper function for feature extraction
+    def get_features(self, name):
+        def hook(model, input, output):
+            self.features[name] = output
+        return hook
+
     def get_brown_pixel_cnt(self, img, img_name):
 
         # Separate the stains from the IHC image
@@ -112,9 +123,14 @@ class ExplainPredictions():
 
 
     def get_outputs(self, input_tensor, model, threshold):
+        
+        # Register the Hook for feature extraction
+        model.backbone.fpn.extra_blocks.register_forward_hook(self.get_features('feats'))
+
         with torch.no_grad():
-            # forward pass of the image through the modle
+            # forward pass of the image through the modEL
             outputs = model(input_tensor)
+          
         
         # get all the scores
         scores = list(outputs[0]['scores'].detach().cpu().numpy())
@@ -139,7 +155,7 @@ class ExplainPredictions():
         labels = labels[:thresholded_preds_count]
 
         # [1,1,1, 2, 2, 2, 3, 3]
-        return masks, boxes, labels, scores
+        return masks, boxes, labels, scores,  self.features['feats']
 
     def draw_segmentation_map(self, image, masks, boxes, labels):
         alpha = 1 
@@ -336,6 +352,8 @@ class ExplainPredictions():
         # This will help us create a different color for each class
         # Load Trained 
         
+        hf = h5py.File(os.path.join(self.results_path,"features.h5"), 'w')
+
         self.model.load_state_dict(torch.load(self.model_input_path))
     
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -347,10 +365,14 @@ class ExplainPredictions():
         test_folders = sorted(test_folders)
       
         for test_folder in tqdm(test_folders):
-
+            
             print("\n", test_folder)
             folder_name = os.path.basename(test_folder)
 
+            # Each group is a Patient
+            g1 = hf.create_group(folder_name)
+
+            
             if folder_name == "labels":
                 continue
 
@@ -372,6 +394,10 @@ class ExplainPredictions():
                 img_name = os.path.basename(img).split('.')[0]
         
                 image = np.array(Image.open(img))
+                img_features = "features_" + img_name
+                
+                
+
 
                 total_image_pixels+= image.shape[0] * image.shape[1]
                 # Check if image has alpha channel
@@ -379,7 +405,24 @@ class ExplainPredictions():
                     image = image[:,:, :3]
 
                 input_tensor, image_float_np = self.prepare_input(image)
-                masks, boxes, labels, scores = self.get_outputs(input_tensor, self.model, self.detection_threshold)
+                masks, boxes, labels, scores, intermediate_features = self.get_outputs(input_tensor, self.model, self.detection_threshold)
+                
+                # Select the final layer from the FPN (0,1,2,3,4)
+                x = intermediate_features[0][4][0] # Remove batch dim , conv feature size [1,256,16,16]
+
+                # [256,16,16]
+                y = torch.mean(x, dim=0)
+
+                # [16,16]
+                z = torch.flatten(y)
+                z = z.cpu().numpy()
+
+                g1.create_dataset(img_name, data=image)
+                g1.create_dataset(img_features, data=z)
+
+
+
+
                 
                 result_img, result_masks = self.draw_segmentation_map(image, masks, boxes, labels)
 
@@ -456,13 +499,15 @@ class ExplainPredictions():
             df.to_csv(self.quantify_path, index=False)
             test_table = wandb.Table(data=wandb_result, columns=self.column_names)
             # self.wandb.log({'quantifications': test_table})
+        hf.close()
 
                 
         
 if __name__ == "__main__":
 
     
-    input_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test1'
+    # input_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test1'
+    input_path = "/mnt/new-nas/work/data/npsad_data/vivek/test-data/"
     model_input_path = '/mnt/new-nas/work/data/npsad_data/vivek/models/vibrant-yogurt-428_mrcnn_model_50.pth'
 
     test_config = dict(
