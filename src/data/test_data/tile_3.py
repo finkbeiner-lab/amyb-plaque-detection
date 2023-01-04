@@ -121,7 +121,9 @@ if __name__ == '__main__':
     out_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/test/images'
     tile_size = (1024, 1024)
 
+    # watch out for '.DS_Store'
     slide_names = ['.'.join(file.split('.')[:-1]) for file in next(os.walk(slide_dir))[2]]
+    slide_names = ['XE16-057_1_AmyB_1', 'XE10-020_1_AmyB_1', 'XE14-051_1_AmyB_1', 'XE12-037_1_AmyB_1', 'XE16-027_1_AmyB_1', 'XE17-013_1_AmyB_1', 'XE15-007_1_AmyB_1', 'XE09-006_1_AmyB_1', 'XE07-060_1_AmyB_1', 'XE10-019_1_AmyB_1', 'XE10-042_1_AmyB_1', 'XE12-007_1_AmyB_1', 'XE10-006_1_AmyB_1', 'XE09-035_1_AmyB_1', 'XE17-014_1_AmyB_1', 'XE13-017_1_AmyB_1', 'XE15-022_1_AmyB_1', 'XE17-059_1_AmyB_1', 'XE10-018_1_AmyB_1', 'XE18-040_1_AmyB_1', 'XE12-036_1_AmyB_1', 'XE08-047_1_AmyB_1', 'XE17-030_1_AmyB_1', 'XE14-004_1_AmyB_1', 'XE10-005_1_AmyB_1', 'XE07-067_1_AmyB_1', 'XE12-031_1_AmyB_1', 'XE12-009_1_AmyB_1', 'XE16-014_1_AmyB_1', 'XE09-063_1_AmyB_1', 'XE12-012_1_AmyB_1', 'XE17-022_1_AmyB_1', 'XE17-048_1_AmyB_1', 'XE13-018_1_AmyB_1', 'XE10-026_1_AmyB_1', 'XE10-033_1_AmyB_1', 'XE08-033_1_AmyB_1', 'XE17-039_1_AmyB_1', 'XE17-029_1_AmyB_1', 'XE13-028_1_AmyB_1', 'XE08-018_1_AmyB_1', 'XE14-047_1_AmyB_1', 'XE16-023_1_AmyB_1', 'XE17-010_1_AmyB_1', 'XE12-042_1_AmyB_1', 'XE18-001_1_AmyB_1', 'XE12-023_1_AmyB_1', 'XE14-037_1_AmyB_1', 'XE11-025_1_AmyB_1', 'XE18-004_1_AmyB_1', 'XE12-010_1_AmyB_1', 'XE08-016_1_AmyB_1', 'XE09-056_1_AmyB_1', 'XE12-016_1_AmyB_1', 'XE14-033_1_AmyB_1', 'XE07-057_1_AmyB_1', 'XE11-027_1_AmyB_1', 'XE17-065_1_AmyB_1', 'XE07-056_1_AmyB_1', 'XE08-015_1_AmyB_1', 'XE09-013_1_AmyB_1', 'XE16-033_1_AmyB_1', 'XE13-007_1_AmyB_1']
 
     for slide_name in slide_names:
         num_tiles = slide_tile_map(slide_name, slide_dir, tile_dir, tile_size, f=crop_lambda(out_dir, slide_name))
