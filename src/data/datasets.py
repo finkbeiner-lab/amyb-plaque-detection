@@ -227,7 +227,7 @@ class VipsJsonDataset(JsonDataset):
 
 
 def show(i, t):
-    i = (ToTensor()(i) * 255).to(torch.uint8)
+    i = ((ToTensor()(i) if not isinstance(i, Tensor) else i) * 255).to(torch.uint8)
     i = torchvision.utils.draw_bounding_boxes(i, t['boxes'])
     i = torchvision.utils.draw_segmentation_masks(i, t['masks'])
     return i
@@ -238,7 +238,7 @@ def show(i, t):
 
 if __name__ == '__main__':
     label_names = 'Core Diffuse Neuritic CAA'.split()
-    vips_img_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/amy-def-mfg'
+    vips_img_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/amy-def-mfg-test'
     json_dir = '/home/gryan/projects/qupath/annotations/amyloid'
     vips_img_names = ['09-063', '10-033']
 
@@ -252,8 +252,8 @@ if __name__ == '__main__':
 
 
     tile_size = 1024
-    ds_train = JsonDataset(json_fnames[0], label_names, step=(tile_size // 2, tile_size // 2), size=(tile_size, tile_size))
-    ds_test = JsonDataset(json_fnames[0], label_names, step=(tile_size, tile_size), size=(tile_size, tile_size))
+    ds_train = VipsJsonDataset(vips_img_fnames[0], json_fnames[0], label_names, step=(tile_size // 2, tile_size // 2), size=(tile_size, tile_size))
+    ds_test = VipsJsonDataset(vips_img_fnames[0], json_fnames[0], label_names, step=(tile_size, tile_size), size=(tile_size, tile_size))
 
     # # ds_test_tiles = np.array(ds_test.tiles)
     # # ds_test_tiles = list(map(tuple, ds_test_tiles[np.random.permutation(np.arange(ds_test_tiles.shape[0]))]))
