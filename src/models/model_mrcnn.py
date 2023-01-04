@@ -14,7 +14,7 @@ from torchvision.models.detection import backbone_utils
 from torchvision.models.detection.generalized_rcnn import GeneralizedRCNN
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
 
-from .generalized_rcnn import GeneralizedRCNN
+from generalized_rcnn import GeneralizedRCNN
 
 class _default_mrcnn_config:
     def __init__(
@@ -257,8 +257,11 @@ def build_default(config, im_size=1024, backbone=None, transform=None):
         transform = GeneralizedRCNNTransform(
             min_size=im_size,
             max_size=im_size,
-            image_mean=[0.485, 0.456, 0.406],
-            image_std=[0.229, 0.224, 0.225],
+            image_mean = [0.913, 0.898, 0.859],
+            image_std = [0.114, 0.118, 0.149],
+            # Imagenet
+            # image_mean=[0.485, 0.456, 0.406],
+            # image_std=[0.229, 0.224, 0.225],
         )
     else:
         transform
