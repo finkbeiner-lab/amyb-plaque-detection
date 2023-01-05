@@ -108,7 +108,7 @@ def format_metrics(metrics):
 
 def write_metrics(slide_name, slide_dir, tile_dir, metrics_file, tile_size):
     num_tiles, norm_values = slide_tile_map(slide_name, slide_dir, tile_dir, tile_size, f=norm_lambda)
-    with open(os.path.join(metrics_file, 'a')) as f:
+    with open(os.path.join(metrics_file), 'a') as f:
         f.write(f'{slide_name},{num_tiles},{norm_to_str(norm_values)}\n')
 
 
