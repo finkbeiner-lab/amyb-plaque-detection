@@ -1,3 +1,4 @@
+import argparse
 import os
 import sys
 __pkg = os.path.abspath(os.path.join(__file__, *('..'.split() * 2)))
@@ -9,6 +10,7 @@ from functools import reduce
 import cv2
 import numpy as np
 import pyvips
+import tqdm
 
 import torch
 from torch import nn, Tensor
@@ -102,18 +104,35 @@ def save_slide_masks(slide_name, slide_dir, out_dir, tile_size, level):
 
 
 if __name__ == '__main__':
-    vips_img_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/amy-def-mfg-test'
-    vips_img_names = sorted(['.'.join(fname.split('.')[:-1]) for fname in next(os.walk(vips_img_dir))[2] if fname.split('.')[-1] == 'mrxs'])
+    parser = argparse.ArgumentParser()
 
-    tile_size, level = 1024, 3
-    out_dir = '/home/gryan/data/slide_test'
-    # out_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/slide_masks'
+    parser.add_argument('slide_dir')
+    parser.add_argument('output_dir')
+    parser.add_argument('tile_size', type=int)
+    parser.add_argument('level', type=int)
+    parser.add_argument('--slide_names', nargs='+')
 
-    for vips_img_name in vips_img_names:
-        save_slide_masks(vips_img_name, vips_img_dir, out_dir, tile_size, level)
+    args = parser.parse_args()
+    slide_dir, output_dir, tile_size, level, slide_names = map(args.__getattribute__, 'slide_dir output_dir tile_size level slide_names'.split())
+    if slide_names is None:
+        slide_names = sorted(['.'.join(fname.split('.')[:-1]) for fname in next(os.walk(slide_dir))[2] if fname.split('.')[-1] == 'mrxs'])
 
 
+    for slide_name in tqdm.tqdm(slide_names):
+        save_slide_masks(slide_name, slide_dir, output_dir, tile_size, level)
 
+
+    # vips_img_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/amy-def-mfg-test'
+    # vips_img_names = sorted(['.'.join(fname.split('.')[:-1]) for fname in next(os.walk(vips_img_dir))[2] if fname.split('.')[-1] == 'mrxs'])
+    #
+    # tile_size, level = 1024, 3
+    # out_dir = '/home/gryan/data/slide_test'
+    # # out_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/slide_masks'
+    #
+    # for vips_img_name in vips_img_names:
+    #     save_slide_masks(vips_img_name, vips_img_dir, out_dir, tile_size, level)
+    #
+    # 
     # vips_img_skip = '07-057 08-018 09-006 09-041 10-005 10-006 10-009 10-018 10-019 10-020 10-021 10-026 11-008 11-018 11-025 11-029 12-009 12-023 12-031 12-036 13-028 14-033 16-027'
     # vips_img_names = next(os.walk(vips_img_dir))[2]
     # vips_img_names = [file[2:2 + 6] for file in vips_img_names]
