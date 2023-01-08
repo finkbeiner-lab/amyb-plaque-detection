@@ -1,4 +1,5 @@
 from typing import Any, List, Optional, Tuple
+import argparse
 import os
 import sys
 __pkg = os.path.abspath(os.path.join(__file__, *('..'.split() * 2)))
@@ -10,6 +11,7 @@ from functools import reduce
 import cv2
 import numpy as np
 import pyvips
+import tqdm
 
 import torch
 from torch import nn, Tensor
@@ -113,34 +115,70 @@ def write_metrics(slide_name, slide_dir, tile_dir, metrics_file, tile_size):
 
 
 def save_slide_crops(slide_names, slide_dir, tile_dir, out_dir, tile_size):
-    for slide_name in slide_names:
+    for slide_name in tqdm.tqdm(slide_names):
         slide_tile_map(slide_name, slide_dir, tile_dir, tuple([tile_size] * 2), f=crop_lambda(out_dir, slide_name))
-        print(slide_name)
 
-def save_slide_metrics(slide_names, slide_dir, tile_dir, out_file, tile_size):
+def save_slide_metrics(slide_names, slide_dir, tile_dir, out_dir, tile_size):
+    out_file = os.path.join(out_dir, 'metrics.csv')
     with open(out_file, 'w') as f:
         f.write('slide_name,num_tiles,num_pixels,sum_1,sum_2\n')
-    for slide_name in slide_names:
+    for slide_name in tqdm.tqdm(slide_names):
         write_metrics(slide_name, slide_dir, tile_dir, out_file, tuple([tile_size] * 2))
-        print(slide_name)
 
-def read_slide_metrics(out_file):
+def read_slide_metrics(out_dir):
+    out_file = os.path.join(out_dir, 'metrics.txt')
     metrics, metrics_total = read_metrics(out_file)
-    out = '\n'.join(map(format_metrics, metrics)) + '\n'
-    out += '\n'
-    out += format_metrics(('Total', metrics_total)) + '\n'
+    out = '\n' + '\n'.join(map(format_metrics, metrics)) + '\n'
+    out += '\n' + format_metrics(('Total', metrics_total)) + '\n'
     return out
 
 
 if __name__ == '__main__':
-    slide_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/amy-def-mfg-test'
-    tile_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/slide_masks'
-    out_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/test/images'
-    out_file = '/home/gryan/Pictures/stats/metrics.txt'
-    tile_size = 1024
+    parser = argparse.ArgumentParser()
 
-    slide_names = sorted(['.'.join(fname.split('.')[:-1]) for fname in next(os.walk(slide_dir))[2] if fname.split('.')[-1] == 'mrxs'])
-    slide_names = ['XE16-014_1_AmyB_1', 'XE09-063_1_AmyB_1', 'XE12-012_1_AmyB_1', 'XE17-022_1_AmyB_1', 'XE17-048_1_AmyB_1', 'XE13-018_1_AmyB_1', 'XE10-026_1_AmyB_1', 'XE10-033_1_AmyB_1', 'XE08-033_1_AmyB_1', 'XE17-039_1_AmyB_1', 'XE17-029_1_AmyB_1', 'XE13-028_1_AmyB_1', 'XE08-018_1_AmyB_1', 'XE14-047_1_AmyB_1', 'XE16-023_1_AmyB_1', 'XE17-010_1_AmyB_1', 'XE12-042_1_AmyB_1', 'XE18-001_1_AmyB_1', 'XE12-023_1_AmyB_1', 'XE14-037_1_AmyB_1', 'XE11-025_1_AmyB_1', 'XE18-004_1_AmyB_1', 'XE12-010_1_AmyB_1', 'XE08-016_1_AmyB_1', 'XE09-056_1_AmyB_1', 'XE12-016_1_AmyB_1', 'XE14-033_1_AmyB_1', 'XE07-057_1_AmyB_1', 'XE11-027_1_AmyB_1', 'XE17-065_1_AmyB_1', 'XE07-056_1_AmyB_1', 'XE08-015_1_AmyB_1', 'XE09-013_1_AmyB_1', 'XE16-033_1_AmyB_1', 'XE13-007_1_AmyB_1']
+    parser.add_argument('command', choices='crops metrics'.split())
+    parser.add_argument('slide_dir')
+    parser.add_argument('input_dir')
+    parser.add_argument('output_dir')
+    parser.add_argument('tile_size', type=int)
+    parser.add_argument('--slide_names', nargs='+')
+
+    args = parser.parse_args()
+    command, slide_dir, input_dir, output_dir, tile_size, slide_names = map(args.__getattribute__, 'command slide_dir input_dir output_dir tile_size slide_names'.split())
+    if slide_names is None:
+        slide_names = sorted(['.'.join(fname.split('.')[:-1]) for fname in next(os.walk(slide_dir))[2] if fname.split('.')[-1] == 'mrxs'])
+
+    if command == 'crops':
+        save_slide_crops(slide_names, slide_dir, input_dir, output_dir, tile_size)
+    if command == 'metrics':
+        save_slide_metrics(slide_names, slide_dir, input_dir, output_dir, tile_size)
+        read_slide_metrics(out_dir)
+
+
+    names = """XE16-014_1_AmyB_1 XE09-063_1_AmyB_1 XE12-012_1_AmyB_1 XE17-022_1_AmyB_1 XE17-048_1_AmyB_1 XE13-018_1_AmyB_1 XE10-026_1_AmyB_1 XE10-033_1_AmyB_1 XE08-033_1_AmyB_1 XE17-039_1_AmyB_1 XE17-029_1_AmyB_1 XE13-028_1_AmyB_1 XE08-018_1_AmyB_1 XE14-047_1_AmyB_1 XE16-023_1_AmyB_1 XE17-010_1_AmyB_1 XE12-042_1_AmyB_1 XE18-001_1_AmyB_1 XE12-023_1_AmyB_1 XE14-037_1_AmyB_1 XE11-025_1_AmyB_1 XE18-004_1_AmyB_1 XE12-010_1_AmyB_1 XE08-016_1_AmyB_1 XE09-056_1_AmyB_1 XE12-016_1_AmyB_1 XE14-033_1_AmyB_1 XE07-057_1_AmyB_1 XE11-027_1_AmyB_1 XE17-065_1_AmyB_1 XE07-056_1_AmyB_1 XE08-015_1_AmyB_1 XE09-013_1_AmyB_1 XE16-033_1_AmyB_1 XE13-007_1_AmyB_1"""
+
+
+
+    # subparsers = parser.add_subparsers(dest='command')
+    #
+    # save_crops_parser = subparsers.add_parser('save_crops')
+    # save_metrics_parser = subparsers.add_parser('save_metrics')
+    # read_metrics_parser = subparsers.add_parser('read_metrics')
+    #
+    # for p in (save_crop_parser, save_metrics_parser):
+    #     p.add_argument('input_path')
+    #     p.add_argument('output_path')
+    #     p.add_argument('tile_size', type=int)
+    #
+    #
+    # slide_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/amy-def-mfg-test'
+    # tile_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/slide_masks'
+    # out_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/test/images'
+    # out_file = '/home/gryan/Pictures/stats/metrics.txt'
+    # tile_size = 1024
+    #
+    # slide_names = sorted(['.'.join(fname.split('.')[:-1]) for fname in next(os.walk(slide_dir))[2] if fname.split('.')[-1] == 'mrxs'])
+    # slide_names = ['XE16-014_1_AmyB_1', 'XE09-063_1_AmyB_1', 'XE12-012_1_AmyB_1', 'XE17-022_1_AmyB_1', 'XE17-048_1_AmyB_1', 'XE13-018_1_AmyB_1', 'XE10-026_1_AmyB_1', 'XE10-033_1_AmyB_1', 'XE08-033_1_AmyB_1', 'XE17-039_1_AmyB_1', 'XE17-029_1_AmyB_1', 'XE13-028_1_AmyB_1', 'XE08-018_1_AmyB_1', 'XE14-047_1_AmyB_1', 'XE16-023_1_AmyB_1', 'XE17-010_1_AmyB_1', 'XE12-042_1_AmyB_1', 'XE18-001_1_AmyB_1', 'XE12-023_1_AmyB_1', 'XE14-037_1_AmyB_1', 'XE11-025_1_AmyB_1', 'XE18-004_1_AmyB_1', 'XE12-010_1_AmyB_1', 'XE08-016_1_AmyB_1', 'XE09-056_1_AmyB_1', 'XE12-016_1_AmyB_1', 'XE14-033_1_AmyB_1', 'XE07-057_1_AmyB_1', 'XE11-027_1_AmyB_1', 'XE17-065_1_AmyB_1', 'XE07-056_1_AmyB_1', 'XE08-015_1_AmyB_1', 'XE09-013_1_AmyB_1', 'XE16-033_1_AmyB_1', 'XE13-007_1_AmyB_1']
 
 
 
