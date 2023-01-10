@@ -106,11 +106,11 @@ def save_slide_masks(slide_name, slide_dir, out_dir, tile_size, level):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('slide_dir')
-    parser.add_argument('output_dir')
-    parser.add_argument('tile_size', type=int)
-    parser.add_argument('level', type=int)
-    parser.add_argument('--slide_names', nargs='+')
+    parser.add_argument('slide_dir', help='directory to read *.mrxs slides from')
+    parser.add_argument('output_dir', help='directory to write mask, tiles, and visualization to')
+    parser.add_argument('tile_size', type=int, help='size of tiles referenced in the output')
+    parser.add_argument('level', type=int, help='downsample level at which slides are read')
+    parser.add_argument('--slide_names', nargs='+', help='filenames (without extension) of slides to process (defaults to all)')
 
     args = parser.parse_args()
     slide_dir, output_dir, tile_size, level, slide_names = map(args.__getattribute__, 'slide_dir output_dir tile_size level slide_names'.split())
