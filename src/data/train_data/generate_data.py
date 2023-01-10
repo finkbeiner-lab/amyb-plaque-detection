@@ -11,6 +11,7 @@ import os
 from os.path import exists
 import glob
 import json
+from shutil import copyfile
 import pdb
 import numpy as np
 from skimage import draw
@@ -21,6 +22,8 @@ from skimage import measure
 from tqdm import tqdm
 from PIL import Image
 import pyvips as Vips
+from tqdm import tqdm
+import random
 # import openslide
 
 # Mask size should be same as image size
@@ -88,30 +91,67 @@ def get_vips_info(vips_img):
     return vfields
 
 
-def create_patient_specific_dirs(img):
+def create_patient_specific_dirs(img, dataset_type):
 
     # Image Folder
     img_file_name = os.path.basename(img).split(".mrxs")[0] + ".json"
     file_name = os.path.join(img_file_name, "images")
     
-    image_save_dir = os.path.join(DATASET_PATH, file_name)
+    image_save_dir = os.path.join(DATASET_PATH, dataset_type, file_name)
     
     if not os.path.exists(image_save_dir):
         os.makedirs(image_save_dir)
     
     # Mask Folder
     file_name = os.path.join(img_file_name, "labels")
-    mask_save_dir = os.path.join(DATASET_PATH, file_name)
+    mask_save_dir = os.path.join(DATASET_PATH, dataset_type, file_name)
 
     if not os.path.exists(mask_save_dir):
         os.makedirs(mask_save_dir)
     
     return image_save_dir, mask_save_dir
 
+def copy_split_json_files(filenames, dst_directory):
+    '''
+    This Fn will copy all json files to respective train and val jsons
+    '''
+    for src_file in tqdm(filenames):
+        filename = os.path.basename(src_file)
+        dst = os.path.join(dst_directory, filename)
+        copyfile(src_file, dst)
+
+def split_jsons(dataset_path, json_path):
+    # Split the Annotated Jsons into Train and Val json folders
+    # Train Jsons
+    train_image_jsons = os.path.join(dataset_path, "amy-def-train-jsons")
+    if not os.path.exists(train_image_jsons):
+        os.makedirs(train_image_jsons)
+
+    # Val Jsons
+    val_image_jsons = os.path.join(dataset_path, "amy-def-val-jsons")
+    if not os.path.exists(val_image_jsons):
+        os.makedirs(val_image_jsons)
+
+    json_files = glob.glob(os.path.join(json_path, '*.json'))
+    json_files.sort()
+    random.seed(230)# shuffles the ordering of filenames
+    random.shuffle(json_files)
+    
+    # Create 80 - 20 Split Train and Val
+    split1 = int(0.8 * len(json_files))
+    split2 = int(1 * len(json_files))
+
+    train_split_files = json_files[:split1]
+    val_split_files = json_files[split1:split2]
+
+    copy_split_json_files(train_split_files, train_image_jsons)
+    copy_split_json_files(val_split_files, val_image_jsons)
+
+    return train_image_jsons, val_image_jsons
 
 
 
-def process_json(WSI_path, json_path,  visualize=False, is_patient_specific=True):
+def process_json(WSI_path, json_path, dataset_path, dataset_type, visualize=False, is_patient_specific=True):
     """This function is used to read and process the json files
     and generate save generated masks
 
@@ -123,16 +163,17 @@ def process_json(WSI_path, json_path,  visualize=False, is_patient_specific=True
     
     """
 
+    if not is_patient_specific:
 
     # Mask Folder
-    mask_save_dir = os.path.join(DATASET_PATH, "labels")
-    if not os.path.exists(mask_save_dir):
-        os.makedirs(mask_save_dir)
+        mask_save_dir = os.path.join(dataset_path, "labels")
+        if not os.path.exists(mask_save_dir):
+            os.makedirs(mask_save_dir)
 
-    # Image Folder
-    image_save_dir = os.path.join(DATASET_PATH, "images")
-    if not os.path.exists(image_save_dir):
-        os.makedirs(image_save_dir)
+        # Image 
+        image_save_dir = os.path.join(dataset_path, "images")
+        if not os.path.exists(image_save_dir):
+            os.makedirs(image_save_dir)
 
 
     imagenames = glob.glob(os.path.join(WSI_path, "*.mrxs"))
@@ -146,7 +187,7 @@ def process_json(WSI_path, json_path,  visualize=False, is_patient_specific=True
 
 
         if is_patient_specific:
-            image_save_dir, mask_save_dir =  create_patient_specific_dirs(img)
+            image_save_dir, mask_save_dir =  create_patient_specific_dirs(img, dataset_type)
 
         # Get the corresponding json file
         json_file_name = os.path.basename(img).split(".mrxs")[0] + ".json"
@@ -283,10 +324,16 @@ if __name__ == '__main__':
                         help='Enter the path where WSI resides')
     parser.add_argument('json_path',
                         help='Enter the path where json annotation resides')
+
+    parser.add_argument('dataset_path',
+                        help='Enter the dataset path where you want to save the images')
                         
     parser.add_argument('is_patient_specific',
                         help='True for generating patient specific training data or else False')
     
     args = parser.parse_args()
 
-    process_json(args.WSI_path, args.json_path, False, args.is_patient_specific)
+    train_image_jsons, val_image_jsons = split_jsons(args.dataset_path, args.json_path)
+
+    process_json(args.WSI_path, train_image_jsons, args.dataset_path, "train", False, args.is_patient_specific)
+    process_json(args.WSI_path, val_image_jsons, args.dataset_path, "val", False, args.is_patient_specific)
