@@ -136,12 +136,12 @@ def read_slide_metrics(out_dir):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('command', choices='crops metrics'.split())
-    parser.add_argument('slide_dir')
-    parser.add_argument('input_dir')
-    parser.add_argument('output_dir')
-    parser.add_argument('tile_size', type=int)
-    parser.add_argument('--slide_names', nargs='+')
+    parser.add_argument('command', choices='crops metrics'.split(), help='whether to output tile crops or slide metrics')
+    parser.add_argument('slide_dir', help='directory to read *.mrxs slides from')
+    parser.add_argument('input_dir', help='directory to read tiles from')
+    parser.add_argument('output_dir', help='directory to write output(s) to')
+    parser.add_argument('tile_size', type=int, help='size of tiles referenced in the input')
+    parser.add_argument('--slide_names', nargs='+', help='filenames (without extension) of slides to process (defaults to all)')
 
     args = parser.parse_args()
     command, slide_dir, input_dir, output_dir, tile_size, slide_names = map(args.__getattribute__, 'command slide_dir input_dir output_dir tile_size slide_names'.split())
