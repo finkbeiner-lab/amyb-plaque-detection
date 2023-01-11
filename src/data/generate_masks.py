@@ -19,6 +19,29 @@ import torchvision
 from torchvision.transforms import ToPILImage
 
 
+"""
+generate_masks.py: compute masks, tiles, and visualizations of slides
+
+Mask computation:
+    1. RGB -> grayscale
+    2. grayscale -> mask (OTSU threshold, binary inverse)
+    3. mask -> mask (x4 blur and threshold, x4 morphological closure)
+    4. mask -> contour (largest area contour selected)
+    5. contour -> mask
+    The final mask generated from the largest area contour is retained in the output mask image.
+
+Tile computation (where tile_size = (xs, ys)):
+    Tiles are represented as (xi, yi), corresponding to the box
+    (xi * xs, yi * ys, ((xi + 1) * xs) - 1, ((yi + 1) * ys) - 1) in (x1, y1, x2, y2) format, or
+    (xi * xs, yi * ys, xs, ys) in (x, y, w, h) format.
+    The tiles containing a nonzero number of mask pixels (positive tiles) are retained in the ouptut tile list.
+
+Visualization computation:
+    The tiles containing zero mask pixels (negative tiles) are found.
+    The pixels of each negative tile in the downsampled slide are set to zero; this is retained in the output visualization image.
+"""
+
+
 def get_cropped(slide, level):
     x, y = [int(slide.get(f'openslide.bounds-{_}')) // (2 ** level) for _ in 'xy']
     return slide.crop(x, y, slide.width - x, slide.height - y)
