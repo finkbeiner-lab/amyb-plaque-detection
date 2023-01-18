@@ -104,8 +104,8 @@ def evaluate(run, model, data_loader, device):
 
             img = images[i].detach().cpu().numpy()
             img = img.transpose(1, 2, 0)
-        
-            masks, boxes, labels, scores = explain.get_outputs(images, model, 0.75)
+
+            masks, boxes, labels, scores, _ = explain.get_outputs(images, model, 0.75)
             result_img, result_masks = explain.draw_segmentation_map(img, masks, boxes, labels)
 
             log_results.append(result_img)

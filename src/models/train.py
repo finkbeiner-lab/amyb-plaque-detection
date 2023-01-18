@@ -135,7 +135,7 @@ if __name__ == '__main__':
     parser.add_argument('base_dir', help="Enter the base dir (NAS)")
     parser.add_argument('dataset_train_location',
                         help='Enter the path train dataset resides')
-    parser.add_argument('dataset_test_location',
+    parser.add_argument('dataset_val_location',
                         help='Enter the path where test dataset resides')
     
     args = parser.parse_args()
@@ -145,26 +145,26 @@ if __name__ == '__main__':
 
     dataset_base_dir = args.base_dir
     dataset_train_location = args.dataset_train_location
-    dataset_test_location = args.dataset_test_location
+    dataset_val_location = args.dataset_val_location
 
     train_config = dict(
-        epochs = 100,
+        epochs = 30,
         batch_size = 6,
         num_classes = 4,
         device_id = 0,
         ckpt_freq =500,
-        eval_freq = 20,
+        eval_freq = 3,
     )
 
-    test_config = dict(
-        batch_size = 1
+    val_config = dict(
+        batch_size = 2
     )
 
     model_config = _default_mrcnn_config(num_classes=1 + train_config['num_classes']).config
     optim_config = dict(
         # cls=grad_optim.GradSGD,
         cls=torch.optim.SGD,
-        defaults=dict(lr=1. * (10. ** (-2)))  #-4 is too slow 
+        defaults=dict(lr=1. * (10. ** (-3)))  #-4 is too slow 
     )
     wandb_config = dict(
         project='nps-ad-vivek',
@@ -184,14 +184,14 @@ if __name__ == '__main__':
 
     ## Dataset loading
     train_dataset = build_features.AmyBDataset(dataset_train_location, T.Compose([T.ToTensor()]))
-    test_dataset = build_features.AmyBDataset(dataset_test_location, T.Compose([T.ToTensor()]))
+    val_dataset = build_features.AmyBDataset(dataset_val_location, T.Compose([T.ToTensor()]))
 
     train_data_loader = torch.utils.data.DataLoader(
             train_dataset, batch_size=train_config['batch_size'], shuffle=True, num_workers=4,
             collate_fn=collate_fn)
     
-    test_data_loader = torch.utils.data.DataLoader(
-            test_dataset, batch_size=test_config['batch_size'], shuffle=False, num_workers=4,
+    val_data_loader = torch.utils.data.DataLoader(
+            val_dataset, batch_size=val_config['batch_size'], shuffle=True, num_workers=4,
             collate_fn=collate_fn)
 
     
@@ -224,7 +224,7 @@ if __name__ == '__main__':
         # print(f'Epoch {epoch}=======================================>.')
 
         for logs in train_one_epoch(model, loss_fn, optimizer, train_data_loader, device, epoch=epoch, log_freq=1):
-            for log in logs:/mnt/new-nas/work/data/npsad_data/vivek/
+            for log in logs:
                 run.log(log)
 
         if epoch + 1 == train_config['epochs'] or epoch % train_config['ckpt_freq'] == 0:
@@ -235,7 +235,7 @@ if __name__ == '__main__':
             run.log_artifact(artifact)
 
         if epoch % train_config['eval_freq'] == 0:
-            eval_res = evaluate(run, model, test_data_loader, device=device)
+            eval_res = evaluate(run, model, val_data_loader, device=device)
         
         model.train(True)
 
@@ -257,5 +257,7 @@ if __name__ == '__main__':
     # explain = ExplainPredictions(model, model_input_path = model_save_name.format(name=exp_name, epoch=train_config['epochs']), test_input_path=input_path, 
     #                             detection_threshold=0.75, wandb=run, save_result=True, ablation_cam=True, save_thresholds=False)
     # explain.generate_results()
+
+    
 
     run.finish()

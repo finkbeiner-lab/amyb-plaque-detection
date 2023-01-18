@@ -123,6 +123,7 @@ class ExplainPredictions():
 
 
     def get_outputs(self, input_tensor, model, threshold):
+
         
         # Register the Hook for feature extraction
         model.backbone.fpn.extra_blocks.register_forward_hook(self.get_features('feats'))

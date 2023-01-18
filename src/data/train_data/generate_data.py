@@ -134,7 +134,7 @@ def split_jsons(dataset_path, json_path):
 
     json_files = glob.glob(os.path.join(json_path, '*.json'))
     json_files.sort()
-    random.seed(230)# shuffles the ordering of filenames
+    random.seed(50)# shuffles the ordering of filenames
     random.shuffle(json_files)
     
     # Create 80 - 20 Split Train and Val
@@ -186,8 +186,7 @@ def process_json(WSI_path, json_path, dataset_path, dataset_type, visualize=Fals
         vinfo = get_vips_info(vips_img)
 
 
-        if is_patient_specific:
-            image_save_dir, mask_save_dir =  create_patient_specific_dirs(img, dataset_type)
+        
 
         # Get the corresponding json file
         json_file_name = os.path.basename(img).split(".mrxs")[0] + ".json"
@@ -203,6 +202,9 @@ def process_json(WSI_path, json_path, dataset_path, dataset_type, visualize=Fals
             continue
         
         print("file name : ", json_file_name)
+
+        if is_patient_specific:
+            image_save_dir, mask_save_dir =  create_patient_specific_dirs(img, dataset_type)
 
         with open(json_file_name) as f:
             data = json.load(f)
