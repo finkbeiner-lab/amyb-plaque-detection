@@ -1,5 +1,7 @@
 import java.io.File
 
+import javafx.scene.input.KeyCombination
+
 import qupath.lib.common.ColorTools
 import qupath.lib.objects.classes.PathClassFactory
 import qupath.lib.gui.scripting.QPEx
@@ -101,6 +103,18 @@ def setPathClasses(QuPathGUI gui, Map<String, List<Integer>> map) {
 }
 
 
+def loadClipboard(QuPathGUI gui) {
+    def clipboard = (new ScriptLoader()).getScript("clipboard.groovy").getInstance(gui)
+    [["copy", "Copy", "Ctrl+Shift+C"], ["paste", "Paste", "Ctrl+Shift+V"]].each({ String func, String label, String shortcut ->
+        GuiTools.runOnApplicationThread({
+            def menu = gui.installCommand(label, clipboard."${func}"())
+            menu.acceleratorProperty().unbind()
+            menu.accelerator = KeyCombination.keyCombination(shortcut)
+        })
+    })
+    return true
+}
+
 def loadContextMenu(QuPathGUI gui) {
     def contextMenu = (new ScriptLoader()).getScript("contextMenu.groovy").getInstance(gui)
     gui.installCommand("Custom context menu", contextMenu)
@@ -121,5 +135,6 @@ setPrefs(prefMap)
 setOverlayOptions(gui.getOverlayOptions(), overlayOptionsMap)
 setPathClasses(gui, pathClassMaps.get(pathClassGroup))
 
+loadClipboard(gui)
 loadContextMenu(gui)
 loadTileManager(gui)
