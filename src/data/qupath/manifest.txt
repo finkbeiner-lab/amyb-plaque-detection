@@ -4,3 +4,4 @@ scripts/tileManager.groovy
 scripts/contextMenu.groovy
 scripts/setPathClasses.groovy
 scripts/startup.groovy
+scripts/clipboard.groovy
