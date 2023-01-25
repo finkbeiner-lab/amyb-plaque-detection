@@ -106,7 +106,6 @@ def train_one_epoch(
 
     yield log_metrics
 
-
 def get_loss_fn(weights, default=0.):    
     def compute_loss_fn(losses):
         item = lambda k: (k, losses[k].item())
@@ -123,82 +122,15 @@ def get_resp(prompt, prompt_fn=None, resps='n y'.split()):
     return resps.index(resp)
 
 
-if __name__ == '__main__':
-    # TODO:
-    #   - add functionality for calling backward with create_graph, i.e. for higher-order derivatives
-    #   - switch to support for standard torchvision-bundled transforms (i.e. instead of `features.transforms as T` try `torchvision.transforms.transforms` or `torchvision.transforms.functional`)
-    #   - complete feature: add grad_optimizer support transparently (so that usage is the same for users and train_one_epoch interface whether torch.optim or grad_optim is selected, i.e. log grads automatically)
-    #   - do ^^ via closures
-    #   - experimental: add an API to collect params and bufs by on module and/or name; generate on-the-fly state_dicts, gradient_dicts, higher-order gradient_dicts, etc.
-
-    parser = argparse.ArgumentParser(description='Maskrcnn training')
-
-    parser.add_argument('base_dir', help="Enter the base dir (NAS)")
-    parser.add_argument('dataset_train_location',
-                        help='Enter the path train dataset resides')
-    parser.add_argument('dataset_test_location',
-                        help='Enter the path where test dataset resides')
-    parser.add_argument('k',
-                        help='Number of folds for k-fold cross-validation')
-    
-    args = parser.parse_args()
-
-    ## CONFIGS ##
-    collate_fn = lambda _: tuple(zip(*_)) # one-liner, no need to import
-
-    dataset_base_dir = args.base_dir
-    dataset_train_location = args.dataset_train_location
-    dataset_test_location = args.dataset_test_location
-    k = int(args.k)
-    isKfold_eval = True    
-
-    train_config = dict(
-        epochs = 50,
-        batch_size = 6,
-        num_classes = 4,
-        device_id = 0,
-        ckpt_freq =500,
-        eval_freq = 50,
-    )
-
-    test_config = dict(
-        batch_size = 1
-    )
-
-    model_config = _default_mrcnn_config(num_classes=1 + train_config['num_classes']).config
-    optim_config = dict(
-        # cls=grad_optim.GradSGD,
-        cls=torch.optim.SGD,
-        defaults=dict(lr=1. * (10. ** (-2)))  #-4 is too slow 
-    )
-    #wandb.init(project="amyloid_beta_runs", entity="monika-ahirwar")
-    wandb_config =dict(
-        project='amyloid_beta_runs',
-        entity='ml_gladstone', config = dict(
-            train_config=train_config,
-            model_config=model_config,
-            optim_config=optim_config,), save_code=False,
-        group='runs',
-        job_type='train',
-    )
-
-    
-    splits=KFold(n_splits=k,shuffle=True,random_state=42)
-
-    ## Get list of patient-ids for train and test
-    train_patient_ids = os.listdir(dataset_train_location)
-    if '.DS_Store' in train_patient_ids:
-        train_patient_ids.remove('.DS_Store')
-
-    test_patient_ids = os.listdir(dataset_test_location)
-    if '.DS_Store' in test_patient_ids:
-        test_patient_ids.remove('.DS_Store')
-
+def run_one_kth_fold(k, dataset_train_location,train_patient_ids,train_config,model_config,dataset_test_location,test_patient_ids,isKfold_eval, run):
+    """
+    This performs training for a value of k in k-fold validation
+    """
     ## Initialize dataframes to store k-fold evaluation metrics
     kfold_perf_df = pd.DataFrame(columns=["iteration","iou_type","metric_name","metric_value","epoch","patient_id"])
     test_kfold_perf_df = pd.DataFrame(columns=["iteration","iou_type","metric_name","metric_value","epoch","patient_id"])
-
-    ## train data for k-folds
+    splits=KFold(n_splits=k,shuffle=True,random_state=42)
+        ## train data for k-folds
     for fold, (train_idx,val_idx) in enumerate(splits.split(np.arange(len(train_patient_ids)))):
         print('Fold {}'.format(fold + 1))
         # Split data into train and val
@@ -229,13 +161,6 @@ if __name__ == '__main__':
         loss_fn = get_loss_fn(loss_weights)
 
         optimizer = optim_config['cls']([dict(params=list(model.parameters()))], **optim_config['defaults'])
-
-        run = wandb.init(**wandb_config)
-        assert run is wandb.run # run was successfully initialized, is not None
-        run_id, run_dir = run.id, run.dir
-        exp_name = run.name
-
-        artifact_name = f'{run_id}-logs'
         eval_metric_full_training = pd.DataFrame()
         # Train Data
         for epoch in range(train_config['epochs']):
@@ -260,66 +185,173 @@ if __name__ == '__main__':
                                   num_workers=4, collate_fn=collate_fn)
                     eval_res, eval_res_df = evaluate(run, model, val_loader,isKfold_eval,device=device)
             #if (epoch + 1) == train_config['epochs']:
-                # Using evaluation metric of last epoch for each k-fold 
-                    eval_metric_full_training = eval_res_df
-                    eval_metric_full_training["iteration"] = fold+1
-                    eval_metric_full_training["epoch"] = epoch
-                    eval_metric_full_training["patient_id"] = train_patient_ids[v]
-                kfold_perf_df = pd.concat([kfold_perf_df,eval_metric_full_training])
-                for t in range(len(test_patient_ids)):
-                    test_ds = build_features.AmyBDataset(os.path.join(dataset_test_location,test_patient_ids[t]), T.Compose([T.ToTensor()]))
-                    #test_ds = torchvision.datasets.ImageFolder(os.path.join(dataset_test_location,test_patient_ids[t],'images'), T.Compose([T.ToTensor()]))
-                    test_loader = DataLoader(test_ds, batch_size=test_config['batch_size'], shuffle=False, num_workers=4, collate_fn=collate_fn)
-                    test_eval_res, test_eval_res_df = evaluate(run, model, test_loader, isKfold_eval, device=device)
-                    test_eval_res_df["iteration"] = fold+1
-                    test_eval_res_df["epoch"] = epoch
-                    test_eval_res_df["patient_id"] = test_patient_ids[t]
-                    test_kfold_perf_df = pd.concat([test_kfold_perf_df,test_eval_res_df])  
+                # Using evaluation metric of last epoch for each k-fold
+                    if (epoch + 1)==train_config['epochs']:
+                        eval_metric_full_training = eval_res_df
+                        eval_metric_full_training["iteration"] = fold+1
+                        eval_metric_full_training["epoch"] = epoch
+                        eval_metric_full_training["patient_id"] = train_patient_ids[v]
+                        kfold_perf_df = pd.concat([kfold_perf_df,eval_metric_full_training])
+                        for t in range(len(test_patient_ids)):
+                            test_ds = build_features.AmyBDataset(os.path.join(dataset_test_location,test_patient_ids[t]), T.Compose([T.ToTensor()]))
+                            test_loader = DataLoader(test_ds, batch_size=test_config['batch_size'], shuffle=False, num_workers=4, collate_fn=collate_fn)
+                            test_eval_res, test_eval_res_df = evaluate(run, model, test_loader, isKfold_eval, device=device)
+                            test_eval_res_df["iteration"] = fold+1
+                            test_eval_res_df["epoch"] = epoch
+                            test_eval_res_df["patient_id"] = test_patient_ids[t]
+                            test_kfold_perf_df = pd.concat([test_kfold_perf_df,test_eval_res_df])  
             model.train(True)
         model_save_name = dataset_base_dir + "models/{name}_mrcnn_model_{epoch}_{fold_number}.pth"
         torch.save(model.state_dict(), model_save_name.format(name=exp_name, epoch=train_config['epochs'], fold_number=k))
+        kfold_perf_df_by_patientid = kfold_perf_df.groupby(['patient_id','iou_type','metric_name','epoch'])['metric_value'].mean().reset_index()
+        test_kfold_perf_df_by_patientid = kfold_perf_df.groupby(['patient_id','iou_type','metric_name','epoch'])['metric_value'].mean().reset_index()
+        return kfold_perf_df_by_patientid, test_kfold_perf_df_by_patientid
+
+
+
+if __name__ == '__main__':
+    # TODO:
+    #   - add functionality for calling backward with create_graph, i.e. for higher-order derivatives
+    #   - switch to support for standard torchvision-bundled transforms (i.e. instead of `features.transforms as T` try `torchvision.transforms.transforms` or `torchvision.transforms.functional`)
+    #   - complete feature: add grad_optimizer support transparently (so that usage is the same for users and train_one_epoch interface whether torch.optim or grad_optim is selected, i.e. log grads automatically)
+    #   - do ^^ via closures
+    #   - experimental: add an API to collect params and bufs by on module and/or name; generate on-the-fly state_dicts, gradient_dicts, higher-order gradient_dicts, etc.
+
+    parser = argparse.ArgumentParser(description='Maskrcnn training')
+
+    parser.add_argument('base_dir', help="Enter the base dir (NAS)")
+    parser.add_argument('dataset_train_location',
+                        help='Enter the path train dataset resides')
+    parser.add_argument('dataset_test_location',
+                        help='Enter the path where test dataset resides')
+    parser.add_argument('k_start',
+                        help='Start with Number of folds for k-fold cross-validation')
+    parser.add_argument('k_end',
+                        help='End with Number of folds for k-fold cross-validation')
     
-    print("\n =================The Model is Trained!====================")
+    args = parser.parse_args()
+
+    ## CONFIGS ##
+    collate_fn = lambda _: tuple(zip(*_)) # one-liner, no need to import
+
+    dataset_base_dir = args.base_dir
+    dataset_train_location = args.dataset_train_location
+    dataset_test_location = args.dataset_test_location
+    k_start = int(args.k_start)
+    k_end = int(args.k_end)
+    isKfold_eval = True    
+
+    train_config = dict(
+        epochs = 50,
+        batch_size = 6,
+        num_classes = 4,
+        device_id = 0,
+        ckpt_freq =500,
+        eval_freq = 5,
+    )
+
+    test_config = dict(
+        batch_size = 1
+    )
+
+    model_config = _default_mrcnn_config(num_classes=1 + train_config['num_classes']).config
+    optim_config = dict(
+        # cls=grad_optim.GradSGD,
+        cls=torch.optim.SGD,
+        defaults=dict(lr=1. * (10. ** (-2)))  #-4 is too slow 
+    )
+    #wandb.init(project="amyloid_beta_runs", entity="monika-ahirwar")
+    wandb_config =dict(
+        project='amyloid_beta_runs',
+        entity='ml_gladstone', config = dict(
+            train_config=train_config,
+            model_config=model_config,
+            optim_config=optim_config,), save_code=False,
+        group='runs',
+        job_type='train',
+    )
+
+    # Initialize wandb run
+    run = wandb.init(**wandb_config)
+    assert run is wandb.run # run was successfully initialized, is not None
+    run_id, run_dir = run.id, run.dir
+    exp_name = run.name
+    artifact_name = f'{run_id}-logs'
     
-    print("-------------Evaluation metric results of all k-fold training models------------------")
-    print(kfold_perf_df)
-    print("-------------Average Evaluation metric summary of all k-fold training models------------------")
-    avg_kfold_perf_df = kfold_perf_df.groupby(['iou_type','metric_name','epoch'])['metric_value'].mean().reset_index()
-    avg_kfold_perf_df = avg_kfold_perf_df.rename(columns = {'metric_value':'avg_metric_value'}) 
-    kfold_perf_df_by_patientid = kfold_perf_df.groupby(['patient_id','iou_type','metric_name','epoch'])['metric_value'].mean().reset_index()
+    ## Get list of patient-ids for train and test
+    train_patient_ids = os.listdir(dataset_train_location)
+    if '.DS_Store' in train_patient_ids:
+        train_patient_ids.remove('.DS_Store')
 
-    kfold_perf_df = pd.merge(kfold_perf_df, avg_kfold_perf_df, on = ['iou_type','metric_name','epoch'], how = 'left')
-    kfold_perf_df = kfold_perf_df.groupby(['iteration','iou_type','metric_name','epoch'])['metric_value'].mean().reset_index()
-    kfold_perf_df['percentage_change']=(kfold_perf_df['metric_value']-kfold_perf_df['avg_metric_value'])/kfold_perf_df['avg_metric_value']
+    test_patient_ids = os.listdir(dataset_test_location)
+    if '.DS_Store' in test_patient_ids:
+        test_patient_ids.remove('.DS_Store')
 
-    tbl = wandb.Table(data=avg_kfold_perf_df)
-    run.log({"Average K-fold Evaluation Metric": tbl})
 
-    tbl1 = wandb.Table(data=kfold_perf_df_by_patientid)
-    run.log({"Average K-fold Evaluation Metric By Patient ID": tbl1})
+    overall_k_result = pd.DataFrame(columns=["k","iou_type","metric_name","metric_value","epoch"])
+    overall_k_result_test = pd.DataFrame(columns=["k","iou_type","metric_name","metric_value","epoch"])
+    for k in range(k_start,k_end+1):
+        kfold_perf_df_by_patientid, test_kfold_perf_df_by_patientid = run_one_kth_fold(k, dataset_train_location,train_patient_ids,train_config,model_config,dataset_test_location,test_patient_ids,isKfold_eval, run)
+        tbl = wandb.Table(data=kfold_perf_df_by_patientid)
+        run.log({"Val Evaluation Metric for "+str(k)+" fold": tbl})
+        tbl = wandb.Table(data=test_kfold_perf_df_by_patientid)
+        run.log({"Test Evaluation Metric for "+str(k)+" fold": tbl})
+        # Averaging across all Patients
+        kfold_perf_df = kfold_perf_df_by_patientid.groupby(['iou_type','metric_name','epoch'])['metric_value'].mean().reset_index()
+        test_kfold_perf_df = test_kfold_perf_df_by_patientid.groupby(['iou_type','metric_name','epoch'])['metric_value'].mean().reset_index()
+        kfold_perf_df["k"]=k
+        test_kfold_perf_df["k"]=k
+        overall_k_result = pd.concat([kfold_perf_df,overall_k_result])
+        overall_k_result_test = pd.concat([test_kfold_perf_df,overall_k_result_test])
 
-    tbl2 = wandb.Table(data=kfold_perf_df)
-    run.log({"All K-fold Evaluation Metric": tbl2})
+    # Aggregate Patient wise data
+    avg_k_result = overall_k_result.groupby(['iou_type','metric_name','epoch'])['metric_value'].mean().reset_index()
+    avg_k_result = avg_k_result.rename(columns = {'metric_value':'avg_metric_value'})
+    avg_k_result_test = overall_k_result_test.groupby(['iou_type','metric_name','epoch'])['metric_value'].mean().reset_index()
+    avg_k_result_test = avg_k_result_test.rename(columns = {'metric_value':'avg_metric_value'})
+    overall_k_result = pd.merge(overall_k_result, avg_k_result, on = ['iou_type','metric_name','epoch'], how = 'left')
+    overall_k_result['percentage_change']=(overall_k_result['metric_value']-overall_k_result['avg_metric_value'])/overall_k_result['avg_metric_value']
+    overall_k_result_test = pd.merge(overall_k_result_test, avg_k_result_test, on = ['iou_type','metric_name','epoch'], how = 'left')
+    overall_k_result_test['percentage_change']=(overall_k_result_test['metric_value']-overall_k_result_test['avg_metric_value'])/overall_k_result_test['avg_metric_value']
 
+
+    # Create plots for k-value vs average precision, k-value vs % change in average precision
     max_val = kfold_perf_df["epoch"].max()
-    final_epoch_kfold_perf_bbox = kfold_perf_df[(kfold_perf_df["epoch"]==max_val) & (kfold_perf_df["metric_name"]==' Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ]') & (kfold_perf_df["iou_type"]=="bbox")]
-    final_epoch_kfold_perf_segm = kfold_perf_df[(kfold_perf_df["epoch"]==max_val) & (kfold_perf_df["metric_name"]==' Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ]') & (kfold_perf_df["iou_type"]=="segm")]
-
-    table_bbox = wandb.Table(data=final_epoch_kfold_perf_bbox, columns=["iteration","metric_value", "percentage_change"])
-    table_segm = wandb.Table(data=final_epoch_kfold_perf_segm, columns=["iteration", "metric_value","percentage_change"])
+    final_epoch_kfold_perf_bbox = overall_k_result[(overall_k_result["epoch"]==max_val) & (overall_k_result["metric_name"]==' Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ]') & (overall_k_result["iou_type"]=="bbox")]
+    final_epoch_kfold_perf_segm = overall_k_result[(overall_k_result["epoch"]==max_val) & (overall_k_result["metric_name"]==' Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ]') & (overall_k_result["iou_type"]=="segm")]
     
-    print("\n =================Test Output====================")
-    test_kfold_by_patientid = test_kfold_perf_df.groupby(['patient_id','iou_type','metric_name','epoch'])['metric_value'].mean().reset_index()
-    tbl3 = wandb.Table(data=test_kfold_by_patientid)
-    run.log({"Test Evaluation Metric": tbl3})
+    final_epoch_kfold_perf_bbox_test = overall_k_result_test[(overall_k_result_test["epoch"]==max_val) & (overall_k_result_test["metric_name"]==' Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ]') & (overall_k_result_test["iou_type"]=="bbox")]
+    final_epoch_kfold_perf_segm_test = overall_k_result_test[(overall_k_result_test["epoch"]==max_val) & (overall_k_result_test["metric_name"]==' Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ]') & (overall_k_result_test["iou_type"]=="segm")]
 
-    # Plots with percentage change for each iteration
-    run.log({"my_custom_plot_id" : wandb.plot.line(table_bbox, "iteration", "percentage_change",
-           title="k-th fold vs percent change - bbox")}) 
-    run.log({"my_custom_plot_id2" : wandb.plot.line(table_bbox, "iteration", "metric_value",
-           title="k-th fold vs AP@[ IoU=0.50:0.95| area=all|maxDets=100] - bbox")})
-    run.log({"my_custom_plot_id3" : wandb.plot.line(table_segm, "iteration", "percentage_change",
-           title="k-th fold vs percent change - segm")})
-    run.log({"my_custom_plot_id4" : wandb.plot.line(table_segm, "iteration", "metric_value",
-           title="k-th fold vs AP@[ IoU=0.50:0.95| area=all|maxDets=100] - segm")})
+    wandb.log({"Val-bbox" : wandb.plot.line_series(
+                       xs=final_epoch_kfold_perf_bbox["k"].values, 
+                       ys=[final_epoch_kfold_perf_bbox["metric_value"].values, final_epoch_kfold_perf_bbox["percentage_change"].values],
+                       keys=["AP@[ IoU=0.50:0.95| area=all|maxDets=100", "Perc change in AP@[ IoU=0.50:0.95| area=all|maxDets=100"],
+                       title="k-th fold vs AP@[ IoU=0.50:0.95| area=all|maxDets=100] - bbox",
+                       xname="k")})
+
+    
+    wandb.log({"Val-segm" : wandb.plot.line_series(
+                       xs=final_epoch_kfold_perf_segm["k"].values, 
+                       ys=[final_epoch_kfold_perf_segm["metric_value"].values, final_epoch_kfold_perf_segm["percentage_change"].values],
+                       keys=["AP@[ IoU=0.50:0.95| area=all|maxDets=100", "Perc change in AP@[ IoU=0.50:0.95| area=all|maxDets=100"],
+                       title="k-th fold vs AP@[ IoU=0.50:0.95| area=all|maxDets=100] - segm",
+                       xname="k")})
+
+    wandb.log({"Test-bbox" : wandb.plot.line_series(
+                       xs=final_epoch_kfold_perf_bbox_test["k"].values, 
+                       ys=[final_epoch_kfold_perf_bbox_test["metric_value"].values, final_epoch_kfold_perf_bbox_test["percentage_change"].values],
+                       keys=["AP@[ IoU=0.50:0.95| area=all|maxDets=100", "Perc change in AP@[ IoU=0.50:0.95| area=all|maxDets=100"],
+                       title="k-th fold vs AP@[ IoU=0.50:0.95| area=all|maxDets=100] - bbox",
+                       xname="k")})
+
+    
+    wandb.log({"Test-segm" : wandb.plot.line_series(
+                       xs=final_epoch_kfold_perf_segm_test["k"].values, 
+                       ys=[final_epoch_kfold_perf_segm_test["metric_value"].values, final_epoch_kfold_perf_segm_test["percentage_change"].values],
+                       keys=["AP@[ IoU=0.50:0.95| area=all|maxDets=100", "Perc change in AP@[ IoU=0.50:0.95| area=all|maxDets=100"],
+                       title="k-th fold vs AP@[ IoU=0.50:0.95| area=all|maxDets=100] - segm",
+                       xname="k")})
+
+    
     run.finish()
