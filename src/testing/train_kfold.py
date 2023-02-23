@@ -23,6 +23,12 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader,TensorDataset,random_split,SubsetRandomSampler, ConcatDataset
 import numpy as np
 import plotly.graph_objects as go
+import random
+
+seed=0
+random.seed(seed)
+np.random.seed(seed)
+torch.manual_seed(seed)
 
 torch.__future__.set_overwrite_module_params_on_conversion(True)
 
@@ -197,7 +203,7 @@ if __name__ == '__main__':
     isKfold_eval = True    
 
     train_config = dict(
-        epochs = 5,
+        epochs = 50,
         batch_size = 6,
         num_classes = 4,
         device_id = 0,
@@ -281,7 +287,7 @@ if __name__ == '__main__':
         table = wandb.Table(columns = ["k vs (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 "+iou_type])
         fig = go.Figure()
         for k in k_range:
-            t = df[ (df["metric_name"]==' Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ]') & (df["iou_type"]==iou_type)]
+            t = df[ (df["metric_name"]==' Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ]') & (df["iou_type"]==iou_type) & (df["k"]==k)]
             fig.add_trace(go.Box(y=t['metric_value'],name="k = "+str(k)))
         fig.update_layout(plot_bgcolor='white')
         fig.update_layout(height=500, width=800)
@@ -316,7 +322,7 @@ if __name__ == '__main__':
         fig.update_traces(mode='markers', marker_line_width=2, marker_size=10)
         fig.write_html("/gladstone/finkbeiner/steve/work/data/npsad_data/monika/Amy_plague_Results/line_plot_all_k_"+iou_type+"_"+test_val+".html", auto_play = False)
         table.add_data(wandb.Html("/gladstone/finkbeiner/steve/work/data/npsad_data/monika/Amy_plague_Results/line_plot_all_k_"+iou_type+"_"+test_val+".html"))
-        run.log({"line_plot_all_k_"+iou_type: table})
+        run.log({"line_plot_all_k_"+iou_type+"_"+test_val: table})
 
     plot_scatterplot(overall_k_result, "bbox", "val")
     plot_scatterplot(overall_k_result, "segm", "val")
