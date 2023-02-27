@@ -10,7 +10,7 @@ from pycocotools.coco import COCO
 # from pycocotools.cocoeval import COCOeval
 from utils.cocoeval import COCOeval
 import pdb
-
+import pandas as pd
 
 class CocoEvaluator:
     def __init__(self, coco_gt, iou_types):
@@ -54,9 +54,14 @@ class CocoEvaluator:
             coco_eval.accumulate()
 
     def summarize(self, run):
+        # run metrics for different iou_type and concatenate output in one dataframe
+        results = pd.DataFrame(columns=["iou_type","metric_name","metric_value"])
         for iou_type, coco_eval in self.coco_eval.items():
             print(f"IoU metric: {iou_type}")
-            coco_eval.summarize(run, iou_type)
+            x = coco_eval.summarize(run, iou_type)
+            x["iou_type"] = iou_type
+            results = pd.concat([results,x])
+        return results
 
     def prepare(self, predictions, iou_type):
         if iou_type == "bbox":
