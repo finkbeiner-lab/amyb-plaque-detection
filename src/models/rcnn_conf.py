@@ -18,6 +18,12 @@ import models
 from models.modules.rcnn import RCNN, RCNNTransform
 
 
+"""
+TODO:
+  - Add retinanet_conf and retinanet_v2_conf
+"""
+
+
 def replace_keys(
     self: Any,
     field: str,

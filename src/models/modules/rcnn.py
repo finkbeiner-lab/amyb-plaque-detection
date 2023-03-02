@@ -9,6 +9,12 @@ import torchvision
 from torchvision.models.detection.image_list import ImageList
 from torchvision.models.detection.roi_heads import paste_mask_in_image, paste_masks_in_image
 
+"""
+TODO:
+  - Unit tests of RCNNTransform subroutines
+  - Implement RetinaNet-compatible RCNN
+"""
+
 
 class RCNN(nn.Module):
     def __init__(

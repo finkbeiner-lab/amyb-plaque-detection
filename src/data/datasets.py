@@ -25,6 +25,13 @@ from torchvision.transforms import ToTensor, ToPILImage
 from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
 
 
+"""
+TODO:
+  - Make json parsing method more configurable
+  - Add methods for computing partial and full intersection of sets of tiles
+"""
+
+
 intdiv = lambda x1, x2: (x1 // x2) if x1 >= 0 else -((x2 - (x1 + 1)) // x2)
 overlap = lambda x1, x2, m, l, b: tuple(map(lambda _: intdiv(_, m), ((x1 - b) - (l - m), x2 - b)))
 
