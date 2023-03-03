@@ -14,7 +14,7 @@ import torchvision
 import data.datasets as datasets
 import models.rcnn_conf as rcnn_conf
 from models.modules.rcnn import RCNN, RCNNTransform
-from modules.model_utils import train, eval, show
+from models.modules.model_utils import train, eval, show
 
 
 
