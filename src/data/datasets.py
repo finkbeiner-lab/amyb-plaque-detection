@@ -27,7 +27,7 @@ from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
 
 """
 TODO:
-  - Make json parsing method more configurable
+  - Make json parsing method optional/more configurable
   - Add methods for computing partial and full intersection of sets of tiles
 """
 
@@ -147,6 +147,7 @@ class JsonDataset(TileDataset):
         self,
         json_name: str,
         label_names: List[str],
+        thresh: int = 100,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -160,7 +161,7 @@ class JsonDataset(TileDataset):
         self.tile_map = OrderedDict()
         for i, (box, mask) in enumerate(zip(self.boxes, self.masks)):
             for tile in tiles_per_box(box, self.step, self.size, self.offset):
-                if get_clipped_mask(get_tile(tile, self.step, self.size, self.offset), box, mask)[1].sum() >= 100:
+                if get_clipped_mask(get_tile(tile, self.step, self.size, self.offset), box, mask)[1].sum() >= thresh:
                     self.tile_map.setdefault(tile, list()).append(i)
         self.tiles = list(self.tile_map.keys())
 
