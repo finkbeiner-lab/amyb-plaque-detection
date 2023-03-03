@@ -79,7 +79,7 @@ def eval(model, device, image, target=None, thresh=None, mask_thresh=None, area_
         out['masks'] = (out['masks'].squeeze(1) > (0.5 if mask_thresh is None else mask_thresh)).to(torch.bool)
     if target is not None:
         metrics = MAP(box_format='xyxy', iou_type='segm', bbox_area_ranges=area_ranges)
-        metrics.update(out, dict([(k, v.to(device)) for k, v in target.items()]))
+        metrics.update([out], [dict([(k, v.to(device)) for k, v in target.items()])])
         metric = metrics.compute()
     return out, metric
 
