@@ -22,6 +22,7 @@ def train(model, optimizer, device, loader, epoch=None, progress=False):
 
 
     model.train(True)
+    scheduler = None if epoch != 0 else torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1e-3, total_iters=min(1e3, len(loader)))
 
     summary = OrderedDict()
     bar = tqdm.tqdm(total=len(loader)) if progress else None
@@ -32,8 +33,11 @@ def train(model, optimizer, device, loader, epoch=None, progress=False):
         targets = [dict([(k, v.to(device)) for k, v in target.items()]) for target in targets]
 
         loss = model.forward(images, targets)
+        optimizer.zero_grad()
         sum(loss.values()).backward()
         optimizer.step()
+        if scheduler is not None:
+            scheduler.step()
 
         for k, v in loss.items():
             summary.setdefault(k, list()).append(v.item())
