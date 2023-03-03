@@ -65,8 +65,8 @@ def train(model, optimizer, device, loader, epoch=None, progress=False):
 class MAP(torchmetrics.detection.mean_ap.MeanAveragePrecision):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        if 'bbox_area_ranges' in kwargs.keys():
-            self.bbox_area_ranges = None if kwargs['bbox_area_ranges'] is None else kwargs['bbox_area_ranges']
+        if 'bbox_area_ranges' in kwargs.keys() and kwargs['bbox_area_ranges'] is not None:
+            self.bbox_area_ranges = kwargs['bbox_area_ranges']
 
 def eval(model, device, image, target=None, thresh=None, mask_thresh=None, area_ranges=None):
     model.train(False)
