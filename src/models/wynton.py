@@ -38,7 +38,7 @@ if __name__ == '__main__':
     freq = 5
     optim_conf = dict(lr=2e-4, momentum=9e-2, weight_decay=1e-5,)
 
-    model_conf = rcnn_conf.rcnn_v2_conf(pretrained=True, num_classes=4)
+    model_conf = rcnn_conf.rcnn_v2_conf(pretrained=True, num_classes=5)
     model = model_conf.module(
         # freeze_submodules=['backbone.body.conv1', 'backbone.body.bn1', 'backbone.body.layer1'],
         skip_submodules=['roi_heads.box_predictor', 'roi_heads.mask_predictor.mask_fcn_logits']
