@@ -5,22 +5,24 @@ import torch
 from torch import nn, Tensor
 
 import torchvision
+import torchmetrics.detection.mean_ap
 
 
 """
 TODO:
   - Add warmup to train function
+  - Change default mask color in show()
+  - Parameterize training logging (i.e. via callbacks) rather than offering two options (tqdm or live terminal output)
 """
 
 
-def train(model, optimizer, device, loader, epoch=None, progress=False):
-    def clear(lines, prefix=None):
-        if prefix is not None:
-            print(prefix)
+def clear(lines, prefix=None):
+    if prefix is not None:
+        print(prefix)
         print('\n'.join(lines))
         return f'\x1b[{len(lines)}A' + '\n'.join([' ' * len(line) for line in lines]) + f'\x1b[{len(lines)}A'
 
-
+def train(model, optimizer, device, loader, epoch=None, progress=False):
     model.train(True)
     scheduler = None if epoch != 0 else torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1e-3, total_iters=min(1e3, len(loader)))
 
@@ -60,15 +62,26 @@ def train(model, optimizer, device, loader, epoch=None, progress=False):
         print()
 
 
-def eval(model, device, image, thresh=None, mask_thresh=None):
+class MAP(torchmetrics.detection.mean_ap.MeanAveragePrecision):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if 'bbox_area_ranges' in kwargs.keys():
+            self.bbox_area_ranges = None if kwargs['bbox_area_ranges'] is None else kwargs['bbox_area_ranges']
+
+def eval(model, device, image, target=None, thresh=None, mask_thresh=None, area_ranges=None):
     model.train(False)
     out = model.forward([image.to(device)], None)[0]
+    metric = None
     if thresh is not None:
         idxs = out['scores'] >= thresh
         out = dict([(k, v[idxs]) for k, v in out.items()])
     if 'masks' in out.keys():
         out['masks'] = (out['masks'].squeeze(1) > (0.5 if mask_thresh is None else mask_thresh)).to(torch.bool)
-    return out
+    if target is not None:
+        metrics = MAP(box_format='xyxy', iou_type='segm', bbox_area_ranges=area_ranges)
+        metrics.update(out, dict([(k, v.to(device)) for k, v in target.items()]))
+        metric = metrics.compute()
+    return out, metric
 
 
 def show(image, target, label_names=None, label_colors=None, masks=True, pil=False):
