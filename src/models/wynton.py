@@ -30,4 +30,4 @@ if __name__ == '__main__':
     tile_size = 1024
     slides_train, slides_test = '09-028 10-033'.split(), '09-063'.split()
     dsets_train, dsets_test = [[datasets.VipsJsonDataset(slide_name_fn(slide), json_name_fn(slide), label_names, step=tuple([tile_size // (2 if training else 1)] * 2), size=tuple([tile_size] * 2)) for slide in slides] for slides, training in ((slides_train, True), (slides_test, False))]
-    # dset_train, dset_test = [torch.utils.data.ConcatDataset(dsets) for dsets in (dsets_train, dsets_test)]
+    dset_train, dset_test = [torch.utils.data.ConcatDataset(dsets) for dsets in (dsets_train, dsets_test)]
