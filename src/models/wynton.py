@@ -22,7 +22,7 @@ if __name__ == '__main__':
     label_names = 'Core Diffuse Neuritic CAA'.split()
     label_colors = 'red blue green black'.split()
 
-    slide_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/amyb-def-mfg-test/'
+    slide_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/amy-def-mfg-test/'
     slide_name_fn = lambda name: os.path.join(slide_dir, f'XE{name}_1_AmyB_1.mrxs')
     json_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/gennadi/jsons/amyb/'
     json_name_fn = lambda name: os.path.join(json_dir, f'{name}.json')
