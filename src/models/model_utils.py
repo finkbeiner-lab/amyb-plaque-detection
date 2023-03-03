@@ -10,9 +10,11 @@ import torchmetrics.detection.mean_ap
 
 """
 TODO:
-  - Add warmup to train function
   - Change default mask color in show()
   - Parameterize training logging (i.e. via callbacks) rather than offering two options (tqdm or live terminal output)
+DONE:
+  - Add warmup to train function
+  - Add dataset evaluation method with metrics and visualization
 """
 
 
@@ -62,34 +64,41 @@ def train(model, optimizer, device, loader, epoch=None, progress=False):
         print()
 
 
+def eval(model, device, image, thresh=None, mask_thresh=None):
+    model.train(False)
+    out = model.forward([image.to(device)], None)[0]
+    if thresh is not None:
+        idxs = out['scores'] >= thresh
+        out = dict([(k, v[idxs]) for k, v in out.items()])
+    if 'masks' in out.keys():
+        out['masks'] = (out['masks'].squeeze(1) > (0.5 if mask_thresh is None else mask_thresh)).to(torch.bool)
+    return out, metric
+
+
 class MAP(torchmetrics.detection.mean_ap.MeanAveragePrecision):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         if 'bbox_area_ranges' in kwargs.keys() and kwargs['bbox_area_ranges'] is not None:
             self.bbox_area_ranges = kwargs['bbox_area_ranges']
 
-def eval(model, device, image, target=None, thresh=None, mask_thresh=None, area_ranges=None):
-    model.train(False)
-    out = model.forward([image.to(device)], None)[0]
-    metric = None
-    if thresh is not None:
-        idxs = out['scores'] >= thresh
-        out = dict([(k, v[idxs]) for k, v in out.items()])
-    if 'masks' in out.keys():
-        out['masks'] = (out['masks'].squeeze(1) > (0.5 if mask_thresh is None else mask_thresh)).to(torch.bool)
-    if target is not None:
-        metrics = MAP(box_format='xyxy', iou_type='segm', bbox_area_ranges=area_ranges)
-        metrics.update([out], [dict([(k, v.to(device)) for k, v in target.items()])])
-        metric = metrics.compute()
-    return out, metric
+def evaluate(model, device, images, targets, thresh=None, mask_thresh=None, label_names=None, label_colors=None, area_ranges=None):
+    preds = list()
+    visualizations = list()
+    metrics = MAP(box_format='xyxy', iou_type='segm', bbox_area_ranges=area_ranges)
+    for image, target in zip(images, targets if targets is not None else [None] * len(images)):
+        pred = eval(model, device, image, thresh=thresh, mask_thresh=mask_thresh)
+        preds.append(pred)
+        visualizations.append([show(image, t, label_names=label_names, label_colors=label_colors) for t in (pred, target)])
+        metrics.update([pred], [dict([(k, v.to(device)) for k, v in target.items()])])
+    return preds, visualizations, metrics.compute()
 
 
-def show(image, target, label_names=None, label_colors=None, masks=True, pil=False):
+def show(image, target, label_names=None, label_colors=None, pil=False):
     image = (image * 255).to(torch.uint8)
     labels = [f'{label}: {target["scores"][i].item():.2f}' if 'scores' in target.keys() else f'{label}' for i, label in enumerate(target['labels'] if label_names is None else [label_names[label - 1] for label in target['labels']])]
     colors = None if label_colors is None else [label_colors[label - 1] for label in target['labels']]
     image = torchvision.utils.draw_bounding_boxes(image, target['boxes'], labels=labels, colors=colors)
-    if 'masks' in target.keys() and masks:
+    if 'masks' in target.keys():
         image = torchvision.utils.draw_segmentation_masks(image, target['masks'].to(torch.bool), alpha=0.5, colors=(['red'] * len(target['labels'])))
     if pil:
         return torchvision.transforms.ToPILImage()(image)
