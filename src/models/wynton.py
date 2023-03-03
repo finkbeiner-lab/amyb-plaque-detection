@@ -31,3 +31,18 @@ if __name__ == '__main__':
     slides_train, slides_test = '09-028 10-033'.split(), '09-063'.split()
     dsets_train, dsets_test = [[datasets.VipsJsonDataset(slide_name_fn(slide), json_name_fn(slide), label_names, step=tuple([tile_size // (2 if training else 1)] * 2), size=tuple([tile_size] * 2)) for slide in slides] for slides, training in ((slides_train, True), (slides_test, False))]
     dset_train, dset_test = [torch.utils.data.ConcatDataset(dsets) for dsets in (dsets_train, dsets_test)]
+    loader = torch.utils.data.DataLoader(dset_train, batch_size=2, shuffle=True, collate_fn=lambda _: tuple(zip(*_)))
+
+    device = torch.device('cuda', 0)
+    epochs = 40
+    freq = 5
+    optim_conf = dict(lr=2e-4, momentum=9e-2, weight_decay=1e-5,)
+
+    model_conf = rcnn_v2_conf(pretrained=True, num_classes=4)
+    model = model_conf.module(
+        # freeze_submodules=['backbone.body.conv1', 'backbone.body.bn1', 'backbone.body.layer1'],
+        skip_submodules=['roi_heads.box_predictor', 'roi_heads.mask_predictor.mask_fcn_logits']
+    ).to(device)
+    optimizer = torch.optim.SGD(model.parameters(), **optim_conf)
+
+    # train(model, optimizer, device, loader, epoch=1, progress=False)
