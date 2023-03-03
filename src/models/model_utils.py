@@ -72,7 +72,7 @@ def eval(model, device, image, thresh=None, mask_thresh=None):
         out = dict([(k, v[idxs]) for k, v in out.items()])
     if 'masks' in out.keys():
         out['masks'] = (out['masks'].squeeze(1) > (0.5 if mask_thresh is None else mask_thresh)).to(torch.bool)
-    return out, metric
+    return out
 
 
 class MAP(torchmetrics.detection.mean_ap.MeanAveragePrecision):
