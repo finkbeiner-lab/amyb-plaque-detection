@@ -27,7 +27,8 @@ from torchvision.utils import draw_bounding_boxes, draw_segmentation_masks
 
 """
 TODO:
-  - Make json parsing method optional/more configurable
+  - Make json parsing method configurable
+  - Make tile assignment optional/configurable
   - Add methods for computing partial and full intersection of sets of tiles
 """
 
