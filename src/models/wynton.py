@@ -81,7 +81,7 @@ if __name__ == '__main__':
             metrics, visualizations = evaulate(
                 model,
                 device,
-                *zip(*[image, target for image, target in dset_test]),
+                dset_test,
                 label_names=data_conf['labels']['names'],
                 label_colors=data_conf['labels']['names'],
                 viz=list(range(min(16, len(dset_test)))),
