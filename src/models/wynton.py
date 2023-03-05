@@ -1,10 +1,11 @@
-from typing import Any, Callable, List, Mapping, Optional, Tuple
-
 import os
 import sys
 __pkg = os.path.abspath(os.path.join(__file__, *('..'.split() * 2)))
 if __pkg not in sys.path:
     sys.path.append(__pkg)
+
+from typing import Any, Callable, List, Mapping, Optional, Tuple
+from collections import OrderedDict
 
 import torch
 from torch import nn, Tensor
@@ -29,7 +30,8 @@ if __name__ == '__main__':
         weight_decay=5e-4
     )
     train_conf = dict(
-        epochs=0,
+        run_id=str(int(time.time())),
+        epochs=1,
         ckpt_freq=1,
         batch_size=2,
         device=0,
@@ -57,6 +59,10 @@ if __name__ == '__main__':
     slide_name_fn = lambda name: os.path.join(slide_dir, f'XE{name}_1_AmyB_1.mrxs')
     json_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/gennadi/jsons/amyb/'
     json_name_fn = lambda name: os.path.join(json_dir, f'{name}.json')
+    out_dir = os.path.join('/wynton/home/finkbeiner/gryan/runs/', train_conf['run_id'])
+
+    if not os.path.exists(out_dir):
+        os.mkdir(out_dir)
 
     dsets_train, dsets_test = [[datasets.VipsJsonDataset(
         slide_name_fn(slide),
@@ -76,7 +82,7 @@ if __name__ == '__main__':
     optimizer = torch.optim.SGD(model.parameters(), **optim_conf)
 
     for epoch in range(1, train_conf['epochs'] + 1):
-        train(model, optimizer, device, loader, epoch=epoch)
+        losses = train(model, optimizer, device, loader, epoch=epoch)
 
         if epoch == train_conf['epochs'] or epoch % train_conf['ckpt_freq'] == 0:
             metrics, visualizations = evaluate(
@@ -85,9 +91,15 @@ if __name__ == '__main__':
                 dset_test,
                 label_names=data_conf['labels']['names'],
                 label_colors=data_conf['labels']['colors'],
-                viz=list(range(min(16, len(dset_test)))),
+                viz=list(range(18)),
             )
-            print(metrics)
-            print()
 
-            visualization = torchvision.utils.make_grid([torchvision.utils.make_grid(_, nrow=1, padding=2) for _ in visualizations], nrow=sqrt(2 * len(visualizations)), padding=4)
+            log = dict(
+                losses=losses,
+                metrics=metrics,
+                weights=model.state_dict(),
+            )
+            viz = torchvision.utils.make_grid([torchvision.utils.make_grid(_, nrow=1, padding=0) for _ in visualizations], nrow=6, padding=4)
+
+            torch.save(log, os.path.join(out_dir, f'{epoch}.pt'))
+            torchvision.transforms.ToPILImage()(viz).save(os.path.join(out_dir, f'{epoch}.png'))
