@@ -79,12 +79,12 @@ if __name__ == '__main__':
         train(model, optimizer, device, loader, epoch=epoch)
 
         if epoch == train_conf['epochs'] or epoch % train_conf['ckpt_freq'] == 0:
-            metrics, visualizations = evaulate(
+            metrics, visualizations = evaluate(
                 model,
                 device,
                 dset_test,
                 label_names=data_conf['labels']['names'],
-                label_colors=data_conf['labels']['names'],
+                label_colors=data_conf['labels']['colors'],
                 viz=list(range(min(16, len(dset_test)))),
             )
             print(metrics)
