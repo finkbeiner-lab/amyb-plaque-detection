@@ -73,7 +73,7 @@ if __name__ == '__main__':
         # freeze_submodules=['backbone.body.conv1', 'backbone.body.bn1', 'backbone.body.layer1'],
         skip_submodules=['roi_heads.box_predictor', 'roi_heads.mask_predictor.mask_fcn_logits']
     ).to(device)
-    optimizer = torch.optim.SGD(model.parameters(), **optim_config)
+    optimizer = torch.optim.SGD(model.parameters(), **optim_conf)
 
     for epoch in range(1, train_conf['epochs'] + 1):
         train(model, optimizer, device, loader, epoch=epoch)
