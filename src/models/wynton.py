@@ -18,9 +18,10 @@ from models.model_utils import train, eval, evaluate, show
 
 
 if __name__ == '__main__':
+    num_classes = 4
     model_conf = dict(
         pretrained=True,
-        num_classes=len(label_names) + 1
+        num_classes=num_classes + 1
     )
     optim_conf = dict(
         lr=1e-3,
