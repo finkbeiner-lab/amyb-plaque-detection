@@ -85,7 +85,7 @@ def evaluate(model, device, dataset, thresh=None, mask_thresh=None, label_names=
     metrics = MAP(box_format='xyxy', iou_type='segm', bbox_area_ranges=area_ranges)
     visualizations = list()
     for idx, (image, target) in enumerate(dataset):
-        pred = dict([(k, v.to(torch.device('cpu'))) for k, v in eval(model, device, image, thresh=thresh, mask_thresh=mask_thresh).items()])
+        pred = eval(model, torch.device('cpu'), image, thresh=thresh, mask_thresh=mask_thresh)
         if viz is None or idx in viz:
             visualizations.append([show(image, t, label_names=label_names, label_colors=label_colors) for t in (pred, target)])
         metrics.update([pred], [target])
