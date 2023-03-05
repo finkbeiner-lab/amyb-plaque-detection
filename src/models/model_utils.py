@@ -81,10 +81,10 @@ class MAP(torchmetrics.detection.mean_ap.MeanAveragePrecision):
         if 'bbox_area_ranges' in kwargs.keys() and kwargs['bbox_area_ranges'] is not None:
             self.bbox_area_ranges = kwargs['bbox_area_ranges']
 
-def evaluate(model, device, images, targets, thresh=None, mask_thresh=None, label_names=None, label_colors=None, viz=None, area_ranges=None):
+def evaluate(model, device, dataset, thresh=None, mask_thresh=None, label_names=None, label_colors=None, viz=None, area_ranges=None):
     metrics = MAP(box_format='xyxy', iou_type='segm', bbox_area_ranges=area_ranges)
     visualizations = list()
-    for idx, (image, target) in enumerate(zip(images, targets if targets is not None else [None] * len(images))):
+    for idx, (image, target) in enumerate(dataset):
         pred = eval(model, device, image, thresh=thresh, mask_thresh=mask_thresh)
         if viz is None or idx in viz:
             visualizations.append([show(image, t, label_names=label_names, label_colors=label_colors) for t in (pred, target)])
