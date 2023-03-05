@@ -54,14 +54,16 @@ def train(model, optimizer, device, loader, epoch=None, progress=False):
             lines = [f'Step: {step + 1}/{len(loader)}'] + [f'  {name}: {val}' for name, val in disp.items()]
             clear_str = clear(lines, clear_str)
 
-    summary = OrderedDict([(k, f'{torch.tensor(v).mean().item():.4f}') for k, v in summary.items()])
+    summary = OrderedDict([(k, torch.tensor(v).mean().item()) for k, v in summary.items()])
+    summary_disp = OrderedDict([(k, f'{v:.4f}') for k, v in summary.items()])
     if progress:
-        bar.set_postfix(summary)
+        bar.set_postfix(summary_disp)
         bar.close()
     else:
-        lines = [f'Epoch{str() if epoch is None else (" " + str(epoch))}:'] + [f'  {name}: {val}' for name, val in summary.items()]
+        lines = [f'Epoch{str() if epoch is None else (" " + str(epoch))}:'] + [f'  {name}: {val}' for name, val in summary_disp.items()]
         clear(lines, clear_str)
         print()
+    return summary
 
 
 def eval(model, device, image, thresh=None, mask_thresh=None):
