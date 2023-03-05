@@ -81,16 +81,15 @@ class MAP(torchmetrics.detection.mean_ap.MeanAveragePrecision):
         if 'bbox_area_ranges' in kwargs.keys() and kwargs['bbox_area_ranges'] is not None:
             self.bbox_area_ranges = kwargs['bbox_area_ranges']
 
-def evaluate(model, device, images, targets, thresh=None, mask_thresh=None, label_names=None, label_colors=None, area_ranges=None):
-    preds = list()
-    visualizations = list()
+def evaluate(model, device, images, targets, thresh=None, mask_thresh=None, label_names=None, label_colors=None, viz=None, area_ranges=None):
     metrics = MAP(box_format='xyxy', iou_type='segm', bbox_area_ranges=area_ranges)
-    for image, target in zip(images, targets if targets is not None else [None] * len(images)):
+    visualizations = list()
+    for idx, (image, target) in enumerate(zip(images, targets if targets is not None else [None] * len(images))):
         pred = eval(model, device, image, thresh=thresh, mask_thresh=mask_thresh)
-        preds.append(pred)
-        visualizations.append([show(image, t, label_names=label_names, label_colors=label_colors) for t in (pred, target)])
+        if viz is None or idx in viz:
+            visualizations.append([show(image, t, label_names=label_names, label_colors=label_colors) for t in (pred, target)])
         metrics.update([pred], [dict([(k, v.to(device)) for k, v in target.items()])])
-    return preds, visualizations, metrics.compute()
+    return metrics.compute(), visualizations
 
 
 def show(image, target, label_names=None, label_colors=None, pil=False):
