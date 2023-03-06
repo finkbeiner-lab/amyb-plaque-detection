@@ -21,8 +21,8 @@ DONE:
 def clear(lines, prefix=None):
     if prefix is not None:
         print(prefix)
-        print('\n'.join(lines))
-        return f'\x1b[{len(lines)}A' + '\n'.join([' ' * len(line) for line in lines]) + f'\x1b[{len(lines)}A'
+    print('\n'.join(lines))
+    return f'\x1b[{len(lines)}A' + '\n'.join([' ' * len(line) for line in lines]) + f'\x1b[{len(lines)}A'
 
 def train(model, optimizer, device, loader, epoch=None, progress=False):
     model.train(True)
