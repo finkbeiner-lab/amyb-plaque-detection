@@ -91,6 +91,10 @@ def evaluate(model, device, dataset, thresh=None, mask_thresh=None, label_names=
         metrics.update([pred], [target])
         if viz is None or idx in viz:
             visualizations.append([show(image, t, label_names=label_names, label_colors=label_colors) for t in (pred, target)])
+
+    print('\n'.join([f'  {k}: {v.item():.4f}' for k, v in metrics]))
+    print()
+
     return metrics.compute(), visualizations
 
 
