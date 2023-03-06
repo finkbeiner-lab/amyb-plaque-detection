@@ -93,7 +93,7 @@ def evaluate(model, device, dataset, thresh=None, mask_thresh=None, label_names=
             visualizations.append([show(image, t, label_names=label_names, label_colors=label_colors) for t in (pred, target)])
 
     metrics = metric.compute()
-    print('\n'.join([f'  {k}: {v.item():.4f}' for k, v in metrics]))
+    print('\n'.join([f'  {k}: {v.item():.4f}' for k, v in metrics.items()]))
     print()
 
     return metrics, visualizations
