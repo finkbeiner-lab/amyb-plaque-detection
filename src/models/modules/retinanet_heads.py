@@ -5,7 +5,7 @@ __pkg = os.path.abspath(os.path.join(__file__, *('..'.split() * 2)))
 if __pkg not in sys.path:
     sys.path.append(__pkg)
 
-from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Union
 from collections import OrderedDict
 from dataclasses import dataclass, field, asdict, is_dataclass, replace, InitVar
 
@@ -93,16 +93,16 @@ class RetinaNetHeads(nn.Module):
         all_anchors: List[List[Tensor]],
         image_shapes: List[Tuple[int, int]],
     ) -> List[Mapping[str, Tensor]]:
-        all_logits = head_outputs['cls_logits']
-        all_regression = head_outputs['bbox_regression']
+        all_logits = all_head_outputs['cls_logits']
+        all_regression = all_head_outputs['bbox_regression']
         num_images = len(image_shapes)
 
         detections = list()
 
         for idx in range(num_images):
             image_shape = image_shapes[idx]
-            scores, labels, boxes = list(), list(), list()
-            for logits, regression, anchors in zip([l[idx] for l in all_logits], [r[idx] for r in all_regression], anchors[idx]):
+            image_scores, image_labels, image_boxes = list(), list(), list()
+            for logits, regression, anchors in zip([l[idx] for l in all_logits], [r[idx] for r in all_regression], all_anchors[idx]):
                 num_classes = logits.size()[-1]
 
                 scores = torch.sigmoid(logits).flatten()
@@ -117,25 +117,26 @@ class RetinaNetHeads(nn.Module):
                 boxes = self.box_coder.decode_single(regression[anchor_idxs], anchors[anchor_idxs])
                 boxes = torchvision.ops.boxes.clip_boxes_to_image(boxes, image_shape)
 
-                scores.append(scores)
-                labels.append(labels)
-                boxes.append(boxes)
+                image_scores.append(scores)
+                image_labels.append(labels)
+                image_boxes.append(boxes)
 
-            scores = torch.cat(scores, dim=0)
-            labels = torch.cat(labels, dim=0)
-            boxes = torch.cat(boxes, dim=0)
+            image_scores = torch.cat(image_scores, dim=0)
+            image_labels = torch.cat(image_labels, dim=0)
+            image_boxes = torch.cat(image_boxes, dim=0)
 
-            keep_idxs = torchvision.ops.boxes.batched_nms(boxes, scores, labels, self.nms_thresh)[:self.detections_per_image]
+            keep_idxs = torchvision.ops.boxes.batched_nms(image_boxes, image_scores, image_labels, self.nms_thresh)[:self.detections_per_image]
 
             detections.append(dict(
-                scores=scores[keep_idxs],
-                labels=labels[keep_idxs],
-                boxes=boxes[keep_idxs],
+                scores=image_scores[keep_idxs],
+                labels=image_labels[keep_idxs],
+                boxes=image_boxes[keep_idxs],
             ))
 
         return detections
 
     def forward(
+        self,
         features: Mapping[str, Tensor],
         anchors: List[Tensor],
         image_sizes: List[Tuple[int, int]],
@@ -154,12 +155,12 @@ class RetinaNetHeads(nn.Module):
             )
         else:
             num_anchors_per_level = [feature.size(2) * feature.size(3) for feature in features]
-            num_anchors_per_location = head_outputs['cls_logits'].size(1) // sum(num_anchors)
-            num_anchors_per_level = [num * num_anchors_per_location for num in num_anchors]
+            num_anchors_per_location = head_outputs['cls_logits'].size(1) // sum(num_anchors_per_level)
+            num_anchors_per_level = [num * num_anchors_per_location for num in num_anchors_per_level]
 
             head_outputs_per_level = dict()
             for k in head_outputs:
-                head_outputs_per_level = list(head_outputs[k].split(num_anchors_per_level, dim=1))
-            anchors_per_level = [list(anchor.split(num_anchors_per_level)) for a in anchors]
+                head_outputs_per_level[k] = list(head_outputs[k].split(num_anchors_per_level, dim=1))
+            anchors_per_level = [list(a.split(num_anchors_per_level)) for a in anchors]
 
             return self.postprocess_detections(head_outputs_per_level, anchors_per_level, image_sizes)

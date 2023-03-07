@@ -5,7 +5,7 @@ __pkg = os.path.abspath(os.path.join(__file__, *('..'.split() * 2)))
 if __pkg not in sys.path:
     sys.path.append(__pkg)
 
-from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Union
 from collections import OrderedDict
 from dataclasses import dataclass, field, asdict, is_dataclass, replace, InitVar
 
