@@ -40,7 +40,7 @@ class RetinaNet(nn.Module):
         original_sizes = [image.size()[-2:] for image in images]
         images, targets = self.transform(images, targets, sizes=sizes)
 
-        features = self.backbone(images.tensors)
+        features = list(self.backbone(images.tensors).values())
         anchors = self.anchor_generator(images, features)
         detections, detection_losses = self.heads(features, anchors, images.image_sizes, targets)
 

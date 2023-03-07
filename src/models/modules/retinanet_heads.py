@@ -141,7 +141,7 @@ class RetinaNetHeads(nn.Module):
 
     def forward(
         self,
-        features: Mapping[str, Tensor],
+        features: List[Tensor],
         anchors: List[Tensor],
         image_sizes: List[Tuple[int, int]],
         targets: List[Mapping[str, Tensor]] = None,
