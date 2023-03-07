@@ -54,7 +54,7 @@ class anchor_conf:
 
     def module(self) -> nn.Module:
         return torchvision.models.detection.anchor_utils.AnchorGenerator(
-            tuple([tuple([self.size * (2 ** level) * scale for scale in self.scales]) for level in range(self.levels)]),
+            tuple([tuple([int(self.size * (2 ** level) * scale) for scale in self.scales]) for level in range(self.levels)]),
             tuple([tuple(self.ratios) for _ in range(self.levels)])
         )
 
@@ -264,6 +264,10 @@ class rcnn_conf:
             if skip_submodules is not None:
                 state_dict = load_submodule_params(model.state_dict(), state_dict, skip_submodules)
             model.load_state_dict(state_dict)
+
+            for module in [_ for _ in model.modules() if isinstance(_, torchvision.ops.misc.FrozenBatchNorm2d)]:
+                module.eps = 0
+            
         if freeze_submodules is not None:
             for submodule in map(model.get_submodule, freeze_submodules):
                 for param in submodule.parameters():
