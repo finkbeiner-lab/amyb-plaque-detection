@@ -250,12 +250,6 @@ class rcnn_conf:
         replace_keys(self, 'heads', keys)
 
     def _module(self) -> nn.Module:
-        # return nn.Sequential(OrderedDict([
-        #     ('backbone', self.backbone.module()),
-        #     ('rpn', self.rpn.module()),
-        #     ('roi_heads', self.heads.module()),
-        #     ('transform', self.transform.module()),
-        # ]))
         return RCNN(
             self.backbone.module(),
             self.rpn.module(),
