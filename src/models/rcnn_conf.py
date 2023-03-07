@@ -194,20 +194,21 @@ class heads_conf:
 @dataclass
 class backbone_conf:
     num_channels: int = 256
+    return_layers: List[int] = field(default_factory=lambda: list(range(4)))
+    extra_blocks: nn.Module = field(default_factory=lambda: torchvision.ops.feature_pyramid_network.LastLevelMaxPool())
     backbone_norm_layer: nn.Module = None
     fpn_norm_layer: nn.Module = None
 
     def module(self) -> nn.Module:
         backbone = torchvision.models.resnet.resnet50(norm_layer=self.backbone_norm_layer)
-        layer_names = OrderedDict([(f'layer{i + 1}', f'{i}') for i in range(4)])
+        layer_names = OrderedDict([(f'layer{i + 1}', f'{i}') for i in self.return_layers])
         in_channels_list = [backbone.get_submodule(name)[-1].conv3.out_channels for name in layer_names.keys()]
-        extra_blocks = torchvision.ops.feature_pyramid_network.LastLevelMaxPool()
         return torchvision.models.detection.backbone_utils.BackboneWithFPN(
             backbone,
             layer_names,
             in_channels_list,
             self.num_channels,
-            extra_blocks=extra_blocks,
+            extra_blocks=self.extra_blocks,
             norm_layer=self.fpn_norm_layer,
         )
 
@@ -237,7 +238,7 @@ class rcnn_conf:
     heads: heads_conf = field(default_factory=heads_conf)
     transform: transform_conf = field(default_factory=transform_conf)
 
-    weights: object = torchvision.models.detection.mask_rcnn.MaskRCNN_ResNet50_FPN_Weights.COCO_V1
+    weights: object = torchvision.models.detection.mask_rcnn.MaskRCNN_ResNet50_FPN_Weights.DEFAULT
 
     def __post_init__(self):
         if self.pretrained:
@@ -288,7 +289,7 @@ class rcnn_v2_conf(rcnn_conf):
         mask_head=mask_head_conf(norm_layer=nn.BatchNorm2d),
     ))
 
-    weights: object = torchvision.models.detection.mask_rcnn.MaskRCNN_ResNet50_FPN_V2_Weights.COCO_V1
+    weights: object = torchvision.models.detection.mask_rcnn.MaskRCNN_ResNet50_FPN_V2_Weights.DEFAULT
 
     def __post_init__(self):
         super().__post_init__()

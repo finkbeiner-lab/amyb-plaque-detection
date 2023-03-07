@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from typing import List, Mapping, Optional, Tuple
+from typing import List, Mapping, Optional, Tuple, Union
 import pdb
 
 import torch
@@ -35,7 +35,7 @@ class RCNN(nn.Module):
         images: List[Tensor],
         targets: Optional[List[Mapping[str, Tensor]]] = None,
         sizes: Optional[Tuple[int, int]] = None,
-    ) -> Tuple[Mapping[str, Tensor], List[Mapping[str, Tensor]]]:
+    ) -> Union[Mapping[str, Tensor], List[Mapping[str, Tensor]]]:
         assert (not self.training) or (targets is not None), 'Targets  should not be "None" in training mode'
 
         original_sizes = [image.size()[-2:] for image in images]
