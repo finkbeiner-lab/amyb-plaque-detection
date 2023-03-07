@@ -38,6 +38,8 @@ class RetinaNetHeads(nn.Module):
         detections_per_image: int = 300,
         prior_probability: float = 1e-2,
         norm_layer: Optional[Callable[..., nn.Module]] = None,
+        loss_type: str = 'l1',
+        iou_type: str = None,
     ) -> None:
         super().__init__()
 
@@ -57,11 +59,13 @@ class RetinaNetHeads(nn.Module):
             prior_probability=prior_probability,
             norm_layer=norm_layer,
         )
+
         self.regression_head = torchvision.models.detection.retinanet.RetinaNetRegressionHead(
             in_channels,
             num_anchors,
             norm_layer=norm_layer,
         )
+        self.regression_head._loss_type = loss_type
 
     def select_training_samples(
         self,
@@ -141,15 +145,18 @@ class RetinaNetHeads(nn.Module):
         anchors: List[Tensor],
         image_sizes: List[Tuple[int, int]],
         targets: List[Mapping[str, Tensor]] = None,
-    ):
+    ) -> Tuple[List[Mapping[str, Tensor]], Mapping[str, Tensor]]:
         head_outputs = dict(
             cls_logits=self.classification_head.forward(features),
             bbox_regression=self.regression_head.forward(features),
         )
 
+        detections = list()
+        losses = dict()
+
         if self.training:
             matched_idxs = self.select_training_samples(targets, anchors)
-            return dict(
+            losses.update(
                 classification=self.classification_head.compute_loss(targets, head_outputs, matched_idxs),
                 bbox_regression=self.regression_head.compute_loss(targets, head_outputs, anchors, matched_idxs),
             )
@@ -163,4 +170,6 @@ class RetinaNetHeads(nn.Module):
                 head_outputs_per_level[k] = list(head_outputs[k].split(num_anchors_per_level, dim=1))
             anchors_per_level = [list(a.split(num_anchors_per_level)) for a in anchors]
 
-            return self.postprocess_detections(head_outputs_per_level, anchors_per_level, image_sizes)
+            detections.extend(self.postprocess_detections(head_outputs_per_level, anchors_per_level, image_sizes))
+
+        return detections, losses
