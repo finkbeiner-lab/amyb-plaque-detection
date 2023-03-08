@@ -66,6 +66,7 @@ class RetinaNetHeads(nn.Module):
             norm_layer=norm_layer,
         )
         self.regression_head._loss_type = loss_type
+        self.iou_type = iou_type
 
     def select_training_samples(
         self,
@@ -75,7 +76,13 @@ class RetinaNetHeads(nn.Module):
         all_matched_idxs = []
         for targets, anchors in zip(all_targets, all_anchors):
             if targets['boxes'].numel() > 0:
-                matrix = torchvision.ops.boxes.box_iou(targets['boxes'], anchors)
+                # matrix = torchvision.ops.boxes.box_iou(targets['boxes'], anchors)
+                matrix = dict(
+                    iou=torchvision.ops.boxes.box_iou,
+                    giou=torchvision.ops.boxes.generalized_box_iou,
+                    ciou=torchvision.ops.boxes.complete_box_iou,
+                    diou=torchvision.ops.boxes.distance_box_iou,
+                )[self.iou_type](targets['boxes'], anchors)
                 matched_vals, matched_idxs = matrix.max(dim=0)
 
                 bg_idxs = matched_vals < self.bg_iou_thresh
