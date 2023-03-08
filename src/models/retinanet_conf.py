@@ -16,7 +16,8 @@ from torch import nn, Tensor
 import torchvision
 
 import models
-from models import rcnn_conf, replace_keys, load_submodule_params
+from models import rcnn_conf
+from models.rcnn_conf import replace_keys, load_submodule_params
 from models.modules.retinanet import RetinaNet
 from models.modules.retinanet_heads import RetinaNetHeads
 
