@@ -48,6 +48,7 @@ def train(model, optimizer, device, loader, epoch=None, scheduler=None, progress
             summary.setdefault(k, list()).append(v.item())
 
         disp = OrderedDict([(k, f'{v.item():.4f}') for k, v in loss.items()])
+        disp.update(lr=f'{optimizer.param_groups[0]['lr']:.4f}')
         if progress:
             bar.set_postfix(disp)
             bar.update()
