@@ -69,11 +69,12 @@ if __name__ == '__main__':
         os.mkdir(out_dir)
 
     # core, neuritic -> core; diffuse -> diffuse; caa -> caa
+    old_label_names = 'Core Diffuse Neuritic CAA'.split()
     fn_relabel = lambda i: [1, 2, 1, 3][i - 1]
     dsets_train, dsets_test = [[datasets.VipsJsonDataset(
         slide_name_fn(slide),
         json_name_fn(slide),
-        data_conf['labels']['names'],
+        old_label_names,
         size=data_conf['size'][train],
         step=data_conf['step'][train],
     ) for slide in data_conf['slides'][train]] for train in 'train test'.split()]
