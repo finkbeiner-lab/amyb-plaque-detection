@@ -19,27 +19,9 @@ from models.modules.rcnn import RCNN, RCNNTransform
 from models.model_utils import train, eval, evaluate, show
 
 
-class DatasetRelabeled(torch.utils.data.Dataset):
-    def __init__(self,
-        dataset: torch.utils.data.Dataset,
-        fn: Callable[[int,], int],
-    ) -> None:
-        self.dataset = dataset
-        self.fn = fn
-
-    def __len__(self) -> int:
-        return self.dataset.__len__()
-
-    def __getitem__(self,
-        idx: int,
-    ) -> Tuple[Tensor, Mapping[str, Tensor]]:
-        image, target = self.dataset.__getitem__(idx)
-        for i, v in enumerate(target['labels']):
-            target['labels'][i] = self.fn(v)
-
-
 if __name__ == '__main__':
-    num_classes = 4
+    # num_classes = 4
+    num_classes = 3
     model_conf = dict(
         pretrained=True,
         num_classes=num_classes + 1
@@ -58,8 +40,10 @@ if __name__ == '__main__':
     )
     data_conf = (lambda tile_size: dict(
         labels=dict(
-            names='Core Diffuse Neuritic CAA'.split(),
-            colors='red green blue black'.split(),
+            # names='Core Diffuse Neuritic CAA'.split(),
+            names='Core Diffuse CAA'.split(),
+            # colors='red green blue black'.split(),
+            colors='red green blue'.split(),
         ),
         slides=dict(
             train='09-028 10-033'.split(),
@@ -84,6 +68,8 @@ if __name__ == '__main__':
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
 
+    # core, neuritic -> core; diffuse -> diffuse; caa -> caa
+    fn_relabel = lambda i: [1, 2, 1, 3][i - 1]
     dsets_train, dsets_test = [[datasets.VipsJsonDataset(
         slide_name_fn(slide),
         json_name_fn(slide),
@@ -92,6 +78,7 @@ if __name__ == '__main__':
         step=data_conf['step'][train],
     ) for slide in data_conf['slides'][train]] for train in 'train test'.split()]
     dset_train, dset_test = [torch.utils.data.ConcatDataset(dsets) for dsets in (dsets_train, dsets_test)]
+    dset_train, dset_test = [datasets.DatasetRelabeled(dset, fn_relabel) for dset in (dset_train, dset_test)]
     loader = torch.utils.data.DataLoader(dset_train, batch_size=train_conf['batch_size'], shuffle=True, collate_fn=lambda _: tuple(zip(*_)))
 
     device = torch.device('cuda', train_conf['device'])
