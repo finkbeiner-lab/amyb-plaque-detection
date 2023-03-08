@@ -103,10 +103,12 @@ def slide_tile_map(slide_name, slide_dir, tile_dir, size, f=None):
     return f(slide, tiles)
 
 
-def read_metrics(metrics_file):
+def read_metrics(metrics_file, names=None):
     with open(metrics_file, 'r') as f:
         lines = f.read().split('\n')[1:-1]
     lines = [line.split(',') for line in lines]
+    if names is not None:
+        lines = [line for line in lines if line[0] in names]
 
     slides = [line[0] for line in lines]
     norms_each = [line[2:] for line in lines]
@@ -170,4 +172,3 @@ if __name__ == '__main__':
     if command == 'metrics':
         save_slide_metrics(slide_names, slide_dir, input_dir, output_dir, tile_size)
         read_slide_metrics(out_dir)
-
