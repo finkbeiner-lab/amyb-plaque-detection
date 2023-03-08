@@ -254,9 +254,27 @@ class DatasetRelabeled(torch.utils.data.Dataset):
         return image, target
 
 
+class DatasetTransformed(torch.utils.data.Dataset):
+    def __init__(
+        self,
+        dataset: torch.utils.data.Dataset,
+        transform: nn.Module,
+    ) -> None:
+        self.dataset = dataset
+        self.transform = transform
+
+    def __len__(self) -> int:
+        return self.dataset.__len__()
+
+    def __getitem__(self,
+        idx: int,
+    ) -> Tuple[Tensor, Mapping[str, Tensor]]:
+        return self.transform(*self.dataset.__getitem__(idx))
+
+
 if __name__ == '__main__':
     pass
-    
+
     # label_names = 'Core Diffuse Neuritic CAA'.split()
     # vips_img_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/amy-def-mfg-test'
     # json_dir = '/home/gryan/projects/qupath/annotations/amyloid'
