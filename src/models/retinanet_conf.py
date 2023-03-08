@@ -42,10 +42,12 @@ class heads_conf:
     prior_probability: float = 1e-2
     norm_layer: Optional[Callable[..., nn.Module]] = None
     loss_type: str = 'l1'
-    iou_type: str = None
+    iou_type: str = 'iou'
+    allow_low_quality_matches: bool = True
+    batched_nms: bool = True
 
     def module(self) -> nn.Module:
-        names = 'fg_iou_thresh bg_iou_thresh batch_size_per_image bbox_reg_weights score_thresh nms_thresh detections_per_image prior_probability norm_layer loss_type iou_type'
+        names = 'fg_iou_thresh bg_iou_thresh batch_size_per_image bbox_reg_weights score_thresh nms_thresh detections_per_image prior_probability norm_layer loss_type iou_type allow_low_quality_matches batched_nms'
         kwargs = dict([(k, v) for k, v in asdict(self).items() if k in names])
         return RetinaNetHeads(
             self.num_channels,

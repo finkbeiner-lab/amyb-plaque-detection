@@ -39,7 +39,9 @@ class RetinaNetHeads(nn.Module):
         prior_probability: float = 1e-2,
         norm_layer: Optional[Callable[..., nn.Module]] = None,
         loss_type: str = 'l1',
-        iou_type: str = None,
+        iou_type: str = 'iou',
+        allow_low_quality_matches: bool = True,
+        batched_nms: bool = True,
     ) -> None:
         super().__init__()
 
@@ -67,6 +69,8 @@ class RetinaNetHeads(nn.Module):
         )
         self.regression_head._loss_type = loss_type
         self.iou_type = iou_type
+        self.allow_low_quality_matches = allow_low_quality_matches
+        self.batched_nms = batched_nms
 
     def select_training_samples(
         self,
@@ -91,7 +95,8 @@ class RetinaNetHeads(nn.Module):
 
                 matched_idxs[bg_idxs] = -1
                 matched_idxs[ignore_idxs] = -2
-                matched_idxs[keep_idxs] = matrix.max(dim=0)[1][keep_idxs]
+                if self.allow_low_quality_matches:
+                    matched_idxs[keep_idxs] = matrix.max(dim=0)[1][keep_idxs]
             else:
                 matched_idxs = torch.full(anchors.size()[0], -1, dtype=torch.long, device=anchors.device)
 
@@ -136,7 +141,7 @@ class RetinaNetHeads(nn.Module):
             image_labels = torch.cat(image_labels, dim=0)
             image_boxes = torch.cat(image_boxes, dim=0)
 
-            keep_idxs = torchvision.ops.boxes.batched_nms(image_boxes, image_scores, image_labels, self.nms_thresh)[:self.detections_per_image]
+            keep_idxs = (torchvision.ops.boxes.batched_nms(image_boxes, image_scores, image_labels, self.nms_thresh) if self.batched_nms else torchvision.ops.boxes.nms(image_boxes, image_scores, self.nms_thresh))[:self.detections_per_image]
 
             detections.append(dict(
                 scores=image_scores[keep_idxs],
