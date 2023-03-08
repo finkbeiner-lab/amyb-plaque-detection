@@ -24,9 +24,10 @@ def clear(lines, prefix=None):
     print('\n'.join(lines))
     return f'\x1b[{len(lines)}A' + '\n'.join([' ' * len(line) for line in lines]) + f'\x1b[{len(lines)}A'
 
-def train(model, optimizer, device, loader, epoch=None, progress=False):
+def train(model, optimizer, device, loader, epoch=None, scheduler=None, progress=False):
     model.train(True)
-    scheduler = None if epoch != 0 else torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1e-3, total_iters=min(1e3, len(loader)))
+    if scheduler is None and epoch == 0:
+        scheduler = torch.optim.lr_scheduler.LinearLR(optimizer, start_factor=1e-3, total_iters=min(1e3, len(loader)))
 
     summary = OrderedDict()
     bar = tqdm.tqdm(total=len(loader)) if progress else None
