@@ -40,7 +40,7 @@ def train(model, optimizer, device, loader, epoch=None, scheduler=None, progress
         loss = model.forward(images, targets)
         optimizer.zero_grad()
         sum(loss.values()).backward()
-        loss['lr'] = optimizer.param_groups[0]['lr']
+        loss['lr'] = torch.tensor(optimizer.param_groups[0]['lr'])
         optimizer.step()
         if scheduler is not None:
             scheduler.step()
