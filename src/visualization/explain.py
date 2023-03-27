@@ -40,7 +40,8 @@ from models.model_mrcnn import _default_mrcnn_config, build_default
 class ExplainPredictions():
     
     # TODO fix the visualization flags
-    def __init__(self, model, model_input_path, test_input_path, detection_threshold, wandb, save_result, ablation_cam, save_thresholds):
+    def __init__(self, model, model_input_path, test_input_path, detection_threshold, wandb, save_result, ablation_cam, save_thresholds,
+                 class_names):
         self.model = model
         self.model_input_path = model_input_path
         self.test_input_path = test_input_path
@@ -49,7 +50,8 @@ class ExplainPredictions():
         self.save_result = save_result
         self.ablation_cam = ablation_cam
         self.save_thresholds = save_thresholds
-        self.class_names = ['Unknown', 'Core', 'Diffuse', 'Neuritic', 'CAA']
+        # self.class_names = ['Unknown', 'Core', 'Diffuse', 'Neuritic', 'CAA']
+        self.class_names = class_names
         self.class_to_colors = {'Core': (255, 0, 0), 'Neuritic' : (0, 0, 255), 'Diffuse': (0,255,0), 'CAA':(225, 255, 0)}
         self.result_save_dir= "/mnt/new-nas/work/data/npsad_data/vivek/reports/figures/"
         self.colors = np.random.uniform(0, 255, size=(len(self.class_names), 3))

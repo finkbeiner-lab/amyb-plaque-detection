@@ -1,0 +1,145 @@
+{
+    "os": "Linux-3.10.0-1160.88.1.el7.x86_64-x86_64-with-glibc2.17",
+    "python": "3.9.16",
+    "heartbeatAt": "2023-03-27T20:55:52.814420",
+    "startedAt": "2023-03-27T20:55:52.335319",
+    "docker": null,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "/home/jlamstein/PycharmProjects/amyb-plaque-detection/src/models/train.py",
+    "codePath": "src/models/train.py",
+    "git": {
+        "remote": "https://github.com/finkbeiner-lab/amyb-plaque-detection.git",
+        "commit": "c1a9bd3bba731f65a599acecb5f628713ff28cef"
+    },
+    "email": "jdlamstein@gmail.com",
+    "root": "/home/jlamstein/PycharmProjects/amyb-plaque-detection",
+    "host": "hobbes",
+    "username": "jlamstein",
+    "executable": "/home/jlamstein/VENV/POSE/bin/python",
+    "cpu_count": 10,
+    "cpu_count_logical": 20,
+    "cpu_freq": {
+        "current": 1463.7301000000002,
+        "min": 1200.0,
+        "max": 4500.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 1199.835,
+            "min": 1200.0,
+            "max": 4500.0
+        },
+        {
+            "current": 2628.68,
+            "min": 1200.0,
+            "max": 4500.0
+        },
+        {
+            "current": 1200.036,
+            "min": 1200.0,
+            "max": 4500.0
+        },
+        {
+            "current": 1477.185,
+            "min": 1200.0,
+            "max": 4500.0
+        },
+        {
+            "current": 1199.835,
+            "min": 1200.0,
+            "max": 4500.0
+        },
+        {
+            "current": 1727.746,
+            "min": 1200.0,
+            "max": 4500.0
+        },
+        {
+            "current": 1200.036,
+            "min": 1200.0,
+            "max": 4500.0
+        },
+        {
+            "current": 1219.171,
+            "min": 1200.0,
+            "max": 4500.0
+        },
+        {
+            "current": 1199.835,
+            "min": 1200.0,
+            "max": 4500.0
+        },
+        {
+            "current": 1199.835,
+            "min": 1200.0,
+            "max": 4500.0
+        },
+        {
+            "current": 1216.754,
+            "min": 1200.0,
+            "max": 4500.0
+        },
+        {
+            "current": 2481.646,
+            "min": 1200.0,
+            "max": 4500.0
+        },
+        {
+            "current": 1200.036,
+            "min": 1200.0,
+            "max": 4500.0
+        },
+        {
+            "current": 1201.043,
+            "min": 1200.0,
+            "max": 4500.0
+        },
+        {
+            "current": 1199.835,
+            "min": 1200.0,
+            "max": 4500.0
+        },
+        {
+            "current": 1253.613,
+            "min": 1200.0,
+            "max": 4500.0
+        },
+        {
+            "current": 1200.238,
+            "min": 1200.0,
+            "max": 4500.0
+        },
+        {
+            "current": 2868.969,
+            "min": 1200.0,
+            "max": 4500.0
+        },
+        {
+            "current": 1200.238,
+            "min": 1200.0,
+            "max": 4500.0
+        },
+        {
+            "current": 1199.835,
+            "min": 1200.0,
+            "max": 4500.0
+        }
+    ],
+    "disk": {
+        "total": 471.51575088500977,
+        "used": 333.3698844909668
+    },
+    "gpu": "NVIDIA TITAN V",
+    "gpu_count": 1,
+    "gpu_devices": [
+        {
+            "name": "NVIDIA TITAN V",
+            "memory_total": 12884901888
+        }
+    ],
+    "memory": {
+        "total": 62.374637603759766
+    }
+}

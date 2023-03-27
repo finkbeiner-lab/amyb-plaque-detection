@@ -71,7 +71,7 @@ def _get_iou_types(model):
 
 
 @torch.inference_mode()
-def evaluate(run, model, data_loader, device):
+def evaluate(run, model, data_loader, device, class_names):
     n_threads = torch.get_num_threads()
     # FIXME remove this and make paste_masks_in_image run on the GPU
     torch.set_num_threads(1)
@@ -84,7 +84,8 @@ def evaluate(run, model, data_loader, device):
     iou_types = _get_iou_types(model)
     coco_evaluator = CocoEvaluator(coco, iou_types)
     explain = ExplainPredictions(model, model_input_path = "", test_input_path="", detection_threshold=0.75, 
-                                wandb=wandb, save_result=True, ablation_cam=True, save_thresholds=False)
+                                wandb=wandb, save_result=True, ablation_cam=True, save_thresholds=False,
+                                 class_names=class_names)
 
     for images, targets in metric_logger.log_every(data_loader, 100, header):
 

@@ -1,0 +1,126 @@
+wandb_version: 1
+
+_wandb:
+  desc: null
+  value:
+    cli_version: 0.14.0
+    framework: torch
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    python_version: 3.9.16
+    start_time: 1679952679.499631
+    t:
+      1:
+      - 1
+      - 41
+      - 55
+      2:
+      - 1
+      - 41
+      - 55
+      3:
+      - 16
+      - 23
+      4: 3.9.16
+      5: 0.14.0
+      8:
+      - 5
+model_config:
+  desc: null
+  value:
+    roi_heads_config:
+      box_config:
+        box_head_config:
+          in_channels: 12544
+          representation_size: 1024
+        box_predictor_config:
+          in_channels: 1024
+          num_classes: 8
+        box_roi_pool_config:
+          canonical_level: 4
+          canonical_scale: 224
+          featmap_names:
+          - '0'
+          - '1'
+          - '2'
+          - '3'
+          output_size: 7
+          sampling_ratio: 2
+      mask_config:
+        mask_head_config:
+          dilation: 1
+          in_channels: 256
+          layers:
+          - 256
+          - 256
+          - 256
+          - 256
+        mask_predictor_config:
+          dim_reduced: 256
+          in_channels: 256
+          num_classes: 8
+        mask_roi_pool_config:
+          canonical_level: 4
+          canonical_scale: 224
+          featmap_names:
+          - '0'
+          - '1'
+          - '2'
+          - '3'
+          output_size: 14
+          sampling_ratio: 2
+      roi_heads_config:
+        batch_size_per_image: 512
+        bbox_reg_weights: null
+        bg_iou_thresh: 0.5
+        detections_per_img: 100
+        fg_iou_thresh: 0.5
+        nms_thresh: 0.5
+        positive_fraction: 0.25
+        score_thresh: 0.05
+    rpn_config:
+      anchor_config:
+        ratios:
+        - 0.5
+        - 1
+        - 2
+        scales:
+        - 1
+        sizes:
+        - 32
+        - 64
+        - 128
+        - 256
+        - 512
+      rpn_config:
+        batch_size_per_image: 256
+        bg_iou_thresh: 0.3
+        fg_iou_thresh: 0.7
+        nms_thresh: 0.7
+        positive_fraction: 0.5
+        post_nms_top_n:
+          testing: 1000
+          training: 2000
+        pre_nms_top_n:
+          testing: 1000
+          training: 2000
+        score_thresh: 0.0
+      rpn_head_config:
+        in_channels: 256
+        num_anchors: 3
+optim_config:
+  desc: null
+  value:
+    cls: torch.optim.sgd.SGD
+    defaults:
+      lr: 0.01
+train_config:
+  desc: null
+  value:
+    batch_size: 1
+    ckpt_freq: 500
+    device_id: 0
+    epochs: 1
+    eval_freq: 20
+    morphology_channel: 3
+    num_classes: 7

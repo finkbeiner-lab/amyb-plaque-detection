@@ -1,0 +1,1 @@
+{"epoch": 0, "loss": 5.4231276512146, "metrics": {"loss_objectness": 0.6855119466781616, "loss_rpn_box_reg": 0.2610973119735718, "loss_classifier": 1.4128367900848389, "loss_box_reg": 0.37493306398391724, "loss_mask": 0.7806572318077087}, "_timestamp": 1679950561.1493962, "_runtime": 8.793309211730957, "_step": 4}
