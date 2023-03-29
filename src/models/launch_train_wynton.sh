@@ -13,7 +13,7 @@ wandb offline
 #module load CBI scl-devtoolset/6
 module load CBI miniconda3-py39
 conda activate amyb
-python train.py /gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi /gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/train-short/ /gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/train-short/
+python train.py /gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi /gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/train/ /gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/train/
 # python test.py
 echo "The model is running on node $HOSTNAME"
 

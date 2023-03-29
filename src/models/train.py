@@ -222,7 +222,10 @@ if __name__ == '__main__':
     run = wandb.init(**wandb_config)
     assert run is wandb.run # run was successfully initialized, is not None
     run_id, run_dir = run.id, run.dir
-    exp_name = run.name
+
+    #TODO: replace this with run.name
+    #exp_name = run.name
+    exp_name = "runtest"
 
     artifact_name = f'{run_id}-logs'
 
@@ -242,14 +245,12 @@ if __name__ == '__main__':
             # run.log_artifact(artifact)
 
         if epoch % train_config['eval_freq'] == 0:
-            eval_res = evaluate(run, model, test_data_loader, device=device)
+            eval_res = evaluate(run, model, test_data_loader, device=device, epoch=epoch)
         
         model.train(True)
-
-
-
     
-    model_save_name = dataset_base_dir + "models/{name}_mrcnn_model_{epoch}.pth"
+    # TODO change the directory if running on desktop
+    model_save_name = "/wynton/home/finkbeiner/vgramas/Projects/amyb-plaque-detection/src/models/" + "saved_models/{name}_mrcnn_model_{epoch}.pth"
     torch.save(model.state_dict(), model_save_name.format(name=exp_name, epoch=train_config['epochs']))
 
 

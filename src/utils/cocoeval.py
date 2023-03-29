@@ -82,6 +82,8 @@ class COCOeval:
         self.stats = []                     # result summarization
         self.ious = {}                      # ious between all gts and dts
         self.table = wandb.Table(columns=["eval_metrics"])
+        self.epoch = 0
+        self.exp_name = {}
         if not cocoGt is None:
             self.params.imgIds = sorted(cocoGt.getImgIds())
             self.params.catIds = sorted(cocoGt.getCatIds())
@@ -124,7 +126,7 @@ class COCOeval:
         self.evalImgs = defaultdict(list)   # per-image per-category evaluation results
         self.eval     = {}                  # accumulated evaluation results
 
-    def evaluate(self):
+    def evaluate(self, epoch, exp_name):
         '''
         Run per image evaluation on given images and store results (a list of dict) in self.evalImgs
         :return: 
@@ -132,6 +134,8 @@ class COCOeval:
         '''
         tic = time.time()
         print('Running per image evaluation...')
+        self.epoch = epoch
+        self.exp_name = exp_name
         p = self.params
         # add backward compatibility if useSegm is specified in params
         if not p.useSegm is None:
@@ -379,7 +383,6 @@ class COCOeval:
             'recall':   recall,
             'scores': scores,
         }
-        pdb.set_trace()
         self.plotPRCurve()
         toc = time.time()
         print('DONE-test (t={:0.2f}s).'.format( toc-tic))
@@ -391,29 +394,37 @@ class COCOeval:
         scores = self.eval['scores']
 
         # Get the mean precision across all categories, area ranges, and max detections
-        mean_precision = np.mean(precision, axis=(2,3,4))
+        mean_precision = np.mean(precision, axis=(1,2,3,4))
 
         # Get the mean recall across all categories, area ranges, and max detections
         mean_recall = np.mean(recall, axis=(1,2,3))
 
-        pdb.set_trace()
+        # Create a new figure
+        fig, ax = plt.subplots()
+        mean_recall = np.random.rand(10)
+        mean_precision = np.random.rand(10)
 
         # Plot the precision-recall curve for each IOU threshold
         for t in range(len(self.params.iouThrs)):
-            # plt.plot(mean_recall[t, 0, :, 2, 0], mean_precision[t, :, 2, 0], label='IOU={:.2f}'.format(self.params.iouThrs[t:t+1]))
-            plt.plot(mean_recall[t, 0, 0, :], mean_precision[t, :, 0, 0, 0], label='IOU={:.2f}'.format(self.params.iouThrs[t]))
+            ax.plot(mean_recall, mean_precision, label=f'IOU={self.params.iouThrs[t]}')
 
-        plt.plot(mean_recall[2, 0, 0, 2], mean_precision[2, :, 0, 3], label='IOU={:.2f}'.format(self.params.iouThrs[2]))
-        # Set plot labels and title
-        plt.xlabel('Recall')
-        plt.ylabel('Precision')
-        plt.title('Precision-Recall curve')
+        # Set the x and y axis limits
+        ax.set_xlim([0,1])
+        ax.set_ylim([0,1])
 
-        # Add legend
-        plt.legend()
+        # Set the axis labels
+        ax.set_xlabel('Recall')
+        ax.set_ylabel('Precision')
 
-        # Show the plot
-        plt.show()
+        # Set the aspect ratio to be equal
+        ax.set_aspect('equal', adjustable='box')
+
+        # Add a legend to the plot
+        ax.legend()
+
+        # Display the plot
+        save_name = "../../reports/figures/{exp_name}_prcurve_epoch_{epoch}.png"
+        plt.savefig(save_name.format(exp_name=self.exp_name,epoch=self.epoch))
 
 
     def summarize(self, run, iou_type):
@@ -453,7 +464,6 @@ class COCOeval:
             print(iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets, mean_s))
             results = {iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets, mean_s): mean_s }
             # x = pd.DataFrame(results)
-            pdb.set_trace()
             # wandb
             self.table.add_data(iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets, mean_s)) 
             
