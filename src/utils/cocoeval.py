@@ -1,6 +1,7 @@
 __author__ = 'tsungyi'
 
 import numpy as np
+import matplotlib.pyplot as plt
 import datetime
 import time
 from collections import defaultdict
@@ -9,6 +10,7 @@ import copy
 import pdb
 import pandas as pd
 import wandb
+import pdb
 
 class COCOeval:
     # Interface for evaluating detection on the Microsoft COCO dataset.
@@ -377,8 +379,42 @@ class COCOeval:
             'recall':   recall,
             'scores': scores,
         }
+        pdb.set_trace()
+        self.plotPRCurve()
         toc = time.time()
         print('DONE-test (t={:0.2f}s).'.format( toc-tic))
+    
+    def plotPRCurve(self):
+        # Get the accumulated evaluation results
+        precision = self.eval['precision']
+        recall = self.eval['recall']
+        scores = self.eval['scores']
+
+        # Get the mean precision across all categories, area ranges, and max detections
+        mean_precision = np.mean(precision, axis=(2,3,4))
+
+        # Get the mean recall across all categories, area ranges, and max detections
+        mean_recall = np.mean(recall, axis=(1,2,3))
+
+        pdb.set_trace()
+
+        # Plot the precision-recall curve for each IOU threshold
+        for t in range(len(self.params.iouThrs)):
+            # plt.plot(mean_recall[t, 0, :, 2, 0], mean_precision[t, :, 2, 0], label='IOU={:.2f}'.format(self.params.iouThrs[t:t+1]))
+            plt.plot(mean_recall[t, 0, 0, :], mean_precision[t, :, 0, 0, 0], label='IOU={:.2f}'.format(self.params.iouThrs[t]))
+
+        plt.plot(mean_recall[2, 0, 0, 2], mean_precision[2, :, 0, 3], label='IOU={:.2f}'.format(self.params.iouThrs[2]))
+        # Set plot labels and title
+        plt.xlabel('Recall')
+        plt.ylabel('Precision')
+        plt.title('Precision-Recall curve')
+
+        # Add legend
+        plt.legend()
+
+        # Show the plot
+        plt.show()
+
 
     def summarize(self, run, iou_type):
         '''
@@ -417,6 +453,8 @@ class COCOeval:
             print(iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets, mean_s))
             results = {iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets, mean_s): mean_s }
             # x = pd.DataFrame(results)
+            pdb.set_trace()
+            # wandb
             self.table.add_data(iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets, mean_s)) 
             
             return mean_s

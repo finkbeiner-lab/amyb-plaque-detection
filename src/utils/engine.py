@@ -111,7 +111,7 @@ def evaluate(run, model, data_loader, device):
             log_results.append(result_img)
             log_results.append(result_masks)
           
-            run.log({"Evaluation": [wandb.Image(image) for image in log_results]})
+            # run.log({"Evaluation": [wandb.Image(image) for image in log_results]})
 
 
         res = {target["image_id"].item(): output for target, output in zip(targets, outputs)}

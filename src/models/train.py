@@ -148,12 +148,12 @@ if __name__ == '__main__':
     dataset_test_location = args.dataset_test_location
 
     train_config = dict(
-        epochs = 100,
-        batch_size = 6,
+        epochs = 1,
+        batch_size = 2,
         num_classes = 4,
         device_id = 0,
         ckpt_freq =500,
-        eval_freq = 20,
+        eval_freq = 1,
     )
 
     test_config = dict(
@@ -169,6 +169,7 @@ if __name__ == '__main__':
     wandb_config = dict(
         project='nps-ad-vivek',
         entity='hellovivek',
+        mode = 'offline',
         config=dict(
             train_config=train_config,
             model_config=model_config,
@@ -184,12 +185,18 @@ if __name__ == '__main__':
 
     ## Dataset loading
     train_dataset = build_features.AmyBDataset(dataset_train_location, T.Compose([T.ToTensor()]))
+    # val_dataset = build_features.AmyBDataset(val_dataset, T.Compose([T.ToTensor()]))
     test_dataset = build_features.AmyBDataset(dataset_test_location, T.Compose([T.ToTensor()]))
 
     train_data_loader = torch.utils.data.DataLoader(
             train_dataset, batch_size=train_config['batch_size'], shuffle=True, num_workers=4,
             collate_fn=collate_fn)
     
+        
+    # val_data_loader = torch.utils.data.DataLoader(
+    #         test_dataset, batch_size=test_config['batch_size'], shuffle=False, num_workers=4,
+    #         collate_fn=collate_fn)
+
     test_data_loader = torch.utils.data.DataLoader(
             test_dataset, batch_size=test_config['batch_size'], shuffle=False, num_workers=4,
             collate_fn=collate_fn)
@@ -224,15 +231,15 @@ if __name__ == '__main__':
         # print(f'Epoch {epoch}=======================================>.')
 
         for logs in train_one_epoch(model, loss_fn, optimizer, train_data_loader, device, epoch=epoch, log_freq=1):
-            for log in logs:/mnt/new-nas/work/data/npsad_data/vivek/
+            for log in logs:
                 run.log(log)
 
-        if epoch + 1 == train_config['epochs'] or epoch % train_config['ckpt_freq'] == 0:
+        # if epoch + 1 == train_config['epochs'] or epoch % train_config['ckpt_freq'] == 0:
 
-            artifact = wandb.Artifact(artifact_name, type='files')
-            with artifact.new_file(f'ckpt/{epoch}.pt', 'wb') as f:
-                torch.save(model.state_dict(), f)
-            run.log_artifact(artifact)
+        #     artifact = wandb.Artifact(artifact_name, type='files')
+        #     with artifact.new_file(f'ckpt/{epoch}.pt', 'wb') as f:
+        #         torch.save(model.state_dict(), f)
+            # run.log_artifact(artifact)
 
         if epoch % train_config['eval_freq'] == 0:
             eval_res = evaluate(run, model, test_data_loader, device=device)

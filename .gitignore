@@ -94,3 +94,6 @@ target/
 
 # Ignore
 reports/*
+
+src/models/wandb/*
+src/models/saved_models/*

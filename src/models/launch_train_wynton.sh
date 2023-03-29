@@ -14,7 +14,7 @@ wandb offline
 module load CBI miniconda3-py39
 conda activate amyb
 python train.py /gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi /gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/train-short/ /gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/train-short/
-
+# python test.py
 echo "The model is running on node $HOSTNAME"
 
 #wandb sync /wynton/home/finkbeiner/vgramas/Projects/amyb-plaque-detection/src/wandb_offline_logs
