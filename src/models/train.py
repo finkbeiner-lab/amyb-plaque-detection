@@ -150,7 +150,7 @@ if __name__ == '__main__':
     train_config = dict(
         epochs = 1,
         batch_size = 2,
-        num_classes = 4,
+        num_classes = 3,
         device_id = 0,
         ckpt_freq =500,
         eval_freq = 1,
@@ -187,6 +187,9 @@ if __name__ == '__main__':
     train_dataset = build_features.AmyBDataset(dataset_train_location, T.Compose([T.ToTensor()]))
     # val_dataset = build_features.AmyBDataset(val_dataset, T.Compose([T.ToTensor()]))
     test_dataset = build_features.AmyBDataset(dataset_test_location, T.Compose([T.ToTensor()]))
+
+    fn_relabel = lambda i: [1, 2, 1, 3][i - 1]
+    train_dataset, test_dataset = [build_features.DatasetRelabeled(dataset, fn_relabel) for dataset in (train_dataset, test_dataset)]
 
     train_data_loader = torch.utils.data.DataLoader(
             train_dataset, batch_size=train_config['batch_size'], shuffle=True, num_workers=4,
