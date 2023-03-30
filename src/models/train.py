@@ -229,7 +229,7 @@ if __name__ == '__main__':
 
     artifact_name = f'{run_id}-logs'
 
-    # Train Data
+    # # Train Data
     for epoch in range(train_config['epochs']):
         # print(f'Epoch {epoch}=======================================>.')
 
@@ -254,16 +254,16 @@ if __name__ == '__main__':
     torch.save(model.state_dict(), model_save_name.format(name=exp_name, epoch=train_config['epochs']))
 
 
-    # print("\n =================The Model is Trained!====================")
-    # print("-----------------Visualizing Model predictions----------------")
+    print("\n =================The Model is Trained!====================")
+    print("-----------------Visualizing Model predictions----------------")
 
     # # TODO Testing is done on Individual WSI Folders
-    # input_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test'
+    input_path = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/test-patients'
 
-    # model = build_default(model_config, im_size=1024)
+    model = build_default(model_config, im_size=1024)
    
-    # explain = ExplainPredictions(model, model_input_path = model_save_name.format(name=exp_name, epoch=train_config['epochs']), test_input_path=input_path, 
-    #                             detection_threshold=0.75, wandb=run, save_result=True, ablation_cam=True, save_thresholds=False)
-    # explain.generate_results()
+    explain = ExplainPredictions(model, model_input_path = model_save_name.format(name=exp_name, epoch=train_config['epochs']), test_input_path=input_path, 
+                                detection_threshold=0.75, wandb=run, save_result=True, ablation_cam=True, save_thresholds=False)
+    explain.generate_results()
 
     run.finish()

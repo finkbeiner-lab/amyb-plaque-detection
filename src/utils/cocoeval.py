@@ -399,6 +399,8 @@ class COCOeval:
         # Get the mean recall across all categories, area ranges, and max detections
         mean_recall = np.mean(recall, axis=(1,2,3))
 
+        pdb.set_trace()
+
         # Create a new figure
         fig, ax = plt.subplots()
         mean_recall = np.random.rand(10)

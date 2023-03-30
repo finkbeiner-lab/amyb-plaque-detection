@@ -51,7 +51,8 @@ class ExplainPredictions():
         self.save_thresholds = save_thresholds
         self.class_names = ['Unknown', 'Core', 'Diffuse', 'Neuritic', 'CAA']
         self.class_to_colors = {'Core': (255, 0, 0), 'Neuritic' : (0, 0, 255), 'Diffuse': (0,255,0), 'CAA':(225, 255, 0)}
-        self.result_save_dir= "/mnt/new-nas/work/data/npsad_data/vivek/reports/figures/"
+        #TODO change this to nas location later
+        self.result_save_dir= "/wynton/home/finkbeiner/vgramas/Projects/amyb-plaque-detection/reports/figures/"
         self.colors = np.random.uniform(0, 255, size=(len(self.class_names), 3))
         self.column_names = ["image_name", "region", "region_mask", "label", 
                             "confidence", "brown_pixels", "centroid", 
@@ -242,8 +243,9 @@ class ExplainPredictions():
 
     def make_result_dirs(self, folder_name):
 
-
-        folder_name = self.wandb.name + "_" + folder_name
+        # TODO remove this later and replace with self.wandb.name
+        # folder_name = self.wandb.name + "_" + folder_name
+        folder_name = "runtest" + "_" + folder_name
         save_path = os.path.join(self.result_save_dir, folder_name)
         results_path = os.path.join(save_path, "results")
         if not os.path.exists(results_path):
@@ -452,7 +454,8 @@ class ExplainPredictions():
                 i = i + 1
                 # plt.show()
 
-            print("Total area of brown pixel", (total_brown_pixels/ total_image_pixels)*100)
+            if total_image_pixels != 0:
+                print("Total area of brown pixel", (total_brown_pixels/ total_image_pixels)*100)
             df.to_csv(self.quantify_path, index=False)
             test_table = wandb.Table(data=wandb_result, columns=self.column_names)
             # self.wandb.log({'quantifications': test_table})
