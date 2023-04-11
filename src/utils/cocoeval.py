@@ -85,6 +85,7 @@ class COCOeval:
         self.epoch = 0
         self.exp_name = {}
         if not cocoGt is None:
+            print("COCO GT NONE")
             self.params.imgIds = sorted(cocoGt.getImgIds())
             self.params.catIds = sorted(cocoGt.getCatIds())
 
@@ -171,6 +172,9 @@ class COCOeval:
         print('DONE (t={:0.2f}s).'.format(toc-tic))
 
     def computeIoU(self, imgId, catId):
+
+        print("Compute IOU")
+
         p = self.params
         if p.useCats:
             gt = self._gts[imgId,catId]
@@ -204,6 +208,8 @@ class COCOeval:
         perform evaluation for single category and image
         :return: dict (single image results)
         '''
+
+        print("evaluateImg")
         p = self.params
         if p.useCats:
             gt = self._gts[imgId,catId]
@@ -344,6 +350,9 @@ class COCOeval:
 
                     tp_sum = np.cumsum(tps, axis=1).astype(dtype=np.float)
                     fp_sum = np.cumsum(fps, axis=1).astype(dtype=np.float)
+                    # print("TP Sum", tp_sum)
+                    # print("fp Sum", fp_sum)
+
                     for t, (tp, fp) in enumerate(zip(tp_sum, fp_sum)):
                         tp = np.array(tp)
                         fp = np.array(fp)
@@ -383,46 +392,70 @@ class COCOeval:
             'recall':   recall,
             'scores': scores,
         }
+        
         self.plotPRCurve()
         toc = time.time()
         print('DONE-test (t={:0.2f}s).'.format( toc-tic))
     
+    # def plotPRCurve(self):
+    #     print("\n\n -----Plotting PR Curve------")
+    #     # Get the accumulated evaluation results
+    #     precision = self.eval['precision']
+    #     recall = self.eval['recall']
+ 
+    #     # Select the category, area range, and maximum number of detections to plot
+    #     category_idx = 0
+    #     area_range_idx = 0
+    #     max_detections_idx = 2
+
+    #     pdb.set_trace()
+
+    #     # Get the precision and recall arrays for the selected category, area range, and maximum number of detections
+    #     p = precision[:, :, category_idx, area_range_idx, max_detections_idx]
+    #     r = recall[:, category_idx, area_range_idx, max_detections_idx]
+
+    #     # Create a new figure and plot the PR curve
+    #     fig, ax = plt.subplots()
+    #     ax.plot(r, p)
+    #     ax.set_xlabel('Recall')
+    #     ax.set_ylabel('Precision')
+    #     ax.set_xlim([0, 1])
+    #     ax.set_ylim([0, 1])
+    #     ax.set_title('PR Curve')
+    #     plt.show()
+
+    #     # Display the plot
+    #     save_name = "../../reports/figures/{exp_name}_prcurve_epoch_{epoch}.png"
+    #     plt.savefig(save_name.format(exp_name=self.exp_name,epoch=self.epoch))
+
     def plotPRCurve(self):
+        print("\n\n -----Plotting PR Curve------")
         # Get the accumulated evaluation results
         precision = self.eval['precision']
         recall = self.eval['recall']
-        scores = self.eval['scores']
 
-        # Get the mean precision across all categories, area ranges, and max detections
-        mean_precision = np.mean(precision, axis=(1,2,3,4))
+        area_range_idx = 0
+        max_detections_idx = 2
 
-        # Get the mean recall across all categories, area ranges, and max detections
-        mean_recall = np.mean(recall, axis=(1,2,3))
+        # Get the number of categories
+        num_categories = precision.shape[2]
 
-        pdb.set_trace()
-
-        # Create a new figure
+        # Create a new figure and plot the PR curves for all categories
         fig, ax = plt.subplots()
-        mean_recall = np.random.rand(10)
-        mean_precision = np.random.rand(10)
+        for category_idx in range(num_categories):
+            p = precision[:, :, category_idx, area_range_idx, max_detections_idx]
+            r = recall[:, category_idx, area_range_idx, max_detections_idx]
+            #  r = recall[:, category_idx, :, :]
+            ax.plot(r,p, label='Category {}'.format(category_idx))
 
-        # Plot the precision-recall curve for each IOU threshold
-        for t in range(len(self.params.iouThrs)):
-            ax.plot(mean_recall, mean_precision, label=f'IOU={self.params.iouThrs[t]}')
 
-        # Set the x and y axis limits
-        ax.set_xlim([0,1])
-        ax.set_ylim([0,1])
-
-        # Set the axis labels
         ax.set_xlabel('Recall')
         ax.set_ylabel('Precision')
-
-        # Set the aspect ratio to be equal
-        ax.set_aspect('equal', adjustable='box')
-
-        # Add a legend to the plot
+        ax.set_xlim([0, 1])
+        ax.set_ylim([0, 1])
+        ax.set_title('PR Curve')
         ax.legend()
+        plt.show()
 
         # Display the plot
         save_name = "../../reports/figures/{exp_name}_prcurve_epoch_{epoch}.png"
@@ -435,6 +468,7 @@ class COCOeval:
         Note this functin can *only* be applied on the default parameter setting
         '''
         def _summarize( ap=1, iouThr=None, areaRng='all', maxDets=100 ):
+            print("summarize")
             p = self.params
             iStr = ' {:<18} {} @[ IoU={:<9} | area={:>6s} | maxDets={:>3d} ] = {:0.3f}'
             titleStr = 'Average Precision' if ap == 1 else 'Average Recall'

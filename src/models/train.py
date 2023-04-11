@@ -1,4 +1,6 @@
 import os
+os.environ['OMP_NUM_THREADS'] = '1'
+
 import sys
 sys.path.append(os.path.join(os.getcwd(), *tuple(['..'])))
 import argparse
@@ -148,16 +150,16 @@ if __name__ == '__main__':
     dataset_test_location = args.dataset_test_location
 
     train_config = dict(
-        epochs = 1,
-        batch_size = 2,
+        epochs = 11,
+        batch_size = 6,
         num_classes = 3,
         device_id = 0,
         ckpt_freq =500,
-        eval_freq = 1,
+        eval_freq = 5,
     )
 
     test_config = dict(
-        batch_size = 1
+        batch_size = 2
     )
 
     model_config = _default_mrcnn_config(num_classes=1 + train_config['num_classes']).config
@@ -181,13 +183,12 @@ if __name__ == '__main__':
     )
 
     
-
-
     ## Dataset loading
     train_dataset = build_features.AmyBDataset(dataset_train_location, T.Compose([T.ToTensor()]))
     # val_dataset = build_features.AmyBDataset(val_dataset, T.Compose([T.ToTensor()]))
     test_dataset = build_features.AmyBDataset(dataset_test_location, T.Compose([T.ToTensor()]))
 
+    # Mapping
     fn_relabel = lambda i: [1, 2, 1, 3][i - 1]
     train_dataset, test_dataset = [build_features.DatasetRelabeled(dataset, fn_relabel) for dataset in (train_dataset, test_dataset)]
 
@@ -208,9 +209,10 @@ if __name__ == '__main__':
     # Model Building
     model = build_default(model_config, im_size=1024)
     device = torch.device('cpu')
-    if torch.cuda.is_available():
-        assert train_config['device_id'] >= 0 and train_config['device_id'] < torch.cuda.device_count()
-        device = torch.device('cuda', train_config['device_id'])
+    # if torch.cuda.is_available():
+        # assert train_config['device_id'] >= 0 and train_config['device_id'] < torch.cuda.device_count()
+    device = torch.device('cuda', train_config['device_id'])
+   
     model = model.to(device)
     model.train(True)
 
@@ -226,7 +228,7 @@ if __name__ == '__main__':
     assert run is wandb.run # run was successfully initialized, is not None
     run_id, run_dir = run.id, run.dir
 
-    #TODO: replace this with run.name
+    # #TODO: replace this with run.name
     #exp_name = run.name
     exp_name = "runtest"
 
@@ -257,16 +259,16 @@ if __name__ == '__main__':
     torch.save(model.state_dict(), model_save_name.format(name=exp_name, epoch=train_config['epochs']))
 
 
-    print("\n =================The Model is Trained!====================")
-    print("-----------------Visualizing Model predictions----------------")
+    # print("\n =================The Model is Trained!====================")
+    # print("-----------------Visualizing Model predictions----------------")
 
-    # # TODO Testing is done on Individual WSI Folders
-    input_path = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/test-patients'
+    # # # TODO Testing is done on Individual WSI Folders
+    # input_path = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/test-patients'
 
-    model = build_default(model_config, im_size=1024)
+    # model = build_default(model_config, im_size=1024)
    
-    explain = ExplainPredictions(model, model_input_path = model_save_name.format(name=exp_name, epoch=train_config['epochs']), test_input_path=input_path, 
-                                detection_threshold=0.75, wandb=run, save_result=True, ablation_cam=True, save_thresholds=False)
-    explain.generate_results()
+    # explain = ExplainPredictions(model, model_input_path = model_save_name.format(name=exp_name, epoch=train_config['epochs']), test_input_path=input_path, 
+    #                             detection_threshold=0.75, wandb=run, save_result=True, ablation_cam=True, save_thresholds=False)
+    # explain.generate_results()
 
-    run.finish()
+    # run.finish()

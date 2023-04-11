@@ -133,6 +133,7 @@ def evaluate(run, model, data_loader, device, epoch):
     coco_evaluator.synchronize_between_processes()
 
     # accumulate predictions from all images
+    # torch.set_num_threads(1)
     coco_evaluator.accumulate()
     coco_evaluator.summarize(run)
     torch.set_num_threads(n_threads)
