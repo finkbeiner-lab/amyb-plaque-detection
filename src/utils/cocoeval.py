@@ -84,8 +84,11 @@ class COCOeval:
         self.table = wandb.Table(columns=["eval_metrics"])
         self.epoch = 0
         self.exp_name = {}
+        self.precision = 0
+        self.recall = 0
+        self.result_flag_precison = False
+        self.result_flag_recall = False
         if not cocoGt is None:
-            print("COCO GT NONE")
             self.params.imgIds = sorted(cocoGt.getImgIds())
             self.params.catIds = sorted(cocoGt.getCatIds())
 
@@ -393,60 +396,16 @@ class COCOeval:
             'scores': scores,
         }
         
-        self.plotPRCurve()
         toc = time.time()
         print('DONE-test (t={:0.2f}s).'.format( toc-tic))
     
-    # def plotPRCurve(self):
-    #     print("\n\n -----Plotting PR Curve------")
-    #     # Get the accumulated evaluation results
-    #     precision = self.eval['precision']
-    #     recall = self.eval['recall']
- 
-    #     # Select the category, area range, and maximum number of detections to plot
-    #     category_idx = 0
-    #     area_range_idx = 0
-    #     max_detections_idx = 2
 
-    #     pdb.set_trace()
-
-    #     # Get the precision and recall arrays for the selected category, area range, and maximum number of detections
-    #     p = precision[:, :, category_idx, area_range_idx, max_detections_idx]
-    #     r = recall[:, category_idx, area_range_idx, max_detections_idx]
-
-    #     # Create a new figure and plot the PR curve
-    #     fig, ax = plt.subplots()
-    #     ax.plot(r, p)
-    #     ax.set_xlabel('Recall')
-    #     ax.set_ylabel('Precision')
-    #     ax.set_xlim([0, 1])
-    #     ax.set_ylim([0, 1])
-    #     ax.set_title('PR Curve')
-    #     plt.show()
-
-    #     # Display the plot
-    #     save_name = "../../reports/figures/{exp_name}_prcurve_epoch_{epoch}.png"
-    #     plt.savefig(save_name.format(exp_name=self.exp_name,epoch=self.epoch))
-
-    def plotPRCurve(self):
+    def plotPRCurve(self, label):
         print("\n\n -----Plotting PR Curve------")
-        # Get the accumulated evaluation results
-        precision = self.eval['precision']
-        recall = self.eval['recall']
-
-        area_range_idx = 0
-        max_detections_idx = 2
-
-        # Get the number of categories
-        num_categories = precision.shape[2]
-
+       
         # Create a new figure and plot the PR curves for all categories
         fig, ax = plt.subplots()
-        for category_idx in range(num_categories):
-            p = precision[:, :, category_idx, area_range_idx, max_detections_idx]
-            r = recall[:, category_idx, area_range_idx, max_detections_idx]
-            #  r = recall[:, category_idx, :, :]
-            ax.plot(r,p, label='Category {}'.format(category_idx))
+        ax.plot(self.recall,self.precision, label=label)
 
 
         ax.set_xlabel('Recall')
@@ -497,8 +456,24 @@ class COCOeval:
                 mean_s = -1
             else:
                 mean_s = np.mean(s[s>-1])
+            
+
+           
+
+            if titleStr == 'Average Precision' and iouStr == '0.50:0.95' and areaRng =='all':
+                self.precision = mean_s
+                self.result_flag_precison = True
+            elif titleStr == 'Average Recall' and iouStr == '0.50:0.95' and areaRng =='all':
+                self.recall = mean_s
+                self.result_flag_recall = True
+
             print(iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets, mean_s))
-            results = {iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets, mean_s): mean_s }
+
+            if self.result_flag_precison and self.result_flag_recall:
+                self.result_flag_precison = False
+                self.result_flag_recall = False
+                label = "PR for {iouStr} with area {areaRng} and maxDets {maxDets}"
+                self.plotPRCurve(label.format(typeStr=typeStr,iouStr=iouStr, areaRng=areaRng, maxDets=maxDets))
             # x = pd.DataFrame(results)
             # wandb
             self.table.add_data(iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets, mean_s)) 
