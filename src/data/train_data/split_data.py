@@ -272,7 +272,7 @@ class SplitData:
 
         # split the images into train test and val
         self.check_distribution("original_data", image_filenames, label_filenames)
-        self.split_dataset(image_filenames, label_filenames, self.dataset_base_dir)
+        # self.split_dataset(image_filenames, label_filenames, self.dataset_base_dir)
 
         # Step 3 Data Augmentation Block
         if self.data_aug:
@@ -284,7 +284,17 @@ class SplitData:
             self.check_distribution("augmented_data", augmented_image_files, augmented_label_files)
             print("\n Total Data :", len(augmented_image_files) + len(image_filenames))
 
-            self.split_dataset(augmented_image_files, augmented_label_files, self.dataset_base_dir)
+            destination_path = os.path.join(self.dataset_base_dir, "images")
+
+            self.copy_split_files_to_dataset("images", augmented_image_files, destination_path)
+
+            destination_path = os.path.join(self.dataset_base_dir, "labels")
+
+            #  copying files from Augmented folder to images and labels
+
+            self.copy_split_files_to_dataset("labels", augmented_label_files, destination_path)
+
+            # self.split_dataset(augmented_image_files, augmented_label_files, self.dataset_base_dir)
 
         # self.visualization.check_images(augmented_image_files, 2)
         # self.visualization.check_images(augmented_label_files, 2)
@@ -308,12 +318,15 @@ class SplitData:
 
         assert len(image_filenames) != 0 and len(label_filenames) != 0
 
-        self.generate_split_dirs()
+        # self.generate_split_dirs()
         self.preprocess_dataset(image_filenames, label_filenames)
 
 
+#
+
 if __name__ == "__main__":
-    #TODO Fix data aug - Not Running
-    base_WSI_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/'
-    split_data = SplitData(base_WSI_path, True, 1000)
+    #TODO Run this for train and val separately - since its patient specific split
+    # Run merge file before running this file
+    base_WSI_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/val'
+    split_data = SplitData(base_WSI_path, True, 200)
     split_data.prepare_dataset()

@@ -148,12 +148,12 @@ if __name__ == '__main__':
     dataset_val_location = args.dataset_val_location
 
     train_config = dict(
-        epochs = 30,
-        batch_size = 6,
+        epochs = 20,
+        batch_size = 8,
         num_classes = 4,
         device_id = 0,
         ckpt_freq =500,
-        eval_freq = 3,
+        eval_freq = 5,
     )
 
     val_config = dict(
