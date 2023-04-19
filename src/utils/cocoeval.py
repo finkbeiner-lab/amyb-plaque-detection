@@ -395,17 +395,43 @@ class COCOeval:
             'recall':   recall,
             'scores': scores,
         }
+
+        self.plotPRCurve1()
         
         toc = time.time()
         print('DONE-test (t={:0.2f}s).'.format( toc-tic))
     
+    def plotPRCurve1(self):
+
+        precision = eval['precision']
+        recall = eval['recall']
+        scores = eval['scores']
+        iouThrs = model.params.iouThrs
+
+        for t in range(len(iouThrs)):
+            plt.figure()
+            plt.xlabel('Precision')
+            plt.ylabel('Recall')
+            plt.ylim([0, 1])
+            plt.xlim([0, 1])
+            plt.title('PR curve for category 1 at IOU threshold {}'.format(iouThrs[t]))
+            for r in range(len(model.params.recThrs)):
+                pr = precision[t, r, 0, 0, -1]
+                rc = recall[t, 0, 0, -1]
+                score = scores[t, r, 0, 0, -1]
+                plt.plot(pr, rc, color=(score, 0, 1 - score), linewidth=2)
+            save_name = "../../reports/figures/{exp_name}_prcurve_epoch_{epoch}.png"
+            plt.savefig(save_name.format(exp_name=self.exp_name,epoch=self.epoch))
+            plt.show()
+
+
 
     def plotPRCurve(self, label):
         print("\n\n -----Plotting PR Curve------")
        
         # Create a new figure and plot the PR curves for all categories
         fig, ax = plt.subplots()
-        ax.plot(self.recall,self.precision, label=label)
+        ax.scatter(self.recall,self.precision, label=label)
 
 
         ax.set_xlabel('Recall')
