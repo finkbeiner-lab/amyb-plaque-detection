@@ -403,26 +403,34 @@ class COCOeval:
     
     def plotPRCurve1(self):
 
-        precision = eval['precision']
-        recall = eval['recall']
-        scores = eval['scores']
-        iouThrs = model.params.iouThrs
+        precision = self.eval['precision']
+        recall = self.eval['recall']
+        scores = self.eval['scores']
+        iouThrs = self.params.iouThrs
+        K =len(self.params.catIds) if self.params.useCats else 1
+        A = len(self.params.areaRng)
 
-        for t in range(len(iouThrs)):
-            plt.figure()
-            plt.xlabel('Precision')
-            plt.ylabel('Recall')
-            plt.ylim([0, 1])
-            plt.xlim([0, 1])
-            plt.title('PR curve for category 1 at IOU threshold {}'.format(iouThrs[t]))
-            for r in range(len(model.params.recThrs)):
-                pr = precision[t, r, 0, 0, -1]
-                rc = recall[t, 0, 0, -1]
-                score = scores[t, r, 0, 0, -1]
-                plt.plot(pr, rc, color=(score, 0, 1 - score), linewidth=2)
-            save_name = "../../reports/figures/{exp_name}_prcurve_epoch_{epoch}.png"
-            plt.savefig(save_name.format(exp_name=self.exp_name,epoch=self.epoch))
-            plt.show()
+        for t, iouThr in enumerate(iouThrs):
+            # Select the precision and recall for the current iou threshold
+            precision_t = precision[t, 0, :, :, :]
+            recall_t = recall[t, :, :, :]
+            scores_t = scores[t, 0, :, :, :]
+            
+
+            # Here you can loop over the categories and area ranges to plot the PR curve for each category and area range
+            for k in range(K):
+                # for a in range(A):
+                plt.plot(recall_t[k, 0, :], precision_t[k, 0, :], label=f'Category {k}, IoU {iouThr}')
+                plt.xlabel('Recall')
+                plt.ylabel('Precision')
+                plt.legend(loc='best')
+                plt.title(f'Precision-Recall Curve for IoU Threshold {iouThr}')
+            
+
+                save_name = "../../reports/figures/prcurve/{exp_name}_prcurve_Cat_{K}_IOU_{iouThr}_epoch_{epoch}.png"
+                plt.savefig(save_name.format(exp_name=self.exp_name,K=k, iouThr=iouThr, epoch=self.epoch))
+                plt.close("all")
+                # plt.show()
 
 
 
@@ -495,11 +503,11 @@ class COCOeval:
 
             print(iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets, mean_s))
 
-            if self.result_flag_precison and self.result_flag_recall:
-                self.result_flag_precison = False
-                self.result_flag_recall = False
-                label = "PR for {iouStr} with area {areaRng} and maxDets {maxDets}"
-                self.plotPRCurve(label.format(typeStr=typeStr,iouStr=iouStr, areaRng=areaRng, maxDets=maxDets))
+            # if self.result_flag_precison and self.result_flag_recall:
+            #     self.result_flag_precison = False
+            #     self.result_flag_recall = False
+            #     label = "PR for {iouStr} with area {areaRng} and maxDets {maxDets}"
+            #     self.plotPRCurve(label.format(typeStr=typeStr,iouStr=iouStr, areaRng=areaRng, maxDets=maxDets))
             # x = pd.DataFrame(results)
             # wandb
             self.table.add_data(iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets, mean_s)) 

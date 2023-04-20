@@ -150,12 +150,12 @@ if __name__ == '__main__':
     dataset_test_location = args.dataset_test_location
 
     train_config = dict(
-        epochs = 1,
-        batch_size = 2,
+        epochs = 11,
+        batch_size = 8,
         num_classes = 3,
         device_id = 0,
         ckpt_freq =500,
-        eval_freq = 1,
+        eval_freq = 5,
     )
 
     test_config = dict(
