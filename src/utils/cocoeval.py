@@ -412,7 +412,7 @@ class COCOeval:
 
         for t, iouThr in enumerate(iouThrs):
             # Select the precision and recall for the current iou threshold
-            precision_t = precision[t, 0, :, :, :]
+            precision_t = precision[t, :, :, :, :] // T X R X K X A X M
             recall_t = recall[t, :, :, :]
             scores_t = scores[t, 0, :, :, :]
             
