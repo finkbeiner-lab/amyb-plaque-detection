@@ -4,6 +4,10 @@ from dataclasses import dataclass, field, asdict
 import os
 import sys
 
+__pkg = os.path.abspath(os.path.join(__file__, *('..'.split() * 2)))
+if __pkg not in sys.path:
+    sys.path.append(__pkg)
+
 import numpy as np
 import pyvips
 
@@ -12,6 +16,8 @@ from torch import nn, Tensor
 
 import torchvision
 from torchvision.transforms import ToTensor, ToPILImage
+
+from models import rcnn_conf
 
 
 def get_tile(
@@ -116,26 +122,13 @@ def paste_vips_slide(model, device, slide_dir, tiles_dir, out_dir, slide_names, 
         tiles_fname = os.path.join(tiles_dir, f'XE{slide_name}_1_AmyB_1.tiles.npy')
         out_fname = os.path.join(out_dir, f'XE{slide_name}_1_AmyB_1.tif')
 
-        vips_img = pyvips.Image.new_from_file(slide_fname)[:3]
+        vips_img = pyvips.Image.new_from_file(slide_fname, access='sequential')[:3]
         vips_tiles = torch.as_tensor(np.load(tiles_fname))
 
         coords = [get_tile(tile, step, size, offset) for tile in vips_tiles]
 
         vips_img_out = paste_vips_tiles(model, device, vips_img, coords, progress=True, progress_desc=slide_name, **kwargs)
-        vips_img_out.write_to_file(out_fname, compression='lzw')
-        # return vips_img_out
-
-
-### Code below here is specific to a local machine ###
-
-__pkg = os.path.abspath(os.path.join(__file__, *('..'.split() * 2)))
-if __pkg not in sys.path:
-    sys.path.append(__pkg)
-
-import PIL
-
-from models import rcnn_conf
-
+        vips_img_out.write_to_file(out_fname, compression='lzw', tile=True, tile_width=size[0], tile_height=size[1], pyramid=True)
 
 
 if __name__ == '__main__':
@@ -161,7 +154,7 @@ if __name__ == '__main__':
 
     # Model-level parameters
 
-    device = torch.device('cpu')
+    device = torch.device('cuda', 0)
 
     model = rcnn_conf.rcnn_conf(num_classes=5).module()
     model.to(device)
