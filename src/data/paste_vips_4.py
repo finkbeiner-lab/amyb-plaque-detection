@@ -119,12 +119,11 @@ def paste_vips_slide(model, device, slide_dir, tiles_dir, out_dir, slide_names, 
         vips_img = pyvips.Image.new_from_file(slide_fname)[:3]
         vips_tiles = torch.as_tensor(np.load(tiles_fname))
 
-        # coords = [get_tile(tile, step, size, offset) for tile in vips_tiles]
-        coords = torch.as_tensor([[38054, 82248, 39077, 83271]])
+        coords = [get_tile(tile, step, size, offset) for tile in vips_tiles]
 
         vips_img_out = paste_vips_tiles(model, device, vips_img, coords, progress=True, progress_desc=slide_name, **kwargs)
-        # vips_img_out.write_to_file(out_fname, compression='lzw')
-        return vips_img_out
+        vips_img_out.write_to_file(out_fname, compression='lzw')
+        # return vips_img_out
 
 
 ### Code below here is specific to a local machine ###
@@ -174,10 +173,10 @@ if __name__ == '__main__':
 
     # Run
 
-    vips_img_out = paste_vips_slide(model, device, slide_dir, tiles_dir, out_dir, slide_names, step, size, offset, label_names=label_names, label_colors=label_colors)
+    paste_vips_slide(model, device, slide_dir, tiles_dir, out_dir, slide_names, step, size, offset, label_names=label_names, label_colors=label_colors)
 
-    coords = torch.as_tensor([[38054, 82248, 39077, 83271]])
-    crop = PIL.Image.fromarray(vips_img_out.crop(*coords[:2], *(1 + coords[2:] - coords[:2])).numpy())
+    # coords = torch.as_tensor([[38054, 82248, 39077, 83271]])
+    # crop = PIL.Image.fromarray(vips_img_out.crop(*coords[:2], *(1 + coords[2:] - coords[:2])).numpy())
 
 
 
