@@ -120,7 +120,7 @@ def paste_vips_slide(model, device, slide_dir, tiles_dir, out_dir, slide_names, 
     for slide_name in slide_names:
         slide_fname = os.path.join(slide_dir, f'XE{slide_name}_1_AmyB_1.mrxs')
         tiles_fname = os.path.join(tiles_dir, f'XE{slide_name}_1_AmyB_1.tiles.npy')
-        out_fname = os.path.join(out_dir, f'XE{slide_name}_1_AmyB_1.tif')
+        out_fname = os.path.join(out_dir, f'out_XE{slide_name}_1_AmyB_1.tif')
 
         vips_img = pyvips.Image.new_from_file(slide_fname, access='sequential')[:3]
         vips_tiles = torch.as_tensor(np.load(tiles_fname))
