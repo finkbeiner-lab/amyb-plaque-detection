@@ -412,7 +412,8 @@ class COCOeval:
 
         for t, iouThr in enumerate(iouThrs):
             # Select the precision and recall for the current iou threshold
-            precision_t = precision[t, :, :, :, :] // T X R X K X A X M
+            precision_t = precision[t, :, :, :, :] 
+            precision_t = np.mean(precision_t, axis=0)
             recall_t = recall[t, :, :, :]
             scores_t = scores[t, 0, :, :, :]
             
@@ -423,6 +424,9 @@ class COCOeval:
                 plt.plot(recall_t[k, 0, :], precision_t[k, 0, :], label=f'Category {k}, IoU {iouThr}')
                 plt.xlabel('Recall')
                 plt.ylabel('Precision')
+                plt.xlim(0, 1)
+                plt.ylim(0, 1)
+                plt.axis('equal')
                 plt.legend(loc='best')
                 plt.title(f'Precision-Recall Curve for IoU Threshold {iouThr}')
             
