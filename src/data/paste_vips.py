@@ -130,7 +130,7 @@ def paste_vips_slide(model, device, slide_dir, tiles_dir, out_dir, slide_names, 
         vips_img_out = paste_vips_tiles(model, device, vips_img, coords, progress=True, progress_desc=slide_name, **kwargs)
         vips_img_out.write_to_file(out_fname, bigtiff=True, compression='lzw', pyramid=True, tile=True, tile_width=size[0], tile_height=size[1])
 
-        print(f'{slide_name}: {out_fname})
+        print(f'{slide_name}: {out_fname}')
         print()
 
 
