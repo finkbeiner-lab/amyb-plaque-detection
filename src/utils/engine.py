@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import wandb
 from visualization.explain import ExplainPredictions
+from sklearn.metrics import precision_recall_curve
+from sklearn.preprocessing import label_binarize
 
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch, wandb, print_freq, scaler=None):
@@ -89,6 +91,9 @@ def evaluate(run, model, data_loader, device, epoch):
     explain = ExplainPredictions(model, model_input_path = "", test_input_path="", detection_threshold=0.75, 
                                 wandb=wandb, save_result=True, ablation_cam=True, save_thresholds=False)
 
+    gt_list = []
+    predicted_list = []
+
     for images, targets in metric_logger.log_every(data_loader, 100, header):
 
        
@@ -100,21 +105,28 @@ def evaluate(run, model, data_loader, device, epoch):
         outputs = model(images)
 
         outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
+
+        for i in range(len(targets)):
+            gt_list.append(float(targets[i]['labels'].cpu().numpy())) 
+            # assuming first entry in labels is the one with highest score
+            predicted_list.append(float(outputs[i]['labels'][0].cpu().numpy()))
+
+        
         model_time = time.time() - model_time
 
-        for i in range(len(images)):
-            log_results = []
+        # for i in range(len(images)):
+        #     log_results = []
 
-            img = images[i].detach().cpu().numpy()
-            img = img.transpose(1, 2, 0)
+        #     img = images[i].detach().cpu().numpy()
+        #     img = img.transpose(1, 2, 0)
         
-            masks, boxes, labels, scores = explain.get_outputs(images, model, 0.75)
-            result_img, result_masks = explain.draw_segmentation_map(img, masks, boxes, labels)
+        #     masks, boxes, labels, scores = explain.get_outputs(images, model, 0.75)
+        #     result_img, result_masks = explain.draw_segmentation_map(img, masks, boxes, labels)
 
-            log_results.append(result_img)
-            log_results.append(result_masks)
+        #     log_results.append(result_img)
+        #     log_results.append(result_masks)
           
-            # run.log({"Evaluation": [wandb.Image(image) for image in log_results]})
+        #     # run.log({"Evaluation": [wandb.Image(image) for image in log_results]})
 
 
         res = {target["image_id"].item(): output for target, output in zip(targets, outputs)}
@@ -125,6 +137,27 @@ def evaluate(run, model, data_loader, device, epoch):
         coco_evaluator.update(res)
         evaluator_time = time.time() - evaluator_time
         metric_logger.update(model_time=model_time, evaluator_time=evaluator_time)
+    
+    gt_list = np.array(gt_list)
+    predicted_list = np.array(predicted_list)
+    y_true_bin = label_binarize(gt_list, classes=[1, 2, 3])  # shape: (4, 3)
+
+    precision = dict()
+    recall = dict()
+    plt.figure(figsize=(10, 8))
+
+    for i in range(3):
+        precision[i], recall[i], _ = precision_recall_curve(y_true_bin[:, i], predicted_list)
+        plt.plot(recall[i], precision[i], label='class {}'.format(i+1))
+
+    
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.legend()
+    plt.title('Precision-Recall Curve')
+    plt.show()
+    pdb.set_trace()
+      
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
