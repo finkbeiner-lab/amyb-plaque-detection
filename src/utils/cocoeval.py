@@ -84,8 +84,6 @@ class COCOeval:
         self.table = wandb.Table(columns=["eval_metrics"])
         self.epoch = 0
         self.exp_name = {}
-        self.precision = 0
-        self.recall = 0
         self.result_flag_precison = False
         self.result_flag_recall = False
         if not cocoGt is None:
@@ -396,8 +394,6 @@ class COCOeval:
             'scores': scores,
         }
 
-        self.plotPRCurve1()
-        
         toc = time.time()
         print('DONE-test (t={:0.2f}s).'.format( toc-tic))
     
@@ -495,23 +491,8 @@ class COCOeval:
             else:
                 mean_s = np.mean(s[s>-1])
             
-
-           
-
-            if titleStr == 'Average Precision' and iouStr == '0.50:0.95' and areaRng =='all':
-                self.precision = mean_s
-                self.result_flag_precison = True
-            elif titleStr == 'Average Recall' and iouStr == '0.50:0.95' and areaRng =='all':
-                self.recall = mean_s
-                self.result_flag_recall = True
-
             print(iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets, mean_s))
 
-            # if self.result_flag_precison and self.result_flag_recall:
-            #     self.result_flag_precison = False
-            #     self.result_flag_recall = False
-            #     label = "PR for {iouStr} with area {areaRng} and maxDets {maxDets}"
-            #     self.plotPRCurve(label.format(typeStr=typeStr,iouStr=iouStr, areaRng=areaRng, maxDets=maxDets))
             # x = pd.DataFrame(results)
             # wandb
             self.table.add_data(iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets, mean_s)) 

@@ -229,8 +229,8 @@ if __name__ == '__main__':
     run_id, run_dir = run.id, run.dir
 
     # #TODO: replace this with run.name
-    #exp_name = run.name
-    exp_name = "runtest"
+    exp_name = run.name
+    # exp_name = "runtest"
 
     artifact_name = f'{run_id}-logs'
 

@@ -86,7 +86,7 @@ def evaluate(run, model, data_loader, device, epoch):
     iou_types = _get_iou_types(model)
 
     #TODO: HardCode Exp name # later replace by run.name
-    exp_name = "runtest"
+    # exp_name = "runtest"
     coco_evaluator = CocoEvaluator(coco, iou_types, epoch, exp_name)
     explain = ExplainPredictions(model, model_input_path = "", test_input_path="", detection_threshold=0.75, 
                                 wandb=wandb, save_result=True, ablation_cam=True, save_thresholds=False)
@@ -126,13 +126,10 @@ def evaluate(run, model, data_loader, device, epoch):
         #     log_results.append(result_img)
         #     log_results.append(result_masks)
           
-        #     # run.log({"Evaluation": [wandb.Image(image) for image in log_results]})
+        #     run.log({"Evaluation": [wandb.Image(image) for image in log_results]})
 
 
         res = {target["image_id"].item(): output for target, output in zip(targets, outputs)}
-        # print(len(outputs))
-        # print("Outputs", outputs[0]['labels'])
-        
         evaluator_time = time.time()
         coco_evaluator.update(res)
         evaluator_time = time.time() - evaluator_time
@@ -146,28 +143,12 @@ def evaluate(run, model, data_loader, device, epoch):
     recall = dict()
     plt.figure(figsize=(10, 8))
 
-    for i in range(3):
-        precision[i], recall[i], _ = precision_recall_curve(y_true_bin[:, i], predicted_list)
-        plt.plot(recall[i], precision[i], label='class {}'.format(i+1))
-
-    
-    plt.xlabel('Recall')
-    plt.ylabel('Precision')
-    plt.legend()
-    plt.title('Precision-Recall Curve')
-    plt.show()
-    pdb.set_trace()
-      
-
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
     
     coco_evaluator.synchronize_between_processes()
-
-    # accumulate predictions from all images
-    # torch.set_num_threads(1)
-    coco_evaluator.accumulate()
-    coco_evaluator.summarize(run)
+    eval_imgs = coco_evaluator.accumulate()
+    results = coco_evaluator.summarize(run)
     torch.set_num_threads(n_threads)
-    return coco_evaluator
+    return eval_imgs
