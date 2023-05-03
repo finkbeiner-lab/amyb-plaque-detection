@@ -49,7 +49,8 @@ class ExplainPredictions():
         self.save_result = save_result
         self.ablation_cam = ablation_cam
         self.save_thresholds = save_thresholds
-        self.class_names = ['Unknown', 'Core', 'Diffuse', 'Neuritic', 'CAA']
+        # self.class_names = ['Unknown', 'Core', 'Diffuse', 'Neuritic', 'CAA']
+        self.class_names = ['Unknown', 'Core', 'Diffuse', 'CAA']
         self.class_to_colors = {'Core': (255, 0, 0), 'Neuritic' : (0, 0, 255), 'Diffuse': (0,255,0), 'CAA':(225, 255, 0)}
         #TODO change this to nas location later
         self.result_save_dir= "/wynton/home/finkbeiner/vgramas/Projects/amyb-plaque-detection/reports/figures/"

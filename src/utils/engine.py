@@ -87,7 +87,7 @@ def evaluate(run, model, data_loader, device, epoch):
 
     #TODO: HardCode Exp name # later replace by run.name
     # exp_name = "runtest"
-    coco_evaluator = CocoEvaluator(coco, iou_types, epoch, exp_name)
+    coco_evaluator = CocoEvaluator(coco, iou_types, epoch, run.name)
     explain = ExplainPredictions(model, model_input_path = "", test_input_path="", detection_threshold=0.75, 
                                 wandb=wandb, save_result=True, ablation_cam=True, save_thresholds=False)
 
@@ -95,6 +95,7 @@ def evaluate(run, model, data_loader, device, epoch):
     predicted_list = []
 
     for images, targets in metric_logger.log_every(data_loader, 100, header):
+
 
        
         images = list(img.to(device) for img in images)
@@ -106,10 +107,10 @@ def evaluate(run, model, data_loader, device, epoch):
 
         outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
 
-        for i in range(len(targets)):
-            gt_list.append(float(targets[i]['labels'].cpu().numpy())) 
-            # assuming first entry in labels is the one with highest score
-            predicted_list.append(float(outputs[i]['labels'][0].cpu().numpy()))
+        # for i in range(len(targets)):
+        #     gt_list.append(float(targets[i]['labels'].cpu().numpy())) 
+        #     # assuming first entry in labels is the one with highest score
+        #     predicted_list.append(float(outputs[i]['labels'][0].cpu().numpy()))
 
         
         model_time = time.time() - model_time
@@ -135,13 +136,13 @@ def evaluate(run, model, data_loader, device, epoch):
         evaluator_time = time.time() - evaluator_time
         metric_logger.update(model_time=model_time, evaluator_time=evaluator_time)
     
-    gt_list = np.array(gt_list)
-    predicted_list = np.array(predicted_list)
-    y_true_bin = label_binarize(gt_list, classes=[1, 2, 3])  # shape: (4, 3)
+    # gt_list = np.array(gt_list)
+    # predicted_list = np.array(predicted_list)
+    # y_true_bin = label_binarize(gt_list, classes=[1, 2, 3])  # shape: (4, 3)
 
-    precision = dict()
-    recall = dict()
-    plt.figure(figsize=(10, 8))
+    # precision = dict()
+    # recall = dict()
+    # plt.figure(figsize=(10, 8))
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()

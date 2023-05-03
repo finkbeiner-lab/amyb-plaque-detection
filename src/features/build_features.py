@@ -77,6 +77,7 @@ class AmyBDataset(torch.utils.data.Dataset):
 
         x = [id // 50 for id in obj_ids]
         labels = torch.tensor(x)
+       
 
 
         masks = torch.as_tensor(masks, dtype=torch.uint8)
