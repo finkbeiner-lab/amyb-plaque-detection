@@ -1,6 +1,5 @@
 from genericpath import exists
 import pdb
-from pickletools import uint8
 from turtle import pd
 import torchvision
 import torch
@@ -33,6 +32,7 @@ from skimage.color import rgb2hed, hed2rgb
 import sys
 sys.path.insert(0, '../')
 from models.model_mrcnn import _default_mrcnn_config, build_default
+from PIL import Image 
 
 
 
@@ -50,10 +50,10 @@ class ExplainPredictions():
         self.ablation_cam = ablation_cam
         self.save_thresholds = save_thresholds
         # self.class_names = ['Unknown', 'Core', 'Diffuse', 'Neuritic', 'CAA']
-        self.class_names = ['Unknown', 'Core', 'Diffuse', 'CAA']
-        self.class_to_colors = {'Core': (255, 0, 0), 'Neuritic' : (0, 0, 255), 'Diffuse': (0,255,0), 'CAA':(225, 255, 0)}
+        self.class_names = ['Unknown', 'Cored', 'Diffuse', 'CAA']
+        self.class_to_colors = {'Cored': (255, 0, 0), 'Neuritic' : (0, 0, 255), 'Diffuse': (0,255,0), 'CAA':(225, 255, 0)}
         #TODO change this to nas location later
-        self.result_save_dir= "/wynton/home/finkbeiner/vgramas/Projects/amyb-plaque-detection/reports/figures/"
+        self.result_save_dir= "/mnt/new-nas/work/data/npsad_data/vivek/reports/figures"
         self.colors = np.random.uniform(0, 255, size=(len(self.class_names), 3))
         self.column_names = ["image_name", "region", "region_mask", "label", 
                             "confidence", "brown_pixels", "centroid", 
@@ -147,8 +147,10 @@ class ExplainPredictions():
         alpha = 1 
         beta = 0.6 # transparency for the segmentation map
         gamma = 0 # scalar added to each 
-        segmentation_map = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint8)
-        result_masks = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint8)
+        # segmentation_map = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint8)
+        # result_masks = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint8)
+        segmentation_map = np.zeros((1024, 1024), dtype=np.uint8)
+        result_masks = np.zeros((1024, 1024), dtype=np.uint8)
 
         for i in range(len(masks)):
 
@@ -198,11 +200,15 @@ class ExplainPredictions():
         image_float_np = np.float32(image) / 255
 
         # define the torchvision image transforms
+        #TODO: Remove the resize for our internal test data
         transform = torchvision.transforms.Compose([
+            torchvision.transforms.Resize(1024),
             torchvision.transforms.ToTensor(),
         ])
 
-        input_tensor = transform(image)
+        #TODO: change back to transform(image)
+
+        input_tensor = transform(transforms.ToPILImage()(image))
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         input_tensor = input_tensor.to(device)
         # Add a batch dimension:
@@ -244,10 +250,10 @@ class ExplainPredictions():
 
     def make_result_dirs(self, folder_name):
 
-        # TODO remove this later and replace with self.wandb.name
-        # folder_name = self.wandb.name + "_" + folder_name
-        folder_name = "runtest" + "_" + folder_name
+    
+        # folder_name = "runtest" + "_" + 
         save_path = os.path.join(self.result_save_dir, folder_name)
+
         results_path = os.path.join(save_path, "results")
         if not os.path.exists(results_path):
             os.makedirs(results_path)
@@ -264,11 +270,12 @@ class ExplainPredictions():
         if not os.path.exists(ablations_path):
             os.makedirs(ablations_path)
         
-        pixel_count_path = os.path.join(self.result_save_dir, "pixel_count")
+        pixel_count_path = os.path.join(save_path, "pixel_count")
         if not os.path.exists(pixel_count_path):
             os.makedirs(pixel_count_path)
         
-        csv_name = folder_name + "_quantify.csv"
+        #TODO remove this folder split
+        csv_name = folder_name.split("/")[1] + "_quantify.csv"
         quantify_path = os.path.join(save_path, csv_name)
 
         self.results_path = results_path
@@ -293,6 +300,8 @@ class ExplainPredictions():
             total_core_plaques = 0
             total_neuritic_plaques = 0
             total_diffused_plaques = 0
+            total_caa_plaques = 0
+
 
             if len(boxes)!= 0:
 
@@ -315,20 +324,23 @@ class ExplainPredictions():
 
                 for props in regions:
 
-                    if labels[i] == "Core":
+                    if labels[i] == "Cored":
                         total_core_plaques+=1
                     elif labels[i] == "Neuritic":
                         total_neuritic_plaques+=1
                     elif labels[i] == "Diffuse":
                         total_diffused_plaques+=1
+                    elif labels[i] == "CAA":
+                        total_caa_plaques+=1
                     
                     data_record = pd.DataFrame.from_records([{ 'image_name': img_name, 'label': labels[i] , 'confidence': scores[i],
                                                                'brown_pixels': total_brown_pixels,
                                                                'core': total_core_plaques, 'neuritic': total_neuritic_plaques, 'diffuse': total_diffused_plaques,
-                                                               'centroid': props.centroid, 'eccentricity': props.eccentricity, 
+                                                               'caa': total_caa_plaques, 'centroid': props.centroid, 'eccentricity': props.eccentricity, 
                                                                'area': props.area, 'equivalent_diameter': props.equivalent_diameter}])
-                    wandb_result.append([img_name, wandb.Image(cropped_img), wandb.Image(cropped_img_mask), labels[i], scores[i], 
-                                         total_brown_pixels, props.centroid, props.eccentricity, props.area, props.equivalent_diameter])
+                    # TODO Uncomment this later
+                    # wandb_result.append([img_name, wandb.Image(cropped_img), wandb.Image(cropped_img_mask), labels[i], scores[i], 
+                    #                      total_brown_pixels, props.centroid, props.eccentricity, props.area, props.equivalent_diameter])
 
                     df = pd.concat([df, data_record], ignore_index=True)
                    
@@ -348,18 +360,33 @@ class ExplainPredictions():
         
         # Test images from each WSI folder
         test_folders = sorted(test_folders)
+
+        # Create Run folder
+        run_name_folder = self.wandb.name
+        if not os.path.exists(run_name_folder):
+            os.makedirs(run_name_folder)
+
+
       
         for test_folder in tqdm(test_folders):
 
-            print("\n", test_folder)
+            print("\n==========", test_folder)
+          
             folder_name = os.path.basename(test_folder)
+      
+
+            # if folder_name == match_clinical_list:
+
+            folder_name = os.path.join(run_name_folder, folder_name)
+
 
             if folder_name == "labels":
                 continue
-
+            
             # make all necessary folders
             self.make_result_dirs(folder_name)
-            images = glob.glob(os.path.join(test_folder, '*.png'))
+            #TODO change the file extension of .png for internal validation
+            images = glob.glob(os.path.join(test_folder, '*.jpg'))
 
             i = 0
             df = pd.DataFrame()
@@ -374,7 +401,9 @@ class ExplainPredictions():
                 result_img = 0
                 img_name = os.path.basename(img).split('.')[0]
         
-                image = np.array(Image.open(img))
+                image = Image.open(img)
+                image = np.array(image.resize((1024, 1024)))
+                
 
                 total_image_pixels+= image.shape[0] * image.shape[1]
                 # Check if image has alpha channel
@@ -383,95 +412,109 @@ class ExplainPredictions():
 
                 input_tensor, image_float_np = self.prepare_input(image)
                 masks, boxes, labels, scores = self.get_outputs(input_tensor, self.model, self.detection_threshold)
-                
-                result_img, result_masks = self.draw_segmentation_map(image, masks, boxes, labels)
 
-                total_brown_pixels+= self.get_brown_pixel_cnt(image, img_name)
+                if len(masks) != 0 and len(boxes) !=0:
 
-                df, wandb_result = self.quantify_plaques(df, wandb_result, img_name, result_img, result_masks, boxes, labels, scores, total_brown_pixels)
-
-                if self.save_result:
-                    mask_img_name = img_name +  "_masks.png"
-                    mask_save_path = os.path.join(self.masks_path, mask_img_name)
-
-                    # Plot masks
-                    cv2.imwrite(mask_save_path, result_masks)
-
-                    # Plot detections
-                    detection_img_name = img_name + "_detection.png"
-                    detection_save_path = os.path.join(self.detections_path, detection_img_name)
-                    bgr_img = cv2.cvtColor(result_img, cv2.COLOR_RGB2BGR)
-                    cv2.imwrite(detection_save_path, bgr_img)
-
-                    # Plot Results
-                    plt.figure(figsize=(10,10))
-                    plt.title("Model Prediction")
-
-                    img_array = [result_img, result_masks]
-
-                    for j in range(2):
-                        plt.subplot(1, 2, j+1)
-                        plt.imshow(img_array[j])
+                    if np.count_nonzero(masks) == 0:
+                        continue
                     
-                    result_img_name = img_name +  "_result.png"
-                    result_save_path = os.path.join(self.results_path, result_img_name)
-                    plt.savefig(result_save_path)
-                    plt.close()
-
-                # plt.show()
-                if self.ablation_cam:
-                    # Ablation CAM
-                    boxes, classes, labels, indices = self.predict(input_tensor, model, device, self.detection_threshold)
-                    target_layers = [model.backbone]
-                    targets = [FasterRCNNBoxScoreTarget(labels=labels, bounding_boxes=boxes)]
+                    # print(" processing------", img_name)
+                    
                 
+                    result_img, result_masks = self.draw_segmentation_map(image, masks, boxes, labels)
 
-                    cam = AblationCAM(model,
-                                target_layers, 
-                                use_cuda=torch.cuda.is_available(), 
-                                reshape_transform=fasterrcnn_reshape_transform,
-                                ablation_layer=AblationLayerFasterRCNN())
+                    # total_brown_pixels+= self.get_brown_pixel_cnt(image, img_name)
 
-                    grayscale_cam = cam(input_tensor, targets=targets)
-                    # Take the first image in the batch:
-                    grayscale_cam = grayscale_cam[0, :]
-                    cam_image = show_cam_on_image(image_float_np, grayscale_cam, use_rgb=True)
-                    # And lets draw the boxes again:
-                    image_with_bounding_boxes = self.draw_boxes(boxes, labels, classes, cam_image)
-
-                    # plt.imshow(image_with_bounding_boxes)
-                    plt.figure(figsize=(10,10))
-                    plt.title("Ablation Cam")
-                    ablation_list = [grayscale_cam, image_with_bounding_boxes]
-                    for k in range(2):
-                        plt.subplot(1, 2, k+1)
-                        plt.imshow(ablation_list[k])
-
+                    df, wandb_result = self.quantify_plaques(df, wandb_result, img_name, result_img, result_masks, boxes, labels, scores, total_brown_pixels)
 
                     if self.save_result:
-                        ablation_img_name = img_name +  "_ablation_cam.png"
-                        save_path_ablation = os.path.join(self.ablations_path, ablation_img_name)
-                        plt.savefig(save_path_ablation)
-                i = i + 1
-                # plt.show()
+                        mask_img_name = img_name +  "_masks.png"
+                        mask_save_path = os.path.join(self.masks_path, mask_img_name)
+
+                        # Plot masks
+                        cv2.imwrite(mask_save_path, result_masks)
+
+                        # Plot detections
+                        detection_img_name = img_name + "_detection.png"
+                        detection_save_path = os.path.join(self.detections_path, detection_img_name)
+                        bgr_img = cv2.cvtColor(result_img, cv2.COLOR_RGB2BGR)
+                        cv2.imwrite(detection_save_path, bgr_img)
+
+                        # Plot Results
+                        plt.figure(figsize=(10,10))
+                        plt.title("Model Prediction")
+
+                        img_array = [result_img, result_masks]
+
+                        for j in range(2):
+                            plt.subplot(1, 2, j+1)
+                            plt.imshow(img_array[j])
+                        
+                        result_img_name = img_name +  "_result.png"
+                        result_save_path = os.path.join(self.results_path, result_img_name)
+                        plt.savefig(result_save_path)
+                        plt.close()
+
+                    # plt.show()
+                    if self.ablation_cam:
+                        # Ablation CAM
+                        boxes, classes, labels, indices = self.predict(input_tensor, model, device, self.detection_threshold)
+                        target_layers = [model.backbone]
+                        targets = [FasterRCNNBoxScoreTarget(labels=labels, bounding_boxes=boxes)]
+                    
+
+                        cam = AblationCAM(model,
+                                    target_layers, 
+                                    use_cuda=torch.cuda.is_available(), 
+                                    reshape_transform=fasterrcnn_reshape_transform,
+                                    ablation_layer=AblationLayerFasterRCNN())
+
+                        grayscale_cam = cam(input_tensor, targets=targets)
+                        # Take the first image in the batch:
+                        grayscale_cam = grayscale_cam[0, :]
+                        cam_image = show_cam_on_image(image_float_np, grayscale_cam, use_rgb=True)
+                        # And lets draw the boxes again:
+                        image_with_bounding_boxes = self.draw_boxes(boxes, labels, classes, cam_image)
+
+                        # plt.imshow(image_with_bounding_boxes)
+                        plt.figure(figsize=(10,10))
+                        plt.title("Ablation Cam")
+
+                        plt.imshow(grayscale_cam)
+                        # ablation_list = [grayscale_cam, image_with_bounding_boxes]
+                        # for k in range(2):
+                        #     plt.subplot(1, 2, k+1)
+                        #     plt.imshow(ablation_list[k])
+
+
+                        if self.save_result:
+                            ablation_img_name = img_name +  "_ablation_cam.png"
+                            save_path_ablation = os.path.join(self.ablations_path, ablation_img_name)
+                            plt.savefig(save_path_ablation)
+                    i = i + 1
+                    # plt.show()
+                
 
             if total_image_pixels != 0:
                 print("Total area of brown pixel", (total_brown_pixels/ total_image_pixels)*100)
             df.to_csv(self.quantify_path, index=False)
             test_table = wandb.Table(data=wandb_result, columns=self.column_names)
-            # self.wandb.log({'quantifications': test_table})
+            # self.wandb.log({'quantifications': test_table})   
 
                 
         
 if __name__ == "__main__":
 
     
-    input_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test1'
-    model_input_path = '/mnt/new-nas/work/data/npsad_data/vivek/models/vibrant-yogurt-428_mrcnn_model_50.pth'
+    # input_path = "/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test-patients/images"
+    # input_path = "/mnt/new-nas/work/data/npsad_data/vivek/reports/Manuscript"
+    input_path = "/mnt/new-nas/work/data/npsad_data/vivek/reports/Manuscript/ablation-cam"
+    # input_path = "/mnt/new-nas/work/data/npsad_data/vivek/Datasets/UCDavis-Dataset/tiles/train/"
+    model_input_path = "/mnt/new-nas/work/data/npsad_data/vivek/models/eager-frog-489_mrcnn_model_100.pth"
 
     test_config = dict(
-        batch_size = 1,
-        num_classes = 4
+        batch_size = 2,
+        num_classes = 3
     )
 
     model_config = _default_mrcnn_config(num_classes=1 + test_config['num_classes']).config
