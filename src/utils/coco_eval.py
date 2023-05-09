@@ -54,6 +54,7 @@ class CocoEvaluator:
     def accumulate(self):
         for coco_eval in self.coco_eval.values():
             coco_eval.accumulate()
+        return self.eval_imgs
 
     def summarize(self, run):
         for iou_type, coco_eval in self.coco_eval.items():
