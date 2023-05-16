@@ -8,7 +8,9 @@ result_data_path = "/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/repor
 result_folders = glob.glob(os.path.join(result_data_path, "*"))
 
 destination_path = "/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/"
-csv_dir = os.path.join(os.path.dirname(destination_path), "csv_data","Internal_dataset")
+#csv_dir = os.path.join(os.path.dirname(destination_path), "csv_data","Internal_dataset")
+csv_dir = os.path.join(os.path.dirname(destination_path), "csv_data","Internal_dataset_latest")
+
 #if not os.path.exists(csv_dir):
  #   os.makedirs(csv_dir)
 

@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 __pkg = os.path.abspath(os.path.join(__file__, *('..'.split() * 2)))
+
 if __pkg not in sys.path:
     sys.path.append(__pkg)
 
@@ -89,8 +90,9 @@ def get_slide_mask(
 ):
     k1, i1, r1 = fill_params
     k2, i2 = close_params
-
-    im = slide[:3].numpy()
+    slide1 = np.ndarray(buffer=slide.write_to_memory(), dtype=np.uint8, shape=(slide.height, slide.width, slide.bands))
+    im = slide1[:,:,:3]
+    #.numpy()
     gray = cv2.cvtColor(im, cv2.COLOR_RGB2GRAY)
     thresh, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
 
@@ -115,6 +117,7 @@ def save_slide_masks(slide_name, slide_dir, out_dir, tile_size, level):
     tile_size //= 2 ** level
     slide = pyvips.Image.new_from_file(os.path.join(slide_dir, f'{slide_name}.mrxs'), level=level)
     # slide = get_cropped(slide, level)
+    
 
     tile_out, mask_out, viz_out = [os.path.join(out_dir, f'{slide_name}.{suffix}') for suffix in ('tiles.npy', 'mask.png', 'viz.png')]
     tiles, mask, viz = get_slide_mask(slide, tile_size)
@@ -137,10 +140,16 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     slide_dir, output_dir, tile_size, level, slide_names = map(args.__getattribute__, 'slide_dir output_dir tile_size level slide_names'.split())
+    print(slide_dir, output_dir, tile_size, level, slide_names)
     if slide_names is None:
+        print(os.listdir(slide_dir))
         slide_names = sorted(['.'.join(fname.split('.')[:-1]) for fname in next(os.walk(slide_dir))[2] if fname.split('.')[-1] == 'mrxs'])
-
+        print(slide_names)
 
     for slide_name in tqdm.tqdm(slide_names):
-        save_slide_masks(slide_name, slide_dir, output_dir, tile_size, level)
+        try:
+            save_slide_masks(slide_name, slide_dir, output_dir, tile_size, level)
+        except pyvips.error.Error:
+            print(slide_name, " not processed")
+        
 
