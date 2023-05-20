@@ -224,12 +224,12 @@ if __name__ == '__main__':
     dataset_test_location = args.dataset_test_location
 
     train_config = dict(
-        epochs = 1,
+        epochs = 100,
         batch_size = 10,
-        num_classes = 3,
+        num_classes = 4,
         device_id = 0,
         ckpt_freq =500,
-        eval_freq = 1,
+        eval_freq = 50,
     )
 
     test_config = dict(
@@ -241,7 +241,7 @@ if __name__ == '__main__':
         # cls=grad_optim.GradSGD,
         cls=torch.optim.SGD,
        
-        defaults=dict(lr=1. * (10. ** (-2)))  #-4 is too slow 
+        defaults=dict(lr=1. * (10. ** (-2)))  #-4 is too  slow 
     )
     wandb_config = dict(
         project='nps-ad-vivek',
@@ -264,18 +264,18 @@ if __name__ == '__main__':
     test_dataset = build_features.AmyBDataset(dataset_test_location, T.Compose([T.ToTensor()]))
 
     # Mapping
-    # fn_relabel = lambda i: [1, 2, 1, 3][i - 1]
-    def remap_label(orig_label):
-        # print("\nOrig", orig_label)
-        if (orig_label==1) or (orig_label==3):
-            # print("mapped 1/3", 1)
-            return 1
-        if orig_label==4:
-            # print("mapped 4", 3)
-            return 3
-        return orig_label
+    # # fn_relabel = lambda i: [1, 2, 1, 3][i - 1]
+    # def remap_label(orig_label):
+    #     # print("\nOrig", orig_label)
+    #     if (orig_label==1) or (orig_label==3):
+    #         # print("mapped 1/3", 1)
+    #         return 1
+    #     if orig_label==4:
+    #         # print("mapped 4", 3)
+    #         return 3
+    #     return orig_label
     
-    train_dataset, test_dataset = [build_features.DatasetRelabeled(dataset, remap_label) for dataset in (train_dataset, test_dataset)]
+    # train_dataset, test_dataset = [build_features.DatasetRelabeled(dataset, remap_label) for dataset in (train_dataset, test_dataset)]
 
     train_data_loader = torch.utils.data.DataLoader(
             train_dataset, batch_size=train_config['batch_size'], shuffle=True, num_workers=4,
@@ -337,10 +337,10 @@ if __name__ == '__main__':
         #         torch.save(model.state_dict(), f)
             # run.log_artifact(artifact)
 
-        if epoch % train_config['eval_freq'] == 0:
-            eval_res = evaluate(run, model, test_data_loader, device=device, epoch=epoch)
-            # pdb.set_trace()
-            # plotPRcurve(eval_res, epoch)
+        # if epoch % train_config['eval_freq'] == 0 and epoch != 0:
+        #     eval_res = evaluate(run, model, test_data_loader, device=device, epoch=epoch)
+        #     # pdb.set_trace()
+        #     # plotPRcurve(eval_res, epoch)
 
         
         model.train(True)

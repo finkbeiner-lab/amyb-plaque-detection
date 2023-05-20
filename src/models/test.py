@@ -23,6 +23,7 @@ from visualization.explain import ExplainPredictions
 import pandas as pd
 import plotly.graph_objects as go
 import pdb
+from sklearn.metrics import precision_recall_curve, auc
 
 
 # def testmodel():
@@ -30,12 +31,13 @@ def plotPRcurve(eval2, epoch, run):
 
     df = pd.DataFrame(columns=["class","tpr","fpr","recall","precision"])
     len_classes = 3 ## Assuming 3 classes
+    colors={"cored":'royalblue', "diffuse":'firebrick','caa':"green"}
 
     
 
     len_classes = len(eval2['bbox'])
 
-   
+    random_rp_dict=dict()
     for c in range(len_classes): # running for all 3 classes
         ## parameters
         area_index = 0 # area - all (areaRng = [[0 ** 2, 1e5 ** 2], [0 ** 2, 32 ** 2], [32 ** 2, 96 ** 2], [96 ** 2, 1e5 ** 2]]  -> areaRngLbl = ['all', 'small', 'medium', 'large'])
@@ -60,6 +62,8 @@ def plotPRcurve(eval2, epoch, run):
         if len(tp_sum) == 0:
             continue
         
+        # rp =tp_sum[-1]/len(tp_sum)
+        # random_rp_dict[c]=rp
         # tp_sum=tp_sum/tp_sum[-1]
         fp_sum = np.cumsum(fps, axis=0, dtype=float)
         # fp_sum=fp_sum/fp_sum[-1]
@@ -81,16 +85,29 @@ def plotPRcurve(eval2, epoch, run):
         x0=0, x1=1, y0=0, y1=1
     )
     classes = ['cored', 'diffuse', 'caa']
-    for i in range(3):
-        fig.add_trace(go.Scatter(x=df[df["class"]==i]["recall"], y=df[df["class"]==i]["precision"], name=classes[i], mode='lines'))
+    class_auc_pr = {}
 
+    for i in range(3):
+        fig.add_trace(go.Scatter(x=df[df["class"]==i]["recall"], y=df[df["class"]==i]["precision"], name=classes[i], mode='lines', line=dict(color=colors[classes[i]])))
+
+        pdb.set_trace()
+        precision = df[df["class"]==i]["precision"]
+        recall = df[df["class"]==i]["recall"]
+        
+        class_auc_pr[c] = auc(recall, precision)
+
+        # fig.add_trace(go.Scatter(x=[0,1], y=[random_rp_dict[i],random_rp_dict[i]], name=classes[i] +"_random", mode='lines',line=dict(color=colors[classes[i]], width=1,dash='dash')))
 
     fig.update_layout(
+        plot_bgcolor='white',
         xaxis_title='Recall',
         yaxis_title='Precision',
         width=1000, height=500,
         title='Precision-Recall Curve'
     )
+    fig.update_xaxes(mirror=True, ticks='outside', showline=True, linecolor='black',gridcolor='lightgrey')
+    fig.update_yaxes(mirror=True, ticks='outside', showline=True, linecolor='black',gridcolor='lightgrey')
+
     
     save_name = "prcurve_{epoch}.html"
     fig_name = save_name.format(epoch=epoch)
@@ -105,8 +122,10 @@ def plotPRcurve(eval2, epoch, run):
 
 if __name__ == '__main__':
     dataset_test_location = "/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/val"
+    
 
     model_path = "/mnt/new-nas/work/data/npsad_data/vivek/models/eager-frog-489_mrcnn_model_100.pth"
+    # model_path = /home/vivek/Projects/amyb-plaque-detection/models/swift-brook-705_mrcnn_model_100.pth
     # model_path = "/home/vivek/Projects/amyb-plaque-detection/models/dry-disco-560_mrcnn_model_50.pth"
 
     epoch = 0
@@ -116,7 +135,7 @@ if __name__ == '__main__':
 
     test_config = dict(
         epochs = 32,
-        batch_size = 10,
+        batch_size = 8,
         num_classes = 3,
         device_id = 0,
         ckpt_freq =500,
@@ -151,3 +170,4 @@ if __name__ == '__main__':
     # Evaluate
     eval_res = evaluate(run, model, test_data_loader, device=device, epoch=epoch)
     plotPRcurve(eval_res, epoch, run)
+    

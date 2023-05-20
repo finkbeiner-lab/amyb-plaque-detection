@@ -28,7 +28,7 @@ Tile computation (where tile_size = (xs, ys)):
     (xi * xs, yi * ys, ((xi + 1) * xs) - 1, ((yi + 1) * ys) - 1) in (x1, y1, x2, y2) format, or
     (xi * xs, yi * ys, xs, ys) in (x, y, w, h) format.
     The tiles listed for a given slide are cropped from it and passed as input to the downstream task.
-
+get_slide_tiles
 Metrics computation:
     tile_as_tensor: Each tile is cropped using pyvips, output as an ndarray, converted to a CUDA tensor, and normalized in the range (0, 1).
     norm: Considering each color channel in turn, the number of pixels, and the sum of a) pixel values and b) pixel values squared is recorded, normalized by the number of pixels.

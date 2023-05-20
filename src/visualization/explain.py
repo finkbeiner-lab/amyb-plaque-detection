@@ -49,8 +49,8 @@ class ExplainPredictions():
         self.save_result = save_result
         self.ablation_cam = ablation_cam
         self.save_thresholds = save_thresholds
-        # self.class_names = ['Unknown', 'Core', 'Diffuse', 'Neuritic', 'CAA']
-        self.class_names = ['Unknown', 'Cored', 'Diffuse', 'CAA']
+        self.class_names = ['Unknown', 'Cored', 'Diffuse', 'Neuritic', 'CAA']
+        # self.class_names = ['Unknown', 'Cored', 'Diffuse', 'CAA']
         self.class_to_colors = {'Cored': (255, 0, 0), 'Neuritic' : (0, 0, 255), 'Diffuse': (0,255,0), 'CAA':(225, 255, 0)}
         #TODO change this to nas location later
         self.result_save_dir= "/mnt/new-nas/work/data/npsad_data/vivek/reports/figures"
@@ -367,7 +367,6 @@ class ExplainPredictions():
             os.makedirs(run_name_folder)
 
 
-      
         for test_folder in tqdm(test_folders):
 
             print("\n==========", test_folder)
@@ -386,7 +385,7 @@ class ExplainPredictions():
             # make all necessary folders
             self.make_result_dirs(folder_name)
             #TODO change the file extension of .png for internal validation
-            images = glob.glob(os.path.join(test_folder, '*.jpg'))
+            images = glob.glob(os.path.join(test_folder, '*.png'))
 
             i = 0
             df = pd.DataFrame()
@@ -508,13 +507,17 @@ if __name__ == "__main__":
     
     # input_path = "/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test-patients/images"
     # input_path = "/mnt/new-nas/work/data/npsad_data/vivek/reports/Manuscript"
-    input_path = "/mnt/new-nas/work/data/npsad_data/vivek/reports/Manuscript/ablation-cam"
+    # input_path = "/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test-missing/images"
+    input_path = "/mnt/new-nas/work/data/npsad_data/vivek/Datasets/neuritic/images"
+
+    #input_path = "/mnt/new-nas/work/data/npsad_data/vivek/reports/Manuscript/ablation-cam"
     # input_path = "/mnt/new-nas/work/data/npsad_data/vivek/Datasets/UCDavis-Dataset/tiles/train/"
-    model_input_path = "/mnt/new-nas/work/data/npsad_data/vivek/models/eager-frog-489_mrcnn_model_100.pth"
+    # model_input_path = "/mnt/new-nas/work/data/npsad_data/vivek/models/eager-frog-489_mrcnn_model_100.pth"
+    model_input_path = "/home/vivek/Projects/amyb-plaque-detection/models/swift-brook-705_mrcnn_model_100.pth"
 
     test_config = dict(
         batch_size = 2,
-        num_classes = 3
+        num_classes = 4
     )
 
     model_config = _default_mrcnn_config(num_classes=1 + test_config['num_classes']).config

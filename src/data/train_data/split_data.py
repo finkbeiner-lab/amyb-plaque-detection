@@ -275,8 +275,8 @@ class SplitData:
         label_filenames.sort()
 
         # split the images into train test and val
-        self.check_distribution("original_data", image_filenames, label_filenames)
-        self.split_dataset(image_filenames, label_filenames, self.dataset_base_dir)
+        # self.check_distribution("original_data", image_filenames, label_filenames)
+        # self.split_dataset(image_filenames, label_filenames, self.dataset_base_dir)
 
         # Step 3 Data Augmentation Block
         if self.data_aug:
@@ -288,7 +288,7 @@ class SplitData:
             self.check_distribution("augmented_data", augmented_image_files, augmented_label_files)
             print("\n Total Data :", len(augmented_image_files) + len(image_filenames))
 
-            self.split_dataset(augmented_image_files, augmented_label_files, self.dataset_base_dir)
+            # self.split_dataset(augmented_image_files, augmented_label_files, self.dataset_base_dir)
 
         # self.visualization.check_images(augmented_image_files, 2)
         # self.visualization.check_images(augmented_label_files, 2)
@@ -318,6 +318,6 @@ class SplitData:
 
 if __name__ == "__main__":
     #TODO Fix data aug - Not Running
-    base_WSI_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/'
+    base_WSI_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/test_amyb_wsi/'
     split_data = SplitData(base_WSI_path, True, 100)
     split_data.prepare_dataset()

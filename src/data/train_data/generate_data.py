@@ -31,7 +31,7 @@ ID_MASK_SHAPE = (1024, 1024)
 lablel2id = {'Core':'50', 'Diffuse':'100',
              'Neuritic':'150', 'CAA': '200', 'Unknown':'0'}
 
-DATASET_PATH = "/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi"
+DATASET_PATH = "/mnt/new-nas/work/data/npsad_data/vivek/Datasets/test_amyb_wsi"
 
 def save_img(img, file_name, tileX, tileY, save_dir, label="mask"):
     im = Image.fromarray(img)
