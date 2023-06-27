@@ -1,0 +1,121 @@
+mkdir: cannot create directory '/tmp/lock-gpu2': File exists
+Successfully started process watches.
+Successfully started recording stats for 2278449.
+W&B offline. Running your script from this directory will only write metadata locally. Use wandb disabled to completely turn off W&B.
+wandb: Tracking run with wandb version 0.13.5
+wandb: W&B syncing is set to `offline` in this directory.  
+wandb: Run `wandb online` or set WANDB_MODE=online to enable cloud syncing.
+/wynton/home/finkbeiner/vgramas/.conda/envs/amyb/lib/python3.9/site-packages/torchvision/transforms/functional.py:165: UserWarning: The given NumPy array is not writeable, and PyTorch does not support non-writeable tensors. This means you can write to the underlying (supposedly non-writeable) NumPy array using the tensor. You may want to copy the array to protect its data or make it writeable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at  /pytorch/torch/csrc/utils/tensor_numpy.cpp:180.)
+  img = torch.as_tensor(np.asarray(pic))
+/wynton/home/finkbeiner/vgramas/.conda/envs/amyb/lib/python3.9/site-packages/torchvision/transforms/functional.py:165: UserWarning: The given NumPy array is not writeable, and PyTorch does not support non-writeable tensors. This means you can write to the underlying (supposedly non-writeable) NumPy array using the tensor. You may want to copy the array to protect its data or make it writeable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at  /pytorch/torch/csrc/utils/tensor_numpy.cpp:180.)
+  img = torch.as_tensor(np.asarray(pic))
+/wynton/home/finkbeiner/vgramas/.conda/envs/amyb/lib/python3.9/site-packages/torchvision/transforms/functional.py:165: UserWarning: The given NumPy array is not writeable, and PyTorch does not support non-writeable tensors. This means you can write to the underlying (supposedly non-writeable) NumPy array using the tensor. You may want to copy the array to protect its data or make it writeable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at  /pytorch/torch/csrc/utils/tensor_numpy.cpp:180.)
+  img = torch.as_tensor(np.asarray(pic))
+/wynton/home/finkbeiner/vgramas/.conda/envs/amyb/lib/python3.9/site-packages/torch/nn/functional.py:718: UserWarning: Named tensors and all their associated APIs are an experimental feature and subject to change. Please do not use them for anything important until they are released as stable. (Triggered internally at  /pytorch/c10/core/TensorImpl.h:1156.)
+  return torch.max_pool2d(input, kernel_size, stride, padding, dilation, ceil_mode)
+/wynton/home/finkbeiner/vgramas/.conda/envs/amyb/lib/python3.9/site-packages/torchvision/transforms/functional.py:165: UserWarning: The given NumPy array is not writeable, and PyTorch does not support non-writeable tensors. This means you can write to the underlying (supposedly non-writeable) NumPy array using the tensor. You may want to copy the array to protect its data or make it writeable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at  /pytorch/torch/csrc/utils/tensor_numpy.cpp:180.)
+  img = torch.as_tensor(np.asarray(pic))
+epoch no : 0, batch no : 0, total loss : 3.46535325050354,  classifier :1.6758482456207275, mask: 1.0523996353149414 ===================
+epoch no : 0, batch no : 1, total loss : 2.879952907562256,  classifier :1.3912320137023926, mask: 0.705605685710907 ===================
+epoch no : 0, batch no : 2, total loss : 2.5877442359924316,  classifier :1.20859956741333, mask: 0.6693947911262512 ===================
+creating index...
+index created!
+[W pthreadpool-cpp.cc:90] Warning: Leaking Caffe2 thread-pool after fork. (function pthreadpool)
+[W pthreadpool-cpp.cc:90] Warning: Leaking Caffe2 thread-pool after fork. (function pthreadpool)
+[W pthreadpool-cpp.cc:90] Warning: Leaking Caffe2 thread-pool after fork. (function pthreadpool)
+[W pthreadpool-cpp.cc:90] Warning: Leaking Caffe2 thread-pool after fork. (function pthreadpool)
+Test:  [0/5]  eta: 0:00:05  model_time: 0.2866 (0.2866)  evaluator_time: 0.2898 (0.2898)  time: 1.0065  data: 0.2784  max mem: 2642
+Test:  [4/5]  eta: 0:00:00  model_time: 0.2547 (0.2587)  evaluator_time: 0.2768 (0.2846)  time: 0.7544  data: 0.0601  max mem: 2642
+Test: Total time: 0:00:03 (0.7709 s / it)
+Averaged stats: model_time: 0.2547 (0.2587)  evaluator_time: 0.2768 (0.2846)
+Accumulating evaluation results...
+DONE-test (t=1.13s).
+Accumulating evaluation results...
+DONE-test (t=1.03s).
+IoU metric: bbox
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.001
+ Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.004
+ Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.000
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = -1.000
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = -1.000
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.001
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.000
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.000
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.033
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = -1.000
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = -1.000
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.033
+IoU metric: segm
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.000
+ Average Precision  (AP) @[ IoU=0.50      | area=   all | maxDets=100 ] = 0.000
+ Average Precision  (AP) @[ IoU=0.75      | area=   all | maxDets=100 ] = 0.000
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = -1.000
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = -1.000
+ Average Precision  (AP) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.000
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=  1 ] = 0.000
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets= 10 ] = 0.000
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=   all | maxDets=100 ] = 0.000
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= small | maxDets=100 ] = -1.000
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area=medium | maxDets=100 ] = -1.000
+ Average Recall     (AR) @[ IoU=0.50:0.95 | area= large | maxDets=100 ] = 0.000
+
+ =================The Model is Trained!====================
+-----------------Visualizing Model predictions----------------
+  0%|          | 0/2 [00:00<?, ?it/s]
+ /gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/test-patients/images
+
+0it [00:00, ?it/s][A0it [00:00, ?it/s]
+100%|██████████| 2/2 [00:00<00:00, 24.91it/s]
+wandb: Waiting for W&B process to finish... (success).
+wandb: 
+wandb: Run history:
+wandb: epoch ▁▁▁
+wandb:  loss █▃▁
+wandb: 
+wandb: Run summary:
+wandb: epoch 0
+wandb:  loss 2.58774
+wandb: 
+wandb: You can sync this run to the cloud by running:
+wandb: wandb sync /wynton/home/finkbeiner/vgramas/Projects/amyb-plaque-detection/src/models/wandb/offline-run-20230329_121725-2xotezxb
+wandb: Find logs at: ./wandb/offline-run-20230329_121725-2xotezxb/logs
+
+ /gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/test-patients/labels
+The model is running on node qb3-idgpu10
+Successfully stopped recording stats for 2278449.
+Successfully retrieved statistics for job: 2278449. 
++------------------------------------------------------------------------------+
+| GPU ID: 3                                                                    |
++====================================+=========================================+
+|-----  Execution Stats  ------------+-----------------------------------------|
+| Start Time                         | Wed Mar 29 12:16:50 2023                |
+| End Time                           | Wed Mar 29 12:17:44 2023                |
+| Total Execution Time (sec)         | 53.97                                   |
+| No. of Processes                   | 0                                       |
++-----  Performance Stats  ----------+-----------------------------------------+
+| Energy Consumed (Joules)           | 219                                     |
+| Power Usage (Watts)                | Avg: 7.367, Max: 7.684, Min: 7.05       |
+| Max GPU Memory Used (bytes)        | 0                                       |
+| SM Clock (MHz)                     | Avg: 300, Max: 300, Min: 300            |
+| Memory Clock (MHz)                 | Avg: 405, Max: 405, Min: 405            |
+| SM Utilization (%)                 | Avg: 0, Max: 0, Min: 0                  |
+| Memory Utilization (%)             | Avg: 0, Max: 0, Min: 0                  |
+| PCIe Rx Bandwidth (megabytes)      | Avg: N/A, Max: N/A, Min: N/A            |
+| PCIe Tx Bandwidth (megabytes)      | Avg: N/A, Max: N/A, Min: N/A            |
++-----  Event Stats  ----------------+-----------------------------------------+
+| Single Bit ECC Errors              | 0                                       |
+| Double Bit ECC Errors              | 0                                       |
+| PCIe Replay Warnings               | 0                                       |
+| Critical XID Errors                | 0                                       |
++-----  Slowdown Stats  -------------+-----------------------------------------+
+| Due to - Power (%)                 | 0                                       |
+|        - Thermal (%)               | 0                                       |
+|        - Reliability (%)           | Not Supported                           |
+|        - Board Limit (%)           | Not Supported                           |
+|        - Low Utilization (%)       | Not Supported                           |
+|        - Sync Boost (%)            | 0                                       |
++-----  Overall Health  -------------+-----------------------------------------+
+| Overall Health                     | Healthy                                 |
++------------------------------------+-----------------------------------------+
+
+Successfully removed group 66

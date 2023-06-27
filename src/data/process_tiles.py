@@ -8,7 +8,7 @@ if __pkg not in sys.path:
 
 from functools import reduce
 
-import cv2
+import cv2 
 import numpy as np
 import pyvips
 import tqdm
@@ -18,7 +18,11 @@ from torch import nn, Tensor
 
 import torchvision
 from torchvision.transforms import ToPILImage
-
+import pdb
+from threading import Thread
+from concurrent.futures import ThreadPoolExecutor, wait, ALL_COMPLETED
+import subprocess
+import time
 
 """
 process_tiles.py: map over slide positive tiles; write crops and compute metrics
@@ -74,33 +78,57 @@ def norm_to_str(norm_values):
 
 def crop_tile(slide, out_dir, tile, ext='png'):
     out_file = os.path.join(out_dir, '_'.join(map(lambda _: '_'.join(_), zip('xy', map(str, tile[:2])))) + f'.{ext}')
-    crop = slide.crop(*tile).numpy()
-    ToPILImage()(crop).save(out_file)
+    #pdb.set_trace()
+    crop = slide.crop(*tile)
+    #crop = slide.crop(*tile).numpy()
+    #ToPILImage()(crop).save(out_file)
+    crop.write_to_file(out_file)
     return True
 
-def crop_lambda(out_dir, slide_name, ext='png'):
+def crop_lambda(out_dir, tiles, slide_name, ext='png'):
     out_dir = os.path.join(out_dir, slide_name)
     if not os.path.isdir(out_dir):
         os.mkdir(out_dir)
     return lambda slide, tiles: len([crop_tile(slide, out_dir, tile, ext=ext) for tile in tiles])
+    
+
+def crop_lambda1(out_dir, tiles, slide_name, slide, ext='png'):
+    out_dir = os.path.join(out_dir, slide_name)
+    if not os.path.isdir(out_dir):
+        os.mkdir(out_dir)
+    return len([crop_tile(slide, out_dir, tile, ext=ext) for tile in tiles])
 
 
-def slide_tile_map(slide_name, slide_dir, tile_dir, size, f=None):
+
+
+def slide_tile_map(slide_name, slide_dir, tile_dir,out_dir, size, f=None):
     if f is None:
         f = lambda slide, tiles: (slide, tiles)
 
     slide_path = os.path.join(slide_dir, f'{slide_name}.mrxs')
     tile_path = os.path.join(tile_dir, f'{slide_name}.tiles.npy')
-
-    slide = pyvips.Image.new_from_file(slide_path, level=0)[:3]
+    
+    
+    #slide = pyvips.Image.new_from_file(slide_path, level=0)[:3]
+    #try:
+    slide = pyvips.Image.new_from_file(slide_path, level=0)
+    
+    slide1 = np.ndarray(buffer=slide.write_to_memory(), dtype=np.uint8, shape=(slide.height, slide.width, slide.bands))
+    slide1 = slide1[:,:,:3]
 
     tiles = np.load(tile_path, allow_pickle=False)
     tiles = np.concatenate([tiles + i for i in range(2)], axis=1) * np.array(size * 2)
     tiles = np.minimum(np.maximum(tiles, 0), np.array([slide.width, slide.height] * 2))
     tiles[:, 2:] -= tiles[:, :2]
+    #pdb.set_trace()
     assert (tiles[:, :2] >= 0).all() and (tiles[:, 2:] > 0).all()
+    crop_lambda1(out_dir, tiles, slide_name, slide)
+    #return f(slide, tiles)
+    
+    #except:
+     #   print("error processing file",slide_name )
 
-    return f(slide, tiles)
+    
 
 
 def read_metrics(metrics_file):
@@ -132,8 +160,13 @@ def write_metrics(slide_name, slide_dir, tile_dir, metrics_file, tile_size):
 
 
 def save_slide_crops(slide_names, slide_dir, tile_dir, out_dir, tile_size):
-    for slide_name in tqdm.tqdm(slide_names):
-        slide_tile_map(slide_name, slide_dir, tile_dir, tuple([tile_size] * 2), f=crop_lambda(out_dir, slide_name))
+    #for slide_name in tqdm.tqdm(slide_names):
+    #slide_tile_map(slide_name, slide_dir, tile_dir, tuple([tile_size] * 2), f=crop_lambda(out_dir, slide_name))
+    print("running code for ",slide_names)
+    exe = ThreadPoolExecutor(max_workers=4)
+    futures = [exe.submit(slide_tile_map, slide_name, slide_dir, tile_dir, out_dir, tuple([tile_size] * 2)) for i, slide_name in tqdm.tqdm(enumerate(slide_names))]
+    done, not_done = wait(futures, return_when=ALL_COMPLETED)
+    exe.shutdown()
 
 def save_slide_metrics(slide_names, slide_dir, tile_dir, out_dir, tile_size):
     out_file = os.path.join(out_dir, 'metrics.csv')
@@ -166,7 +199,10 @@ if __name__ == '__main__':
         slide_names = sorted(['.'.join(fname.split('.')[:-1]) for fname in next(os.walk(slide_dir))[2] if fname.split('.')[-1] == 'mrxs'])
 
     if command == 'crops':
+        start_time = time.time()
         save_slide_crops(slide_names, slide_dir, input_dir, output_dir, tile_size)
+        print("--- %s seconds ---" % (time.time() - start_time))
+
     if command == 'metrics':
         save_slide_metrics(slide_names, slide_dir, input_dir, output_dir, tile_size)
         read_slide_metrics(out_dir)

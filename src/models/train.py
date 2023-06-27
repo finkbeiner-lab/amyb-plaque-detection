@@ -1,4 +1,6 @@
 import os
+os.environ['OMP_NUM_THREADS'] = '1'
+
 import sys
 sys.path.append(os.path.join(os.getcwd(), *tuple(['..'])))
 import argparse
@@ -6,6 +8,7 @@ import argparse
 from typing import Callable, Dict, List, Optional, Set
 from collections import OrderedDict
 import pdb
+import numpy as np
 import torch
 from torch import nn, Tensor
 import torch.optim
@@ -17,6 +20,8 @@ from utils.engine import evaluate
 import torchvision
 import matplotlib.pyplot as plt
 from visualization.explain import ExplainPredictions
+import pandas as pd
+import plotly.graph_objects as go
 
 
 # Sets the behavior of calls such as
@@ -121,6 +126,77 @@ def get_resp(prompt, prompt_fn=None, resps='n y'.split()):
         resp = input(prompt if prompt_fn is None else propt_fn(resp))
     return resps.index(resp)
 
+def plotPRcurve(eval2, epoch, run):
+
+    df = pd.DataFrame(columns=["class","tpr","fpr","recall","precision"])
+    len_classes = 3 ## Assuming 3 classes
+   
+    for c in range(len_classes): # running for all 3 classes
+        ## parameters
+        area_index = 0 # area - all (areaRng = [[0 ** 2, 1e5 ** 2], [0 ** 2, 32 ** 2], [32 ** 2, 96 ** 2], [96 ** 2, 1e5 ** 2]]  -> areaRngLbl = ['all', 'small', 'medium', 'large'])
+        threshold_index= 0 # threshold 0.5  (iouThrs = np.linspace(.5, 0.95, int(np.round((0.95 - .5) / .05)) + 1, endpoint=True)) -- can vary threshold from here 
+        iou_type="bbox"
+        maxDet = 100 
+        # Selecting from 
+        pdb.set_trace()
+        eval_table = eval2[iou_type][c][area_index]
+
+        dt_score_list = np.concatenate([eval_table[i]['dtScores'][0:maxDet] for i in range(len(eval_table)) if eval_table[i]!=None])
+        inds = np.argsort(-dt_score_list, kind='mergesort') 
+        dtScoresSorted = dt_score_list[inds]
+        dtm  = np.concatenate([eval_table[i]['dtMatches'][threshold_index][0:maxDet]  for i in range(len(eval_table)) if eval_table[i]!=None]) [inds]
+        dtIg  = np.concatenate([eval_table[i]['dtIgnore'][threshold_index][0:maxDet]  for i in range(len(eval_table)) if eval_table[i]!=None]) [inds]
+        gtIg = np.concatenate([eval_table[i]['gtIgnore'] for i in range(len(eval_table)) if eval_table[i]!=None])
+        npig = np.count_nonzero(gtIg==0)
+        tps = np.logical_and(               dtm,  np.logical_not(dtIg) )
+        fps = np.logical_and(np.logical_not(dtm), np.logical_not(dtIg) )
+        tp_sum = np.cumsum(tps, axis=0, dtype=float)
+
+        if len(tp_sum) == 0:
+            continue
+        
+        tp_sum=tp_sum/tp_sum[-1]
+        fp_sum = np.cumsum(fps, axis=0, dtype=float)
+        fp_sum=fp_sum/fp_sum[-1]
+        rc_list =[]
+        pr_list =[]
+        for t, (tp, fp) in enumerate(zip(tp_sum, fp_sum)):
+            rc = tp / npig
+            pr = tp / (fp+tp+np.spacing(1))
+            rc_list.append(rc)
+            pr_list.append(pr)
+        tmp = pd.DataFrame({"tpr":tp_sum,"fpr":fp_sum,"recall":rc_list,"precision":pr_list})
+        tmp["class"] = c
+        df = pd.concat([df, tmp])
+    
+    # plotly plot
+    fig = go.Figure()
+    fig.add_shape(
+        type='line', line=dict(dash='dash'),
+        x0=0, x1=1, y0=0, y1=1
+    )
+    classes = ['cored', 'diffuse', 'caa']
+    for i in range(3):
+        fig.add_trace(go.Scatter(x=df[df["class"]==i]["recall"], y=df[df["class"]==i]["precision"], name=classes[i], mode='lines'))
+
+
+    fig.update_layout(
+        xaxis_title='Recall',
+        yaxis_title='Precision',
+        width=1000, height=500,
+        title='Precision-Recall Curve'
+    )
+    
+    save_name = "prcurve_{epoch}.html"
+    fig_name = save_name.format(epoch=epoch)
+    
+    fig.write_html(fig_name)
+    run.log({"Precision-Recall": wandb.Html(open(fig_name))})
+
+    # plt.plot(rc_list,pr_list)
+    # plt.show()
+                
+
 
 if __name__ == '__main__':
     # TODO:
@@ -148,27 +224,29 @@ if __name__ == '__main__':
     dataset_test_location = args.dataset_test_location
 
     train_config = dict(
-        epochs = 100,
-        batch_size = 6,
-        num_classes = 4,
+        epochs = 1,
+        batch_size = 10,
+        num_classes = 3,
         device_id = 0,
         ckpt_freq =500,
-        eval_freq = 20,
+        eval_freq = 1,
     )
 
     test_config = dict(
-        batch_size = 1
+        batch_size = 6
     )
 
     model_config = _default_mrcnn_config(num_classes=1 + train_config['num_classes']).config
     optim_config = dict(
         # cls=grad_optim.GradSGD,
         cls=torch.optim.SGD,
+       
         defaults=dict(lr=1. * (10. ** (-2)))  #-4 is too slow 
     )
     wandb_config = dict(
         project='nps-ad-vivek',
         entity='hellovivek',
+        # mode = 'offline',
         config=dict(
             train_config=train_config,
             model_config=model_config,
@@ -180,16 +258,34 @@ if __name__ == '__main__':
     )
 
     
-
-
     ## Dataset loading
     train_dataset = build_features.AmyBDataset(dataset_train_location, T.Compose([T.ToTensor()]))
+    # val_dataset = build_features.AmyBDataset(val_dataset, T.Compose([T.ToTensor()]))
     test_dataset = build_features.AmyBDataset(dataset_test_location, T.Compose([T.ToTensor()]))
+
+    # Mapping
+    # fn_relabel = lambda i: [1, 2, 1, 3][i - 1]
+    def remap_label(orig_label):
+        # print("\nOrig", orig_label)
+        if (orig_label==1) or (orig_label==3):
+            # print("mapped 1/3", 1)
+            return 1
+        if orig_label==4:
+            # print("mapped 4", 3)
+            return 3
+        return orig_label
+    
+    train_dataset, test_dataset = [build_features.DatasetRelabeled(dataset, remap_label) for dataset in (train_dataset, test_dataset)]
 
     train_data_loader = torch.utils.data.DataLoader(
             train_dataset, batch_size=train_config['batch_size'], shuffle=True, num_workers=4,
             collate_fn=collate_fn)
     
+        
+    # val_data_loader = torch.utils.data.DataLoader(
+    #         test_dataset, batch_size=test_config['batch_size'], shuffle=False, num_workers=4,
+    #         collate_fn=collate_fn)
+
     test_data_loader = torch.utils.data.DataLoader(
             test_dataset, batch_size=test_config['batch_size'], shuffle=False, num_workers=4,
             collate_fn=collate_fn)
@@ -198,9 +294,10 @@ if __name__ == '__main__':
     # Model Building
     model = build_default(model_config, im_size=1024)
     device = torch.device('cpu')
-    if torch.cuda.is_available():
-        assert train_config['device_id'] >= 0 and train_config['device_id'] < torch.cuda.device_count()
-        device = torch.device('cuda', train_config['device_id'])
+    # if torch.cuda.is_available():
+        # assert train_config['device_id'] >= 0 and train_config['device_id'] < torch.cuda.device_count()
+    device = torch.device('cuda', train_config['device_id'])
+   
     model = model.to(device)
     model.train(True)
 
@@ -210,47 +307,54 @@ if __name__ == '__main__':
 
     loss_fn = get_loss_fn(loss_weights)
 
+    # optimizer = torch.optim.Adam(model.parameters(), lr=0.001, betas=(0.9, 0.999), eps=1e-08, weight_decay=0, amsgrad=False)
     optimizer = optim_config['cls']([dict(params=list(model.parameters()))], **optim_config['defaults'])
 
     run = wandb.init(**wandb_config)
     assert run is wandb.run # run was successfully initialized, is not None
     run_id, run_dir = run.id, run.dir
+    print("run Id", run_id)
+
+    # #TODO: replace this with run.name
     exp_name = run.name
+    print("*****RUN Name******", exp_name)
+    # exp_name = "runtest"
 
     artifact_name = f'{run_id}-logs'
 
-    # Train Data
+    # # Train Data
     for epoch in range(train_config['epochs']):
         # print(f'Epoch {epoch}=======================================>.')
 
         for logs in train_one_epoch(model, loss_fn, optimizer, train_data_loader, device, epoch=epoch, log_freq=1):
-            for log in logs:/mnt/new-nas/work/data/npsad_data/vivek/
+            for log in logs:
                 run.log(log)
 
-        if epoch + 1 == train_config['epochs'] or epoch % train_config['ckpt_freq'] == 0:
+        # if epoch + 1 == train_config['epochs'] or epoch % train_config['ckpt_freq'] == 0:
 
-            artifact = wandb.Artifact(artifact_name, type='files')
-            with artifact.new_file(f'ckpt/{epoch}.pt', 'wb') as f:
-                torch.save(model.state_dict(), f)
-            run.log_artifact(artifact)
+        #     artifact = wandb.Artifact(artifact_name, type='files')
+        #     with artifact.new_file(f'ckpt/{epoch}.pt', 'wb') as f:
+        #         torch.save(model.state_dict(), f)
+            # run.log_artifact(artifact)
 
         if epoch % train_config['eval_freq'] == 0:
-            eval_res = evaluate(run, model, test_data_loader, device=device)
+            eval_res = evaluate(run, model, test_data_loader, device=device, epoch=epoch)
+            # pdb.set_trace()
+            # plotPRcurve(eval_res, epoch)
+
         
         model.train(True)
-
-
-
     
-    model_save_name = dataset_base_dir + "models/{name}_mrcnn_model_{epoch}.pth"
+    # TODO change the directory if running on desktop
+    model_save_name = "/home/vivek/Projects/amyb-plaque-detection/" + "models/{name}_mrcnn_model_{epoch}.pth"
     torch.save(model.state_dict(), model_save_name.format(name=exp_name, epoch=train_config['epochs']))
 
 
     # print("\n =================The Model is Trained!====================")
     # print("-----------------Visualizing Model predictions----------------")
 
-    # # TODO Testing is done on Individual WSI Folders
-    # input_path = '/mnt/new-nas/work/data/npsad_data/vivek/Datasets/amyb_wsi/test'
+    # # # TODO Testing is done on Individual WSI Folders
+    # input_path = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/test-patients'
 
     # model = build_default(model_config, im_size=1024)
    
@@ -258,4 +362,4 @@ if __name__ == '__main__':
     #                             detection_threshold=0.75, wandb=run, save_result=True, ablation_cam=True, save_thresholds=False)
     # explain.generate_results()
 
-    run.finish()
+    # run.finish()

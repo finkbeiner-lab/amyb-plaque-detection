@@ -13,12 +13,14 @@ import pdb
 
 
 class CocoEvaluator:
-    def __init__(self, coco_gt, iou_types):
+    def __init__(self, coco_gt, iou_types, epoch, exp_name):
         assert isinstance(iou_types, (list, tuple))
         coco_gt = copy.deepcopy(coco_gt)
         self.coco_gt = coco_gt
 
         self.iou_types = iou_types
+        self.epoch = epoch
+        self.exp_name = exp_name
         self.coco_eval = {}
 
         #Instantiating COCOeval class for different ioutypes
@@ -40,7 +42,7 @@ class CocoEvaluator:
 
             coco_eval.cocoDt = coco_dt
             coco_eval.params.imgIds = list(img_ids)
-            img_ids, eval_imgs = evaluate(coco_eval)
+            img_ids, eval_imgs = evaluate(coco_eval, self.epoch, self.exp_name)
 
             self.eval_imgs[iou_type].append(eval_imgs)
 
@@ -52,6 +54,7 @@ class CocoEvaluator:
     def accumulate(self):
         for coco_eval in self.coco_eval.values():
             coco_eval.accumulate()
+        return self.eval_imgs
 
     def summarize(self, run):
         for iou_type, coco_eval in self.coco_eval.items():
@@ -164,7 +167,7 @@ def create_common_coco_eval(coco_eval, img_ids, eval_imgs):
     coco_eval._paramsEval = copy.deepcopy(coco_eval.params)
 
 
-def evaluate(imgs):
+def evaluate(imgs, epoch, exp_name):
     with redirect_stdout(io.StringIO()):
-        imgs.evaluate()
+        imgs.evaluate(epoch, exp_name)
     return imgs.params.imgIds, np.asarray(imgs.evalImgs).reshape(-1, len(imgs.params.areaRng), len(imgs.params.imgIds))

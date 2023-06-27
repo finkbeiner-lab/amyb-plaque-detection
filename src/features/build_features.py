@@ -1,13 +1,16 @@
+from typing import Any, Callable, List, Mapping, Optional, Tuple
+
 import os
 from matplotlib import image
-
-import torch
 import numpy as np
 from PIL import Image
 import pdb
 
+import torch
+from torch import nn, Tensor
 
-class AmyBDataset(object):
+
+class AmyBDataset(torch.utils.data.Dataset):
     def __init__(self, root, transforms):
         self.root = root
         self.transforms = transforms
@@ -74,6 +77,7 @@ class AmyBDataset(object):
 
         x = [id // 50 for id in obj_ids]
         labels = torch.tensor(x)
+       
 
 
         masks = torch.as_tensor(masks, dtype=torch.uint8)
@@ -98,3 +102,25 @@ class AmyBDataset(object):
 
     def __len__(self):
         return len(self.imgs)
+
+
+class DatasetRelabeled(torch.utils.data.Dataset):
+    def __init__(self,
+        dataset: torch.utils.data.Dataset,
+        fn: Callable[[int,], int],
+    ) -> None:
+        self.dataset = dataset
+        self.fn = fn
+
+    def __len__(self) -> int:
+        return self.dataset.__len__()
+
+    def __getitem__(self,
+        idx: int,
+    ) -> Tuple[Tensor, Mapping[str, Tensor]]:
+        image, target = self.dataset.__getitem__(idx)
+        for i, v in enumerate(target['labels']):
+            target['labels'][i] = self.fn(v)
+        return image, target
+
+
