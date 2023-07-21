@@ -190,7 +190,7 @@ if __name__ == '__main__':
     tile_map, tile_map_inv = tile_overlap_map(tiles, bounds)
     tiles_inv = list(tile_map_inv.keys())
 
-    ## Generate per-tile output files
+    ## Generate per-half-tile output files
     # for x, y in progress_wrapper(tiles_inv, progress=True, desc=slide_names[idx]):
     #     vips_tile = vips_img.crop(x * step_size, y * step_size, 2 * step_size, 2 * step_size)
     #
@@ -201,29 +201,50 @@ if __name__ == '__main__':
     #     if target['labels'].size()[0] > 0:
     #         torch.save(target, os.path.join(tile_out_dirs[idx], f'{x},{y}.pt'))
 
-    inst_map = dict()
+    # inst_map = dict()
 
-    nms_thresh = 0.5
-    batched = False
-    tile = (15, 153)
-    tiles = tile_map[tile]
-    slide_name = slide_names[idx]
+    # nms_thresh = 0.5
+    # batched = False
+    # tiles = tile_map[tile]
+    # slide_name = slide_names[idx]
 
-    tiles = [(x, y) for x, y in tiles if os.path.isfile(os.path.join(out_dir, slide_name, f'{x},{y}.pt'))]
-    targets = [torch.load(os.path.join(out_dir, slide_name, f'{x},{y}.pt')) for x, y in tiles]
-    tile_idxs, inst_idxs, target = target_merge(targets, tiles, tile, step_size, fns=[
-        lambda _: (_, torchvision.ops.remove_small_boxes(_['boxes'], step_size * 1e-2)),
-        lambda _: (_, torchvision.ops.batched_nms(_['boxes'], _['scores'], _['labels'], nms_thresh) if batched else torchvision.ops.nms(_['boxes'], _['scores'], nms_thresh)),
-        lambda _: clip_merge(_, torch.tensor([step_size, step_size, 3 * step_size, 3 * step_size], dtype=torch.long)),
-    ])
-    # target_copy = dict([(k, v.clone()) for k, v in target.items()])
 
-    for tile_idx, inst_idx in zip(tile_idxs, inst_idxs):
-        inst_map.setdefault(tiles[tile_idx.item()], set()).update([inst_idx.item()])
+    def merge_tiles(out_dir, tiles, tile, step_size, nms_thresh=0.5, batched=False):
+        tiles = [(x, y) for x, y in tiles if os.path.isfile(os.path.join(out_dir, f'{x},{y}.pt'))]
+        targets = [torch.load(os.path.join(out_dir, f'{x},{y}.pt')) for x, y in tiles]
+        tile_idxs, inst_idxs, target = target_merge(targets, tiles, tile, step_size, fns=[
+            lambda _: (_, torchvision.ops.remove_small_boxes(_['boxes'], step_size * 1e-2)),
+            lambda _: (_, torchvision.ops.batched_nms(_['boxes'], _['scores'], _['labels'], nms_thresh) if batched else torchvision.ops.nms(_['boxes'], _['scores'], nms_thresh)),
+            lambda _: clip_merge(_, torch.tensor([step_size, step_size, 3 * step_size, 3 * step_size], dtype=torch.long)),
+        ])
+        # target_copy = dict([(k, v.clone()) for k, v in target.items()])
 
-    vips_tile = vips_img.crop(*tuple([_ * 2 * step_size for _ in list(tile) + [1] * 2]))
-    vips_tile_t = torch.tensor(vips_tile.numpy()).permute(2, 0, 1)
-    ToPILImage()(show(vips_tile_t, target, label_names, label_colors)).show()
+        inst_map = dict()
+        for tile_idx, inst_idx in zip(tile_idxs, inst_idxs):
+            inst_map.setdefault(tiles[tile_idx.item()], set()).update([inst_idx.item()])
+
+        return inst_map, target
+
+    
+    # tile = (15, 153)
+    # inst_map, target = merge_tiles(os.path.join(out_dir, slide_names[idx]), tile_map[tile], tile, step_size)
+
+    # vips_tile = vips_img.crop(*tuple([_ * 2 * step_size for _ in list(tile) + [1] * 2]))
+    # vips_tile_t = torch.tensor(vips_tile.numpy()).permute(2, 0, 1)
+    # ToPILImage()(show(vips_tile_t, target, label_names, label_colors)).show()
+
+
+    ## Generate per-tile target output files
+    for x, y in progress_wrapper(tile_map, progress=True, desc=slide_names[idx]):
+        inst_map, target = merge_tiles(os.path.join(out_dir, slide_names[idx]), tile_map[(x, y)], (x, y), step_size)
+        torch.save(dict(
+            instances=inst_map,
+            target=target,
+        ), os.path.join(out_dir, slide_names[idx], f'target_{x},{y}.pt'))
+
+
+    ## Stitch together per-tile target output files
+
 
     # nms_thresh = 0.5
     # t = (x, y)
