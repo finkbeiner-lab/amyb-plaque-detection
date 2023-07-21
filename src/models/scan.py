@@ -60,20 +60,6 @@ def progress_wrapper(it, progress=False, **kwargs):
         return tqdm.tqdm(it, **kwargs)
     return it
 
-def target_offset(target_src, target_dst, offset):
-    offset_box = torch.tensor(tuple(offset[:2]) * 2)
-    boxes_dst = target_src['boxes'] + offset_box
-
-    masks_src = target_src['masks']
-    masks_dst = torch.zeros(target_src['masks'].size()[:1] + target_dst['masks'].size()[1:]).to(torch.bool)
-    masks_dst[:, offset_box[1]:(offset_box[1] + masks_src.size()[1]), offset_box[0]:(offset_box[0] + masks_src.size()[2])] = masks_src
-
-    target_dst['scores'] = torch.concatenate([target_dst['scores'], target_src['scores']], axis=0)
-    target_dst['labels'] = torch.concatenate([target_dst['labels'], target_src['labels']], axis=0)
-    target_dst['boxes'] = torch.concatenate([target_dst['boxes'], boxes_dst], axis=0)
-    target_dst['masks'] = torch.concatenate([target_dst['masks'], masks_dst], axis=0)
-    return target_dst
-
 
 def tile_overlap_map(tiles, bounds):
     validate = lambda bounds, coords: bounds[0] <= coords[0] and bounds[1] <= coords[1] and bounds[2] >= coords[0] and bounds[3] >= coords[1]
@@ -92,6 +78,63 @@ def tile_overlap_map(tiles, bounds):
             overlaps_inv.setdefault(t, list()).append(k)
 
     return overlaps, overlaps_inv
+
+
+def target_offset(target_src, target_dst, offset):
+    offset_box = torch.tensor(tuple(offset[:2]) * 2)
+    boxes_dst = target_src['boxes'] + offset_box
+
+    masks_src = target_src['masks']
+    masks_dst = torch.zeros(target_src['masks'].size()[:1] + target_dst['masks'].size()[1:]).to(torch.bool)
+    masks_dst[:, offset_box[1]:(offset_box[1] + masks_src.size()[1]), offset_box[0]:(offset_box[0] + masks_src.size()[2])] = masks_src
+
+    target_dst['scores'] = torch.concatenate([target_dst['scores'], target_src['scores']], axis=0)
+    target_dst['labels'] = torch.concatenate([target_dst['labels'], target_src['labels']], axis=0)
+    target_dst['boxes'] = torch.concatenate([target_dst['boxes'], boxes_dst], axis=0)
+    target_dst['masks'] = torch.concatenate([target_dst['masks'], masks_dst], axis=0)
+    return target_dst
+
+
+def target_merge(targets, tiles, tile, step_size, fns=None):
+    offsets = [tuple([(a + 1 - b * 2) * step_size for a, b in zip(_, tile)]) for _ in tiles]
+
+    tile_idxs = torch.zeros((0,), dtype=torch.long)
+    inst_idxs = torch.zeros((0,), dtype=torch.long)
+    target = dict(
+        boxes=torch.zeros((0, 4), dtype=torch.float),
+        labels=torch.zeros((0,), dtype=torch.long),
+        scores=torch.zeros((0,), dtype=torch.float),
+        masks=torch.zeros((0, 4 * step_size, 4 * step_size), dtype=torch.bool),
+    )
+
+    for i, (_target, _offset) in enumerate(zip(targets, offsets)):
+        tile_idxs = torch.concatenate([tile_idxs, torch.ones((len(_target['labels']),), dtype=torch.long) * i])
+        inst_idxs = torch.concatenate([inst_idxs, torch.arange(len(_target['labels']), dtype=torch.long)])
+        target = target_offset(_target, target, _offset)
+
+    for fn in (fns if fns is not None else list()):
+        target, keep_idxs = fn(target)
+        tile_idxs = tile_idxs[keep_idxs]
+        inst_idxs = inst_idxs[keep_idxs]
+        target = dict([(k, v[keep_idxs, ...]) for k, v in target.items()])
+
+    return tile_idxs, inst_idxs, target
+
+
+def clip(tile, box):
+    clipped = box.clone()
+    clipped[..., :2] = torch.maximum(tile[..., :2], clipped[..., :2]) - tile[..., :2]
+    clipped[..., 2:] = torch.minimum(tile[..., 2:], clipped[..., 2:]) - tile[..., :2]
+    in_bounds = (clipped[..., :2] <= clipped[..., 2:]).all(dim=-1)
+    return clipped, in_bounds
+
+def clip_merge(target, tile):
+    clipped_boxes, in_bounds = clip(tile, target['boxes'])
+    target['boxes'] = clipped_boxes
+    target['masks'] = target['masks'][..., tile[0]:tile[2], tile[1]:tile[3]]
+    keep_idxs = torch.where(in_bounds)[0]
+    return target, keep_idxs
+
 
 def loadable_tiles(out_dir, tiles):
     return [(x, y) for x, y in tiles if os.path.isfile(os.path.join(out_dir, f'{x},{y}.pt'))]
@@ -147,6 +190,7 @@ if __name__ == '__main__':
     tile_map, tile_map_inv = tile_overlap_map(tiles, bounds)
     tiles_inv = list(tile_map_inv.keys())
 
+    ## Generate per-tile output files
     # for x, y in progress_wrapper(tiles_inv, progress=True, desc=slide_names[idx]):
     #     vips_tile = vips_img.crop(x * step_size, y * step_size, 2 * step_size, 2 * step_size)
     #
@@ -157,57 +201,29 @@ if __name__ == '__main__':
     #     if target['labels'].size()[0] > 0:
     #         torch.save(target, os.path.join(tile_out_dirs[idx], f'{x},{y}.pt'))
 
-    def target_merge(targets, tiles, tile, step_size, fns=None):
-        offsets = [tuple([(a + 1 - b * 2) * step_size for a, b in zip(_, tile)]) for _ in tiles]
-
-        tile_idxs = torch.zeros((0,), dtype=torch.long)
-        inst_idxs = torch.zeros((0,), dtype=torch.long)
-        target = dict(
-            boxes=torch.zeros((0, 4), dtype=torch.float),
-            labels=torch.zeros((0,), dtype=torch.long),
-            scores=torch.zeros((0,), dtype=torch.float),
-            masks=torch.zeros((0, 4 * step_size, 4 * step_size), dtype=torch.bool),
-        )
-
-        for i, (_target, _offset) in enumerate(zip(targets, offsets)):
-            tile_idxs = torch.concatenate([tile_idxs, torch.ones((len(_target['labels']),), dtype=torch.long) * i])
-            inst_idxs = torch.concatenate([inst_idxs, torch.arange(len(_target['labels']), dtype=torch.long)])
-            target = target_offset(_target, target, _offset)
-
-        for fn in (fns if fns is not None else list()):
-            target, keep_idxs = fn(target)
-            tile_idxs = tile_idxs[keep_idxs]
-            inst_idxs = inst_idxs[keep_idxs]
-            target = dict([(k, v[keep_idxs, ...]) for k, v in target.items()])
-
-        return tile_idxs, inst_idxs, target
-
-    def clip(tile, box):
-        clipped = box.clone()
-        clipped[..., :2] = torch.maximum(tile[..., :2], clipped[..., :2]) - tile[..., :2]
-        clipped[..., 2:] = torch.minimum(tile[..., 2:], clipped[..., 2:]) - tile[..., :2]
-        in_bounds = (clipped[..., :2] <= clipped[..., 2:]).all(dim=-1)
-        return clipped, in_bounds
-
-    def clip_merge(target, tile):
-        clipped_boxes, in_bounds = clip(tile, target['boxes'])
-        target['boxes'] = clipped_boxes
-        target['masks'] = target['masks'][..., tile[0]:tile[2], tile[1]:tile[3]]
-        keep_idxs = torch.where(in_bounds)[0]
-        return target, keep_idxs
+    inst_map = dict()
 
     nms_thresh = 0.5
+    batched = False
     tile = (15, 153)
     tiles = tile_map[tile]
-    tiles = [(x, y) for x, y in tiles if os.path.isfile(os.path.join(out_dir, slide_names[idx], f'{x},{y}.pt'))]
-    targets = [torch.load(os.path.join(out_dir, slide_names[idx], f'{x},{y}.pt')) for x, y in tiles]
+    slide_name = slide_names[idx]
+
+    tiles = [(x, y) for x, y in tiles if os.path.isfile(os.path.join(out_dir, slide_name, f'{x},{y}.pt'))]
+    targets = [torch.load(os.path.join(out_dir, slide_name, f'{x},{y}.pt')) for x, y in tiles]
     tile_idxs, inst_idxs, target = target_merge(targets, tiles, tile, step_size, fns=[
         lambda _: (_, torchvision.ops.remove_small_boxes(_['boxes'], step_size * 1e-2)),
+        lambda _: (_, torchvision.ops.batched_nms(_['boxes'], _['scores'], _['labels'], nms_thresh) if batched else torchvision.ops.nms(_['boxes'], _['scores'], nms_thresh)),
         lambda _: clip_merge(_, torch.tensor([step_size, step_size, 3 * step_size, 3 * step_size], dtype=torch.long)),
-        lambda _: torchvision.ops.nms(_['boxes'], _['scores'], nms_thresh),
     ])
     # target_copy = dict([(k, v.clone()) for k, v in target.items()])
 
+    for tile_idx, inst_idx in zip(tile_idxs, inst_idxs):
+        inst_map.setdefault(tiles[tile_idx.item()], set()).update([inst_idx.item()])
+
+    vips_tile = vips_img.crop(*tuple([_ * 2 * step_size for _ in list(tile) + [1] * 2]))
+    vips_tile_t = torch.tensor(vips_tile.numpy()).permute(2, 0, 1)
+    ToPILImage()(show(vips_tile_t, target, label_names, label_colors)).show()
 
     # nms_thresh = 0.5
     # t = (x, y)
