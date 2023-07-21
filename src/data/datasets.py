@@ -140,7 +140,7 @@ class VipsDataset(TileDataset):
         self,
         idx: int,
     ) -> Any:
-        return VipsDataset.read_vips(self.vips_img, super().__getitem__(idx))
+        return ToTensor()(VipsDataset.read_vips(self.vips_img, super().__getitem__(idx)))
 
 
 class JsonDataset(TileDataset):
