@@ -49,13 +49,14 @@ class ExplainPredictions():
         self.save_result = save_result
         self.ablation_cam = ablation_cam
         self.save_thresholds = save_thresholds
-        self.class_names = ['Unknown', 'Core', 'Diffuse', 'Neuritic', 'CAA']
+        self.class_names = ['Core', 'Diffuse', 'Neuritic', 'CAA']
         self.class_to_colors = {'Core': (255, 0, 0), 'Neuritic' : (0, 0, 255), 'Diffuse': (0,255,0), 'CAA':(225, 255, 0)}
-        self.result_save_dir= "/mnt/new-nas/work/data/npsad_data/vivek/reports/figures/"
+        #self.result_save_dir= "/mnt/new-nas/work/data/npsad_data/vivek/reports/figures/"
+        self.result_save_dir= "/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/reports/metrics/"
         self.colors = np.random.uniform(0, 255, size=(len(self.class_names), 3))
         self.column_names = ["image_name", "region", "region_mask", "label", 
                             "confidence", "brown_pixels", "centroid", 
-                            "eccentricity", "area", "equivalent_diameter"]
+                            "eccentricity", "area", "equivalent_diameter","mask_present"]
         self.results_path = ""
         self.masks_path = "" 
         self.detections_path = "" 
@@ -122,23 +123,37 @@ class ExplainPredictions():
         # index of those scores which are above a certain threshold
         thresholded_preds_inidices = [scores.index(i) for i in scores if i > threshold]
         thresholded_preds_count = len(thresholded_preds_inidices)
-
-        scores = scores[:thresholded_preds_count]
+        scores = np.array(scores)[thresholded_preds_inidices]
+        #print("score after", scores)
         # get the masks
+        #print(np.unique(outputs[0]['masks'].cpu().numpy()))
         masks = (outputs[0]['masks']>0.5).squeeze().detach().cpu().numpy()
-        # print("masks", masks)
-        # discard masks for objects which are below threshold
-        masks = masks[:thresholded_preds_count]
+
+        #print(masks.shape)
         # get the bounding boxes, in (x1, y1), (x2, y2) format
         boxes = [[(int(i[0]), int(i[1])), (int(i[2]), int(i[3]))]  for i in outputs[0]['boxes'].detach().cpu()]
+
+        if len(masks.shape)==2:
+            masks = np.array([masks])
+            
+        if len(masks)!=len(boxes):
+            print("True")
+        # discard masks for objects which are below threshold
+        masks = masks[thresholded_preds_inidices]
         # discard bounding boxes below threshold value
-        boxes = boxes[:thresholded_preds_count]
+        boxes = np.array(boxes)[thresholded_preds_inidices]
+        #print(boxes)
         # get the classes labels
         # print('labels', outputs[0]['labels'])
-        labels = [self.class_names[i] for i in outputs[0]['labels']]
-        labels = labels[:thresholded_preds_count]
-
-        # [1,1,1, 2, 2, 2, 3, 3]
+        #print(outputs[0]['labels'])
+        #print(thresholded_preds_count)
+        #print(outputs[0]['labels'])
+        #print(outputs[0]['labels'])
+        labels = [self.class_names[i-1] for i in outputs[0]['labels']]
+        #labels = [i for i in outputs[0]['labels']]
+        #print(labels)
+        #labels = labels[:thresholded_preds_count+1]
+        labels = np.array(labels)[thresholded_preds_inidices]
         return masks, boxes, labels, scores
 
     def draw_segmentation_map(self, image, masks, boxes, labels):
@@ -241,9 +256,8 @@ class ExplainPredictions():
         return image
 
     def make_result_dirs(self, folder_name):
-
-
-        folder_name = self.wandb.name + "_" + folder_name
+        #folder_name = self.wandb.name + "_" + folder_name
+        
         save_path = os.path.join(self.result_save_dir, folder_name)
         results_path = os.path.join(save_path, "results")
         if not os.path.exists(results_path):
@@ -265,7 +279,7 @@ class ExplainPredictions():
         if not os.path.exists(pixel_count_path):
             os.makedirs(pixel_count_path)
         
-        csv_name = folder_name + "_quantify.csv"
+        csv_name = folder_name.split("/")[1] + "_quantify.csv"
         quantify_path = os.path.join(save_path, csv_name)
 
         self.results_path = results_path
@@ -301,6 +315,7 @@ class ExplainPredictions():
                
                 cropped_img = result_img[x1:x2, y1:y2]
                 cropped_img_mask = result_masks[x1:x2, y1:y2]
+                unique_pixel = np.unique(cropped_img_mask)
 
                 ret, bw_img = cv2.threshold(cropped_img_mask,0,255,cv2.THRESH_BINARY)
 
@@ -309,9 +324,11 @@ class ExplainPredictions():
                 # Closing operation Dilation followed by erosion
                 closing = cv2.morphologyEx(bw_img, cv2.MORPH_CLOSE, kernel)
                 regions = regionprops(closing)
-
+                if 0 in np.unique(closing):
+                    mask_present=1
+                else:
+                    mask_present=0
                 for props in regions:
-
                     if labels[i] == "Core":
                         total_core_plaques+=1
                     elif labels[i] == "Neuritic":
@@ -323,9 +340,9 @@ class ExplainPredictions():
                                                                'brown_pixels': total_brown_pixels,
                                                                'core': total_core_plaques, 'neuritic': total_neuritic_plaques, 'diffuse': total_diffused_plaques,
                                                                'centroid': props.centroid, 'eccentricity': props.eccentricity, 
-                                                               'area': props.area, 'equivalent_diameter': props.equivalent_diameter}])
+                                                               'area': props.area, 'equivalent_diameter': props.equivalent_diameter, 'mask_present':mask_present}])
                     wandb_result.append([img_name, wandb.Image(cropped_img), wandb.Image(cropped_img_mask), labels[i], scores[i], 
-                                         total_brown_pixels, props.centroid, props.eccentricity, props.area, props.equivalent_diameter])
+                                         total_brown_pixels, props.centroid, props.eccentricity, props.area, props.equivalent_diameter,mask_present ])
 
                     df = pd.concat([df, data_record], ignore_index=True)
                    
@@ -341,19 +358,23 @@ class ExplainPredictions():
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model.eval().to(device)
 
-        test_folders = glob.glob(os.path.join(self.test_input_path, "*"))
+        #test_folders = glob.glob(os.path.join(self.test_input_path, "*"))
         
         # Test images from each WSI folder
-        test_folders = sorted(test_folders)
-      
+        #test_folders = sorted(test_folders)
+        test_folders = self.test_input_path
+        print(test_folders)
         for test_folder in tqdm(test_folders):
 
             print("\n", test_folder)
             folder_name = os.path.basename(test_folder)
+            
 
             if folder_name == "labels":
                 continue
-
+            
+            folder_name =  os.path.join("evaluation-test", folder_name)
+            
             # make all necessary folders
             self.make_result_dirs(folder_name)
             images = glob.glob(os.path.join(test_folder, '*.png'))
@@ -380,7 +401,7 @@ class ExplainPredictions():
 
                 input_tensor, image_float_np = self.prepare_input(image)
                 masks, boxes, labels, scores = self.get_outputs(input_tensor, self.model, self.detection_threshold)
-                
+
                 result_img, result_masks = self.draw_segmentation_map(image, masks, boxes, labels)
 
                 total_brown_pixels+= self.get_brown_pixel_cnt(image, img_name)
@@ -454,7 +475,7 @@ class ExplainPredictions():
 
             print("Total area of brown pixel", (total_brown_pixels/ total_image_pixels)*100)
             df.to_csv(self.quantify_path, index=False)
-            test_table = wandb.Table(data=wandb_result, columns=self.column_names)
+            #test_table = wandb.Table(data=wandb_result, columns=self.column_names)
             # self.wandb.log({'quantifications': test_table})
 
                 
