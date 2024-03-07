@@ -99,7 +99,7 @@ gui.imageDataProperty().addListener(new ChangeListener<ImageData<BufferedImage>>
         //def script
         //print newProject.currentLanguageProperty()
         try {
-            def contextMenu = (new ScriptLoader()).getScript("interrater_annotator_hotkey_version.groovy")
+            def contextMenu = (new ScriptLoader()).getScript("interrater_annotator.groovy")
         } catch (IOException ignored) {
             return
         }
