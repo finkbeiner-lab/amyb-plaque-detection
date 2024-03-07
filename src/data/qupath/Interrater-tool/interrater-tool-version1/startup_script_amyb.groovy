@@ -84,28 +84,7 @@ def setPathClasses(QuPathGUI gui, Map<String, List<Integer>> map) {
 }
 
 
-gui = QuPathGUI.getInstance()
-setPrefs(prefMap)
-//setPathClasses(gui, pathClassMaps.get(pathClassGroup))
 
-gui.imageDataProperty().addListener(new ChangeListener<ImageData<BufferedImage>>() {
-    @Override
-    void changed(ObservableValue<? extends ImageData<BufferedImage>> observable, ImageData<BufferedImage> oldProject, ImageData<BufferedImage> newProject) {
-        if (newProject == null || oldProject == newProject) {
-            return
-        }
-        //def manager = newProject.getScripts()
-        //print manager
-        //def script
-        //print newProject.currentLanguageProperty()
-        try {
-            def contextMenu = (new ScriptLoader()).getScript("interrater_annotator.groovy")
-        } catch (IOException ignored) {
-            return
-        }
-        //DefaultScriptEditor.executeScript(DefaultScriptEditor.Language.GROOVY, contextMenu, newProject, null, true, null)
-    }
-})
 println("Registered per project 'startup.groovy' handler")
 
 
