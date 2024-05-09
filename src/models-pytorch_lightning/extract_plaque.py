@@ -40,10 +40,10 @@ from models.model_mrcnn import _default_mrcnn_config, build_default
 class ExplainPredictions():
     
     # TODO fix the visualization flags
-    def __init__(self, model, model_input_path, test_input_path, detection_threshold, wandb, save_result, ablation_cam, save_thresholds):
-        self.model = model
-        self.model_input_path = model_input_path
-        self.test_input_path = test_input_path
+    def __init__(self, model, model_input_path, slide_names, detection_threshold, wandb, save_result, ablation_cam, save_thresholds):
+        #self.model = model
+        #self.model_input_path = model_input_path
+        self.slide_names = slide_names
         self.detection_threshold = detection_threshold
         self.wandb = wandb
         self.save_result = save_result
@@ -359,22 +359,22 @@ class ExplainPredictions():
         
         # Test images from each WSI folder
         #test_folders = sorted(test_folders)
-        test_folders = self.test_input_path
-        print(test_folders)
-        for test_folder in tqdm(test_folders):
+        slide_names = self.slide_names
+        #print(test_folders)
+        for slide_name in tqdm(slide_names):
 
-            print("\n", test_folder)
-            folder_name = os.path.basename(test_folder)
-            
+            #print("\n", test_folder)
+            #folder_name = os.path.basename(slide_name)
+            num_tiles = slide_tile_map(slide_name, slide_dir, tile_dir, tile_size, f=crop_lambda(out_dir, slide_name))
 
-            if folder_name == "labels":
-                continue
+            #if folder_name == "labels":
+            #    continue
             
-            folder_name =  os.path.join("evaluation-test", folder_name)
+            #folder_name =  os.path.join("evaluation-test", folder_name)
             
             # make all necessary folders
-            self.make_result_dirs(folder_name)
-            images = glob.glob(os.path.join(test_folder, '*.png'))
+            self.make_result_dirs(slide_name)
+            #images = glob.glob(os.path.join(test_folder, '*.png'))
 
             i = 0
             df = pd.DataFrame()
@@ -385,11 +385,12 @@ class ExplainPredictions():
             total_brown_pixels = 0
             total_image_pixels = 0
 
-            for img in tqdm(images):
+            for img in tqdm(num_tiles):
                 result_img = 0
-                img_name = os.path.basename(img).split('.')[0]
-        
-                image = np.array(Image.open(img))
+                #img_name = os.path.basename(img).split('.')[0]
+                img_name = str(i)
+                #image = np.array(Image.open(img))
+                image = img
 
                 total_image_pixels+= image.shape[0] * image.shape[1]
                 # Check if image has alpha channel
@@ -478,7 +479,7 @@ class ExplainPredictions():
                 
         
 if __name__ == "__main__":
-    input_path = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/test1'
+    
     model_input_path = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/models/eager-frog-489_mrcnn_model_100.pth'
    
 
@@ -490,11 +491,20 @@ if __name__ == "__main__":
     model_config = _default_mrcnn_config(num_classes=1 + test_config['num_classes']).config
     model = build_default(model_config, im_size=1024)
 
-    # Use the Run ID from train_model.py here if you want to add some visualizations after training has been done
-    # with wandb.init(project="nps-ad", id = "17vl5roa", entity="hellovivek", resume="allow"):\
-     
-    
     run = wandb.init(project="nps-ad-vivek",  entity="hellovivek")
-    explain = ExplainPredictions(model, model_input_path = model_input_path, test_input_path=input_path, 
-                                    detection_threshold=0.75, wandb=run, save_result=True, ablation_cam=True, save_thresholds=False)
+    
+    
+    slide_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/amy-def-mfg-test'
+    tile_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/slide_masks'
+    out_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/test/images'
+    tile_size = (1024, 1024)
+
+    # watch out for '.DS_Store'
+    slide_names = ['.'.join(file.split('.')[:-1]) for file in next(os.walk(slide_dir))[2]]
+    slide_names = ['XE16-057_1_AmyB_1', 'XE10-020_1_AmyB_1', 'XE14-051_1_AmyB_1', 'XE12-037_1_AmyB_1', 'XE16-027_1_AmyB_1', 'XE17-013_1_AmyB_1', 'XE15-007_1_AmyB_1', 'XE09-006_1_AmyB_1', 'XE07-060_1_AmyB_1', 'XE10-019_1_AmyB_1', 'XE10-042_1_AmyB_1', 'XE12-007_1_AmyB_1', 'XE10-006_1_AmyB_1', 'XE09-035_1_AmyB_1', 'XE17-014_1_AmyB_1', 'XE13-017_1_AmyB_1', 'XE15-022_1_AmyB_1', 'XE17-059_1_AmyB_1', 'XE10-018_1_AmyB_1', 'XE18-040_1_AmyB_1', 'XE12-036_1_AmyB_1', 'XE08-047_1_AmyB_1', 'XE17-030_1_AmyB_1', 'XE14-004_1_AmyB_1', 'XE10-005_1_AmyB_1', 'XE07-067_1_AmyB_1', 'XE12-031_1_AmyB_1', 'XE12-009_1_AmyB_1', 'XE16-014_1_AmyB_1', 'XE09-063_1_AmyB_1', 'XE12-012_1_AmyB_1', 'XE17-022_1_AmyB_1', 'XE17-048_1_AmyB_1', 'XE13-018_1_AmyB_1', 'XE10-026_1_AmyB_1', 'XE10-033_1_AmyB_1', 'XE08-033_1_AmyB_1', 'XE17-039_1_AmyB_1', 'XE17-029_1_AmyB_1', 'XE13-028_1_AmyB_1', 'XE08-018_1_AmyB_1', 'XE14-047_1_AmyB_1', 'XE16-023_1_AmyB_1', 'XE17-010_1_AmyB_1', 'XE12-042_1_AmyB_1', 'XE18-001_1_AmyB_1', 'XE12-023_1_AmyB_1', 'XE14-037_1_AmyB_1', 'XE11-025_1_AmyB_1', 'XE18-004_1_AmyB_1', 'XE12-010_1_AmyB_1', 'XE08-016_1_AmyB_1', 'XE09-056_1_AmyB_1', 'XE12-016_1_AmyB_1', 'XE14-033_1_AmyB_1', 'XE07-057_1_AmyB_1', 'XE11-027_1_AmyB_1', 'XE17-065_1_AmyB_1', 'XE07-056_1_AmyB_1', 'XE08-015_1_AmyB_1', 'XE09-013_1_AmyB_1', 'XE16-033_1_AmyB_1', 'XE13-007_1_AmyB_1']
+
+
+    explain = ExplainPredictions(model, model_input_path = model_input_path, slide_names=slide_names, 
+                                detection_threshold=0.75, wandb=run, save_result=True, ablation_cam=True, save_thresholds=False)
+    
     explain.generate_results()
