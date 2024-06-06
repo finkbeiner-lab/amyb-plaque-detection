@@ -1,4 +1,8 @@
+// Step1: Code to Generate the custom JSON file with all the required attributes. Run this before generate_data.py
+
 import static qupath.lib.gui.scripting.QPEx.*
+import qupath.lib.gui.scripting.QPEx
+
 import groovy.io.FileType
 import javafx.application.Platform
 import qupath.lib.projects.Project;
@@ -10,60 +14,89 @@ import qupath.lib.regions.ImageRegion
 import qupath.lib.io.GsonTools
 import qupath.lib.objects.classes.PathClassTools
 
-File folder = new File('/mnt/new-nas/work/data/npsad_data/vivek/QuPath')
-project = ""
+File folder = new File('/Volumes/Finkbeiner-Steve/work/data/npsad_data/vivek/QuPath')
+Project<BufferedImage> project
 
-//folder.eachFileRecurse FileType.FILES,  { file ->
-//
-//    // do nothing if the file ends with a .txt extension
-//    if (file.name.endsWith(".qpproj")) {
-//        println "Processing file ${file.absolutePath}"
-//        
-//        if(file.isFile())
-//        
-//            Project<BufferedImage> project = ProjectIO.loadProject(file, BufferedImage.class)
-//            print(project)
-//        
-//    }
-//}
+folder.eachFileRecurse FileType.FILES,  { file ->
 
-File new_file = new File('/mnt/new-nas/work/data/npsad_data/vivek/QuPath/XE10-053_1_AmyB_1/project.qpproj')
+   // do nothing if the file ends with a .txt extension
+   if (file.name.endsWith(".qpproj")) {
+       println "Processing file ${file.absolutePath}"
+       
+       if(file.isFile())
+       
+            project = ProjectIO.loadProject(file, BufferedImage.class)
+            print(project)
+           
+            def image_list = project.getImageList()[0]
+            def image_data = image_list.readImageData()
+            describe(image_data)
 
- Project<BufferedImage> project = ProjectIO.loadProject(new_file, BufferedImage.class)
- describe(project)
- def image_list = project.getImageList()[0]
- def image_data = image_list.readImageData()
- describe(image_data)
- 
- PathObjectHierarchy heirarchy = image_data.getHierarchy()
- Collection annotations = heirarchy.getAnnotationObjects()
- print(annotations)
+            PathObjectHierarchy heirarchy = image_data.getHierarchy()
+            Collection annotations = heirarchy.getAnnotationObjects()
+            print(annotations)
 
-//def imageData = QPEx.getCurrentImageData()
-//def server = imageData.getServer()
+            def tileSize = 1024
+            filename = image_list.getImageName()
+
+            // String path = server.getPath()
+            // filename = path.split("/")[-1]
+            filename = filename.split(".mrxs")[0]
+            print("Filename")
+            print(filename)
+
+            def (unlabeled, labeled) = annotationsToROIsMap(annotations)
+            def roiTypes = ["Cored", "Coarse-Grained", "Diffuse", "CAA"]
+            def roisByType = [:]
+            roiTypes.each({
+                for (k in labeled.keySet()) {
+                    if (k.get(0) == it) {
+                        if (!(k.get(0) in roisByType.keySet()))
+                            roisByType[k.get(0)] = []
+                        roisByType.get(k.get(0)).addAll(labeled.get(k))
+                    }
+                }
+            })
+
+            //def plane = viewer.imagePlane
+            def gson = GsonTools.getInstance(true)
+
+            def results = []
+            def roi_count = 0
+
+            for (item in roisByType) { 
+                def roiType = item.key
+                def rois = item.value
+                def temp_results = [:]  
+                temp_results["label"] = roiType
+                temp_results["filename"] = filename
+                
+                def temp_attributes = []
+                
+                for (_item in ROIsToTilesMap(tileSize, rois)) {
+                    def roi = _item.key
+                    def tiles = _item.value
+                    temp_attributes.add(ROIToDict(tileSize, roi))
+            //        println ROIToDict(tileSize, roi)
+                }
+                
+                temp_results["region_attributes"] =  temp_attributes
+                
+                results.add(temp_results)
+                
+                roi_count = roi_count + 1
+            }
 
 
+            savepath = "/Volumes/Finkbeiner-Steve/work/data/npsad_data/vivek/amy-def-mfg-jsons/" + filename + ".json"
+            print(savepath)
 
-
-//***********************
-
-
-
-
-
-//TODO:
-// general cleanup
-// fix (or check) image server pixel size, plane
-// find grid specs, methods to define custom overlays/grid overlays/text overlays
-
-def tileSize = 1024
-
-def imageData = QPEx.getCurrentImageData()
-def server = imageData.getServer()
-
-String path = server.getPath()
-filename = path.split("/")[-1]
-filename = filename.split(".mrxs")[0]
+            try (Writer writer = new FileWriter(savepath)) {
+                    gson.toJson(results, writer);
+                }
+         
+   }
+}
 
 
 def annotationsMap(annotations) {
@@ -281,64 +314,4 @@ def tilesToAnnotations(t, tiles, plane) {
     }
     return annotations
 }
-
-
-//def viewer = qupath.lib.gui.scripting.QPEx.getCurrentViewer()
-//def hierarchy = viewer.hierarchy
-//
-//def annotations = hierarchy.annotationObjects
-def (unlabeled, labeled) = annotationsToROIsMap(annotations)
-
-
-def roiTypes = ["Core", "Neuritic", "Diffuse", "CAA"]
-def roisByType = [:]
-roiTypes.each({
-    for (k in labeled.keySet()) {
-        if (k.get(0) == it) {
-            if (!(k.get(0) in roisByType.keySet()))
-                roisByType[k.get(0)] = []
-            roisByType.get(k.get(0)).addAll(labeled.get(k))
-        }
-    }
-})
-
-//def plane = viewer.imagePlane
-def gson = GsonTools.getInstance(true)
-
-def results = []
-def roi_count = 0
-
-for (item in roisByType) { 
-    def roiType = item.key
-    def rois = item.value
-    def temp_results = [:]  
-    temp_results["label"] = roiType
-    temp_results["filename"] = filename
-    
-    def temp_attributes = []
-    
-    for (_item in ROIsToTilesMap(tileSize, rois)) {
-        def roi = _item.key
-        def tiles = _item.value
-        temp_attributes.add(ROIToDict(tileSize, roi))
-//        println ROIToDict(tileSize, roi)
-    }
-    
-    temp_results["region_attributes"] =  temp_attributes
-    
-    results.add(temp_results)
-    
-    roi_count = roi_count + 1
-}
-
-
-
-savepath = "/mnt/new-nas/work/data/npsad_data/vivek/amy-def-mfg-jsons/" + filename + ".json"
-print(savepath)
-
-try (Writer writer = new FileWriter(savepath)) {
-        gson.toJson(results, writer);
-    }
-
-
 
