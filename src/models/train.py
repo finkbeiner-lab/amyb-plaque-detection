@@ -148,7 +148,7 @@ if __name__ == '__main__':
     dataset_test_location = args.dataset_test_location
 
     train_config = dict(
-        epochs = 100,
+        epochs = 50,
         batch_size = 6,
         num_classes = 4,
         device_id = 0,
@@ -166,9 +166,20 @@ if __name__ == '__main__':
         cls=torch.optim.SGD,
         defaults=dict(lr=1. * (10. ** (-2)))  #-4 is too slow 
     )
+    """
+    wandb_config =dict(
+        project='amyloid_beta_runs',
+        entity='ml_gladstone', config = dict(
+            train_config=train_config,
+            model_config=model_config,
+            optim_config=optim_config,), save_code=False,
+        group='runs',
+        job_type='train',
+    )
+    """
     wandb_config = dict(
-        project='nps-ad-vivek',
-        entity='hellovivek',
+        project='nps-ad-nature',
+        entity='monika-ahirwar',
         config=dict(
             train_config=train_config,
             model_config=model_config,
@@ -178,7 +189,7 @@ if __name__ == '__main__':
         group='runs',
         job_type='train',
     )
-
+    
     
 
 
@@ -224,7 +235,7 @@ if __name__ == '__main__':
         # print(f'Epoch {epoch}=======================================>.')
 
         for logs in train_one_epoch(model, loss_fn, optimizer, train_data_loader, device, epoch=epoch, log_freq=1):
-            for log in logs:/mnt/new-nas/work/data/npsad_data/vivek/
+            for log in logs:
                 run.log(log)
 
         if epoch + 1 == train_config['epochs'] or epoch % train_config['ckpt_freq'] == 0:

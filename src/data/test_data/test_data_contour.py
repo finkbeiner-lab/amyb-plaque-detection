@@ -15,6 +15,7 @@ from torch import nn, Tensor
 
 import torchvision
 from torchvision.transforms import ToPILImage
+import pandas as pd
 
 
 def norm(x: Tensor):
@@ -68,26 +69,52 @@ def fill_contours(contours, shape):
 
 
 if __name__ == '__main__':
-    vips_img_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/amy-def-mfg-test'
+    #vips_img_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/amy-def-mfg-test'
+    #vips_img_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/amy-def-mfg-test'
     out_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/slide_masks'
+    csv_test_amyb_mdf = pd.read_csv("/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Metadata/overlap_with_metadata_srna_flag/AmyB-MFG_hasClinicalDataflag_hassnRNAflag.csv")
+    vips_img_dir_new = csv_test_amyb_mdf[csv_test_amyb_mdf["hasClinicalData"]==True]["path"].values
+    print(len(vips_img_dir_new))
+    vips_img_names = os.listdir(out_dir)
+    print(vips_img_names[:2])
+    files_to_run = []
+    for file in vips_img_dir_new:
+        if file.split("/")[-1].split(".")[0]+".mask.png" in vips_img_names:
+            files_to_run.append(file)
+            
+            
+    print(len(files_to_run))
+    
+    
+    
+    out_dir_new = "/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/test-patients/images-npy"
+    
+    
+    
+    
+    #vips_img_skip = '07-057 08-018 09-006 09-041 10-005 10-006 10-009 10-018 10-019 10-020 10-021 10-026 11-008 11-018 11-025 11-029 12-009 12-023 12-031 12-036 13-028 14-033 16-027'
+    #vips_img_names = next(os.walk(vips_img_dir))[2]
+    #vips_img_names = [file[2:2 + 6] for file in vips_img_names]
+    #vips_img_names = sorted(list(set(vips_img_names).difference(vips_img_skip)))
 
-    vips_img_skip = '07-057 08-018 09-006 09-041 10-005 10-006 10-009 10-018 10-019 10-020 10-021 10-026 11-008 11-018 11-025 11-029 12-009 12-023 12-031 12-036 13-028 14-033 16-027'
-    vips_img_names = next(os.walk(vips_img_dir))[2]
-    vips_img_names = [file[2:2 + 6] for file in vips_img_names]
-    vips_img_names = sorted(list(set(vips_img_names).difference(vips_img_skip)))
-
-    vips_img_fnames = [os.path.join(vips_img_dir, f'XE{vips_img_name}_1_AmyB_1.mrxs') for vips_img_name in vips_img_names]
+    #vips_img_fnames = [os.path.join(vips_img_dir, f'XE{vips_img_name}_1_AmyB_1.mrxs') for vips_img_name in vips_img_names]
+    vips_img_fnames = files_to_run
 
     tile_size = 128
     level = 3
     k1, i1, r1 = 9, 4, .01
     k2, i2 = 9, 4
 
-    for fname in vips_img_fnames:
-        name = os.path.join(out_dir, '.'.join(os.path.split(fname)[1].split('.')[:-1]))
+    for i, fname in enumerate(vips_img_fnames):
+        print(i)
+        #name = os.path.join(out_dir, '.'.join(os.path.split(fname)[1].split('.')[:-1]))
+        name = os.path.join(out_dir_new, '.'.join(os.path.split(fname)[1].split('.')[:-1]))
         tile_name, mask_name, viz_name = [f'{name}.{suffix}' for suffix in ('tiles.npy', 'mask.png', 'viz.png')]
-
-        slide = pyvips.Image.new_from_file(fname, level=level)
+        #print(name,tile_name, mask_name, viz_name )
+        try:
+            slide = pyvips.Image.new_from_file(fname)
+        except pyvips.error.Error:
+            pass
         # slide = get_cropped(slide, level)
 
         im = slide.numpy()[..., :3]
@@ -112,3 +139,4 @@ if __name__ == '__main__':
         np.save(tile_name, tiles_pos, allow_pickle=False)
         mask_out.save(mask_name)
         viz_out.save(viz_name)
+   
