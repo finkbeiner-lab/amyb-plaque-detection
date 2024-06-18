@@ -67,7 +67,7 @@ def train_model(wandb_config,train_config,model_config,optim_config, dataset_bas
     #tensorboard = pl_loggers.TensorBoardLogger(save_dir="/gladstone/finkbeiner/steve/work/data/npsad_data/monika/models/")
 
     trainer = L.Trainer(limit_train_batches=6, max_epochs=train_config['epochs'],devices=1, accelerator="gpu",default_root_dir = ckpt_path, num_sanity_val_steps=0,
-                        check_val_every_n_epoch=2,callbacks=[chkpt])
+                        check_val_every_n_epoch=1,callbacks=[chkpt])
     train_loader = train_data_loader
     valid_loader = val_data_loader
     trainer.fit(model, train_loader, valid_loader) 
@@ -103,7 +103,7 @@ if __name__ == '__main__':
     """
     dataset_base_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/'
     dataset_train_location = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/train'
-    dataset_val_location = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/val'
+    dataset_val_location = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/val/XE07-047_1_AmyB_1'
     
     train_config = dict(
         epochs = 5,
@@ -133,7 +133,7 @@ if __name__ == '__main__':
     )
     """
     wandb_config = dict(
-        project='amyloid_beta_runs',
+        project='nps-ad-nature',
         entity='monika-ahirwar',
         config=dict(
             train_config=train_config,

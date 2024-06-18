@@ -184,7 +184,7 @@ class LitMaskRCNN(L.LightningModule):
         self.avg_segmentation_overlap = f1_mean
         self.val_acc = labels_matched
         if (f1_mean>=0) or (labels_matched>=0):
-            print(f1_mean, labels_matched)
+            print(" Validation f1 mean score:", f1_mean, " perc labels matched", labels_matched)
         self.log('avg_seg_overlap',f1_mean)
         self.log('val_acc', labels_matched)
         return f1_mean, labels_matched

@@ -16,8 +16,11 @@ import pdb
 
 
 # Color Coding
-id2label = {'1':'Core', '2':'Diffuse',
-             '3':'Neuritic', '4':'CAA','Unknown':'0'}
+#id2label = {'1':'Core', '2':'Diffuse',
+#             '3':'Neuritic', '4':'CAA','Unknown':'0'}
+
+id2label = {"1":"Cored","2":"Diffuse",
+             "3":"Coarse-Grained","4": "CAA"}
 
 
 class GeneralizedRCNN(nn.Module):

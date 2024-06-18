@@ -10,6 +10,9 @@ from torchmetrics.classification import MulticlassConfusionMatrix
 import torchvision.ops.boxes as bops
 from torchmetrics.classification import Dice
 import pandas as pd
+import numpy as np
+from sklearn.metrics import precision_recall_fscore_support
+
 
 class_names = ['Cored', 'Diffuse', 'Coarse-Grained', 'CAA']
 def get_outputs(outputs, threshold):
@@ -68,13 +71,14 @@ def match_mask(masked_image,binary_array):
     iou_coeff = (diag_elements)/(total_predicted+total_actual-diag_elements)
     #csv_filename_tosave = "Eval_Metric_"+ geofile.split(".")[0] + ".csv"
     eval_metrics = pd.DataFrame({"Class":["True","False"],"Precision":precision, "recall":recall,"f1_score":f1_score,"iou_coeff":iou_coeff})
+    #print(eval_metrics)
     #eval_metrics.to_csv(os.path.join(eval_dir,csv_filename_tosave))
     return eval_metrics[eval_metrics["Class"]=="False"]["f1_score"].values[0]
 
 
 def match_label(pred_label, gt_label):
-    print(pred_label)
-    print(gt_label)
+    #print(pred_label)
+    #print(gt_label)
     if pred_label==gt_label:
         return 1
     else:
@@ -93,27 +97,75 @@ def evaluate_metrics(target,masks, labels):
     matched_label_list=[]
     mean_f1_score = -1
     mean_matched_label=-1
+    actual_label_list = []
+    pred_label_list = []
     for i in range(len(target)):
-        target_label = actual_label_target(target[i]['labels'])
+        target_labels = actual_label_target(target[i]['labels'])
         #print(target[i]['masks'][0].shape, masks[0].shape)
-        for j in range(len(masks)):
-            for k in range(len(masks[j])):
-                target_mask = target[i]['masks'][0].cpu().numpy()
-                target_mask= np.where(target_mask > 0, 1, 0)
-                if target_mask.shape==masks[j][k].shape:
-                    f1_score = match_mask(masks[j][k],target_mask)
-                    f1_score_list.append(f1_score)
-                    if f1_score>0:
-                        matched_label = match_label(labels[j][k],target_label)
-                        matched_label_list.append(matched_label)
-                    else:
-                        matched_label_list.append(0)
-    if len(f1_score_list)>0:
-        mean_f1_score=np.nansum(f1_score_list)/len(f1_score_list)
-    if len(matched_label_list)>0:
-        mean_matched_label = sum(matched_label_list)/len(matched_label_list)
+        for l in range(len(target_labels)):
+            for j in range(len(masks)):
+                for k in range(len(masks[j])):
+                    target_mask = target[i]['masks'][l].cpu().numpy()
+                    target_mask= np.where(target_mask > 0, 1, 0)
+                    if target_mask.shape==masks[j][k].shape:
+                        f1_score = match_mask(masks[j][k],target_mask)
+                        f1_score_list.append(f1_score)
+                        if f1_score>0:
+                            matched_label = match_label(labels[j][k],target_labels[l])
+                            matched_label_list.append(matched_label)
+                        else:
+                            matched_label_list.append(0)
+                        actual_label_list.append(target_labels[l])
+                        pred_label_list.append(labels[j][k])
+    #if len(f1_score_list)>0:
+    #    mean_f1_score=np.nansum(f1_score_list)/len(f1_score_list)
+    #if len(matched_label_list)>0:
+    #    mean_matched_label = sum(matched_label_list)/len(matched_label_list)
     #print(f1_score_list, matched_label_list)
-    return mean_f1_score, mean_matched_label
+    return f1_score_list, matched_label_list, actual_label_list,pred_label_list
 
 
 
+def compute_iou(mask1, mask2):
+    intersection = torch.logical_and(mask1, mask2).sum().item()
+    union = torch.logical_or(mask1, mask2).sum().item()
+    iou = intersection / union if union != 0 else 0
+    return iou
+
+def evaluate_mask_rcnn(predictions, ground_truths, iou_threshold=0.5):
+    all_precisions = []
+    all_recalls = []
+    all_f1_scores = []
+
+    for pred, gt in zip(predictions, ground_truths):
+        pred_masks = pred['masks']
+        gt_masks = gt['masks']
+        pred_labels = pred['labels']
+        gt_labels = gt['labels']
+
+        iou_matrix = torch.zeros((len(pred_masks), len(gt_masks)))
+        for i, pred_mask in enumerate(pred_masks):
+            for j, gt_mask in enumerate(gt_masks):
+                iou_matrix[i, j] = compute_iou(pred_mask, gt_mask)
+
+        matches = iou_matrix > iou_threshold
+
+        precision, recall, f1, _ = precision_recall_fscore_support(
+            matched_gt_labels.cpu().numpy(), matched_pred_labels.cpu().numpy(), average='weighted', zero_division=0)
+
+        all_precisions.append(precision)
+        all_recalls.append(recall)
+        all_f1_scores.append(f1)
+
+    mean_precision = np.mean(all_precisions)
+    mean_recall = np.mean(all_recalls)
+    mean_f1 = np.mean(all_f1_scores)
+
+    return mean_precision, mean_recall, mean_f1
+
+# Example usage
+#predictions = [{'masks': [mask1, mask2], 'labels': [label1, label2]}]
+#ground_truths = [{'masks': [gt_mask1, gt_mask2], 'labels': [gt_label1, gt_label2]}]
+
+#mean_precision, mean_recall, mean_f1 = evaluate_mask_rcnn(predictions, ground_truths)
+#print(f'Mean Precision: {mean_precision}, Mean Recall: {mean_recall}, Mean F1 Score: {mean_f1}')
