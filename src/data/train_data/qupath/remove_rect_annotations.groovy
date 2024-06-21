@@ -1,14 +1,16 @@
-import static qupath.lib.gui.scripting.QPEx.*
-import qupath.lib.roi.*
-import qupath.lib.objects.*
+import qupath.lib.roi.ROIs
+import qupath.lib.regions.ImagePlane
+import qupath.lib.objects.PathObjects
+import qupath.lib.roi.RectangleROI
+import qupath.lib.objects.PathAnnotationObject
 
-
-def viewer = qupath.lib.gui.scripting.QPEx.getCurrentViewer()
-def hierarchy = viewer.hierarchy
-
-
-def annotations = hierarchy.annotationObjects
-def firstAnnotation = getAnnotationObjects().findAll{it.ROI.getRoiName() == "Rectangle"}
-removeObjects(firstAnnotation, true)
-
-
+int z = 0
+int t = 0
+def plane = ImagePlane.getPlane(z, t)
+def roi = ROIs.createRectangleROI(96064-22526,7323-189,  1024, 1024 , plane)
+print roi
+def rgb = getColorRGB(50, 50, 200)
+def pathClass = getPathClass('Other', rgb)
+def annotation = new PathAnnotationObject(roi, pathClass)
+//def annotation = PathObjects.createAnnotationObject(roi)
+addObject(annotation)
