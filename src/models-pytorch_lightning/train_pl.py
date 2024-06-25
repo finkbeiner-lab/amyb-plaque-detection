@@ -35,7 +35,7 @@ from typing import Tuple, List, Dict, Optional, Union
 from lightning.pytorch.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger
 import wandb
-
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping
 
 
 def train_model(wandb_config,train_config,model_config,optim_config, dataset_base_dir, dataset_train_location, dataset_val_location  ):
@@ -65,9 +65,10 @@ def train_model(wandb_config,train_config,model_config,optim_config, dataset_bas
     chkpt = ModelCheckpoint(monitor="val_acc", mode="max")
 
     #tensorboard = pl_loggers.TensorBoardLogger(save_dir="/gladstone/finkbeiner/steve/work/data/npsad_data/monika/models/")
-
+    early_stop_callback = EarlyStopping(monitor="val_acc", min_delta=0.00, patience=5, verbose=False, mode="max")
+    
     trainer = L.Trainer(limit_train_batches=6, max_epochs=train_config['epochs'],devices=1, accelerator="gpu",default_root_dir = ckpt_path, num_sanity_val_steps=0,
-                        check_val_every_n_epoch=1,callbacks=[chkpt])
+                        check_val_every_n_epoch=2,callbacks=[chkpt, early_stop_callback])
     train_loader = train_data_loader
     valid_loader = val_data_loader
     trainer.fit(model, train_loader, valid_loader) 
@@ -103,7 +104,7 @@ if __name__ == '__main__':
     """
     dataset_base_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/'
     dataset_train_location = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/train'
-    dataset_val_location = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/val/XE07-047_1_AmyB_1'
+    dataset_val_location = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/val'
     
     train_config = dict(
         epochs = 5,

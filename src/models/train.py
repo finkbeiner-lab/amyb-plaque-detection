@@ -233,7 +233,7 @@ if __name__ == '__main__':
     dataset_test_location = args.dataset_test_location
 
     train_config = dict(
-        epochs = 80,
+        epochs = 100,
         batch_size = 4,
         num_classes = 4,
         device_id = 0,

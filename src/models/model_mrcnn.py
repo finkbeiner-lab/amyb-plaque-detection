@@ -258,8 +258,10 @@ def build_default(config, im_size=1024, backbone=None, transform=None):
         transform = GeneralizedRCNNTransform(
             min_size=im_size,
             max_size=im_size,
-            image_mean=[0.8687, 0.8770, 0.8657],
-            image_std=[0.1292, 0.1395, 0.1760],
+            #image_mean=[0.8687, 0.8770, 0.8657], # for train
+            image_mean=[0.8668, 0.8636, 0.8392], # for train_v2
+            #image_std=[0.1292, 0.1395, 0.1760],# for train
+            image_std=[0.1503, 0.1621, 0.1963],# for train_v2
         )
     else:
         transform
