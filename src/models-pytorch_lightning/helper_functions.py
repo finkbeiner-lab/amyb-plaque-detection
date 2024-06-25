@@ -73,8 +73,8 @@ def match_mask(masked_image,binary_array):
 
 
 def match_label(pred_label, gt_label):
-    print(pred_label)
-    print(gt_label)
+    #print(pred_label)
+    #print(gt_label)
     if pred_label==gt_label:
         return 1
     else:
@@ -82,10 +82,6 @@ def match_label(pred_label, gt_label):
 
 def actual_label_target(gt_label):
     return gt_label.cpu().numpy()
-    #idx = gt_label.cpu().numpy()
-    #if idx>0:
-    #    return class_names[idx-1]
-    #return idx.astype(int)
 
 
 def evaluate_metrics(target,masks, labels):
@@ -96,24 +92,22 @@ def evaluate_metrics(target,masks, labels):
     for i in range(len(target)):
         target_label = actual_label_target(target[i]['labels'])
         #print(target[i]['masks'][0].shape, masks[0].shape)
-        for j in range(len(masks)):
-            for k in range(len(masks[j])):
-                target_mask = target[i]['masks'][0].cpu().numpy()
-                target_mask= np.where(target_mask > 0, 1, 0)
-                if target_mask.shape==masks[j][k].shape:
-                    f1_score = match_mask(masks[j][k],target_mask)
-                    f1_score_list.append(f1_score)
-                    if f1_score>0:
-                        matched_label = match_label(labels[j][k],target_label)
-                        matched_label_list.append(matched_label)
-                    else:
-                        matched_label_list.append(0)
-    if len(f1_score_list)>0:
-        mean_f1_score=np.nansum(f1_score_list)/len(f1_score_list)
-    if len(matched_label_list)>0:
-        mean_matched_label = sum(matched_label_list)/len(matched_label_list)
-    #print(f1_score_list, matched_label_list)
-    return mean_f1_score, mean_matched_label
-
-
-
+        for l in range(len(target_labels)):
+            for j in range(len(masks)):
+                for k in range(len(masks[j])):
+                    target_mask = target[i]['masks'][l].cpu().numpy()
+                    target_mask= np.where(target_mask > 0, 1, 0)
+                    if target_mask.shape==masks[j][k].shape:
+                        f1_score = match_mask(masks[j][k],target_mask)
+                        f1_score_list.append(f1_score)
+                        if f1_score>0:
+                            matched_label = match_label(labels[j][k],target_labels[l])
+                            matched_label_list.append(matched_label)
+                        else:
+                            matched_label_list.append(0)
+        if len(f1_score_list)>0:
+            mean_f1_score=np.nansum(f1_score_list)/len(f1_score_list)
+        if len(matched_label_list)>0:
+            mean_matched_label = sum(matched_label_list)/len(matched_label_list)
+        #print(f1_score_list, matched_label_list)
+        return mean_f1_score, mean_matched_label
