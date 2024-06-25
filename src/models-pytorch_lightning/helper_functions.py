@@ -73,8 +73,8 @@ def match_mask(masked_image,binary_array):
 
 
 def match_label(pred_label, gt_label):
-    print(pred_label)
-    print(gt_label)
+    #print(pred_label)
+    #print(gt_label)
     if pred_label==gt_label:
         return 1
     else:
@@ -114,6 +114,7 @@ def evaluate_metrics(target,masks, labels):
         mean_matched_label = sum(matched_label_list)/len(matched_label_list)
     #print(f1_score_list, matched_label_list)
     return mean_f1_score, mean_matched_label
+    #return f1_score_list, matched_label_list
 
 
 

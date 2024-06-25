@@ -18,6 +18,7 @@ class_names = ['Cored', 'Diffuse', 'Coarse-Grained', 'CAA']
 def get_outputs(outputs, threshold):
     mask_list = []
     label_list = []
+    score_list =[]
     for j in range(len(outputs)):
         scores = list(outputs[j]['scores'].detach().cpu().numpy())
         # print("\n scores", max(scores))
@@ -46,7 +47,8 @@ def get_outputs(outputs, threshold):
         labels = [labels[x] for x in thresholded_preds_inidices]
         mask_list.append(masks)
         label_list.append(labels)
-    return mask_list, label_list
+        score_list.append(scores)
+    return mask_list, label_list, score_list
 
 
 def match_mask(masked_image,binary_array):
@@ -92,13 +94,14 @@ def actual_label_target(gt_label):
     #return idx.astype(int)
 
 
-def evaluate_metrics(target,masks, labels):
+def evaluate_metrics(target,masks, labels, scores):
     f1_score_list=[]
     matched_label_list=[]
-    mean_f1_score = -1
-    mean_matched_label=-1
+    #mean_f1_score = -1
+    #mean_matched_label=-1
     actual_label_list = []
     pred_label_list = []
+    score_list = []
     for i in range(len(target)):
         target_labels = actual_label_target(target[i]['labels'])
         #print(target[i]['masks'][0].shape, masks[0].shape)
@@ -117,12 +120,13 @@ def evaluate_metrics(target,masks, labels):
                             matched_label_list.append(0)
                         actual_label_list.append(target_labels[l])
                         pred_label_list.append(labels[j][k])
+                        score_list.append(scores[j][k])
     #if len(f1_score_list)>0:
     #    mean_f1_score=np.nansum(f1_score_list)/len(f1_score_list)
     #if len(matched_label_list)>0:
     #    mean_matched_label = sum(matched_label_list)/len(matched_label_list)
     #print(f1_score_list, matched_label_list)
-    return f1_score_list, matched_label_list, actual_label_list,pred_label_list
+    return f1_score_list, matched_label_list, actual_label_list,pred_label_list, score_list
 
 
 

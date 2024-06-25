@@ -18,13 +18,16 @@ from features import build_features
 from features import transforms as T
 from utils.engine import evaluate
 import torchvision
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from visualization.explain import ExplainPredictions
 import pandas as pd
 import plotly.graph_objects as go
 from utils.helper_functions import evaluate_metrics, get_outputs, compute_iou, evaluate_mask_rcnn
 import pdb
 from torch.optim.lr_scheduler import ExponentialLR
+from sklearn.metrics import precision_recall_fscore_support
+from sklearn.metrics import precision_recall_curve
+from sklearn.metrics import multilabel_confusion_matrix
 
 
 # Sets the behavior of calls such as
@@ -48,7 +51,7 @@ from torch.optim.lr_scheduler import ExponentialLR
 # if the semantics of Parameter change, an in-place modification of the
 # underlying Tensor object itself would be required (i.e. a _to()), but this is not universally supported.
 torch.__future__.set_overwrite_module_params_on_conversion(True)
-
+"""
 def visualize_augmentations(images, targets):
 
     plt.figure(figsize=(10,10)) # specifying the overall grid size
@@ -71,11 +74,7 @@ def visualize_augmentations(images, targets):
         save_name = "../../../reports/figures/augmentation_{img_no}.png"
 
         plt.savefig(save_name.format(img_no=i))
-
-
-#def test_model():
-
-
+"""
 
 
 def train_one_epoch(
@@ -114,8 +113,42 @@ def train_one_epoch(
         if (i % log_freq) == 0:
             yield log_metrics
             log_metrics = list()
-    scheduler.step()
+    #scheduler.step()
     yield log_metrics
+
+
+def evaluate_one_epoch(
+    model: torch.nn.Module,
+    dataset_test_location,
+    test_patient_ids,
+    test_config,
+    device):
+    f1_mean_list = []
+    labels_matched_list = []
+    actual_label_list=[]
+    pred_label_list=[]
+    for t in range(len(test_patient_ids)):
+        model.eval()
+        if len(os.listdir(os.path.join(dataset_test_location,test_patient_ids[t],"images")))==0:
+            continue
+        test_ds = build_features.AmyBDataset(os.path.join(dataset_test_location,test_patient_ids[t]),T.Compose([T.ToTensor()]))
+        test_loader = torch.utils.data.DataLoader(test_ds, batch_size=test_config['batch_size'], shuffle=False, num_workers=4, collate_fn=collate_fn)
+        for i, (images, targets) in enumerate(test_loader):
+            images = [image.to(device) for image in images]
+            targets = [dict([(k, v.to(device)) for k, v in target.items()]) for target in targets]
+            outputs = model.forward(images, targets)
+            masks, labels, scores = get_outputs(outputs, 0.25)
+            f1_mean, labels_matched, actual_labels,pred_labels, score_list=  evaluate_metrics(targets, masks, labels,scores)
+            if len(f1_mean)>0 or len(labels_matched)>0:
+                #print(" Validation f1 mean score:", f1_mean, " perc labels matched", labels_matched)
+                f1_mean_list.extend(f1_mean)
+                labels_matched_list.extend(labels_matched)
+                actual_label_list.extend(actual_labels)
+                pred_label_list.extend(pred_labels)
+    #return np.nansum(f1_mean_list)/len(f1_mean_list), np.sum(labels_matched_list)/len(labels_matched_list)
+    return f1_mean_list, labels_matched_list, actual_label_list, pred_label_list
+
+
 
 
 def get_loss_fn(weights, default=0.):
@@ -233,12 +266,12 @@ if __name__ == '__main__':
     dataset_test_location = args.dataset_test_location
 
     train_config = dict(
-        epochs = 80,
-        batch_size = 4,
+        epochs = 5,
+        batch_size = 16,
         num_classes = 4,
         device_id = 0,
         ckpt_freq =500,
-        eval_freq = 10,
+        eval_freq = 1,
     )
 
     test_config = dict(
@@ -273,24 +306,6 @@ if __name__ == '__main__':
     
     ## Dataset loading
     train_dataset = build_features.AmyBDataset(dataset_train_location, T.Compose([T.ToTensor()]))
-    # val_dataset = build_features.AmyBDataset(val_dataset, T.Compose([T.ToTensor()]))
-    #test_dataset = build_features.AmyBDataset(dataset_test_location, T.Compose([T.ToTensor()]))
-
-    # Mapping
-    # fn_relabel = lambda i: [1, 2, 1, 3][i - 1]
-    """
-    def remap_label(orig_label):
-        # print("\nOrig", orig_label)
-        if (orig_label==1) or (orig_label==3):
-            # print("mapped 1/3", 1)
-            return 1
-        if orig_label==4:
-            # print("mapped 4", 3)
-            return 3
-        return orig_label
-    """
-    
-    #train_dataset, test_dataset = [build_features.DatasetRelabeled(dataset, remap_label) for dataset in (train_dataset, test_dataset)]
 
     train_data_loader = torch.utils.data.DataLoader(
             train_dataset, batch_size=train_config['batch_size'], shuffle=True, num_workers=4,
@@ -300,16 +315,6 @@ if __name__ == '__main__':
     
     if '.DS_Store' in test_patient_ids:
         test_patient_ids.remove('.DS_Store')
-        
-    # val_data_loader = torch.utils.data.DataLoader(
-    #         test_dataset, batch_size=test_config['batch_size'], shuffle=False, num_workers=4,
-    #         collate_fn=collate_fn)
-
-        
-    #test_data_loader = torch.utils.data.DataLoader(
-    #        test_dataset, batch_size=test_config['batch_size'], shuffle=False, num_workers=4,
-    #        collate_fn=collate_fn)
-
     
     # Model Building
     model = build_default(model_config, im_size=1024)
@@ -349,55 +354,32 @@ if __name__ == '__main__':
     f1_scores = []
     label_matched_1 = []
     for epoch in range(train_config['epochs']):
-        # print(f'Epoch {epoch}=======================================>.')
-
         for logs in train_one_epoch(model, loss_fn, optimizer, scheduler, train_data_loader, device, epoch=epoch, log_freq=1):
             for log in logs:
                 run.log(log)
-
-        # if epoch + 1 == train_config['epochs'] or epoch % train_config['ckpt_freq'] == 0:
-
-        #     artifact = wandb.Artifact(artifact_name, type='files')
-        #     with artifact.new_file(f'ckpt/{epoch}.pt', 'wb') as f:
-        #         torch.save(model.state_dict(), f)
-            # run.log_artifact(artifact)
-
         if (epoch % train_config['eval_freq'] == 0) and (epoch!=0):
-            #eval_res = evaluate(run, model, test_data_loader, device=device, epoch=epoch)
-            # pdb.set_trace()
-            # plotPRcurve(eval_res, epoch)
-            model_save_name = "/gladstone/finkbeiner/steve//work/data/npsad_data/vivek/" + "models/{name}_mrcnn_model_{epoch}.pth"
+            model_save_name = "/workspace/Projects/Amyb_plaque_detection/" + "models/{name}_mrcnn_model_{epoch}.pth"
             torch.save(model.state_dict(), model_save_name.format(name=exp_name, epoch=epoch))
-            for t in range(len(test_patient_ids)):
-                model.eval()
-                if len(os.listdir(os.path.join(dataset_test_location,test_patient_ids[t],"images")))==0:
-                    continue
-                test_ds = build_features.AmyBDataset(os.path.join(dataset_test_location,test_patient_ids[t]),T.Compose([T.ToTensor()]))
-                test_loader = torch.utils.data.DataLoader(test_ds, batch_size=test_config['batch_size'], shuffle=False, num_workers=4, collate_fn=collate_fn)
-                f1_mean_list = []
-                labels_matched_list = []
-                for i, (images, targets) in enumerate(test_loader):
-                    images = [image.to(device) for image in images]
-                    targets = [dict([(k, v.to(device)) for k, v in target.items()]) for target in targets]
-                    outputs = model.forward(images, targets)
-                    masks, labels = get_outputs(outputs, 0.50)
-                    f1_mean, labels_matched, _, _ =  evaluate_metrics(targets, masks, labels)
-                    if len(f1_mean)>0 or len(labels_matched)>0:
-                        #print(" Validation f1 mean score:", f1_mean, " perc labels matched", labels_matched)
-                        f1_mean_list.extend(f1_mean)
-                        labels_matched_list.extend(labels_matched)
-                
-                print(test_patient_ids[t], " -f1 mean- ", np.nansum(f1_mean_list)/len(f1_mean_list),  " - % match - ", np.sum(labels_matched_list)/len(labels_matched_list), "---count----", len(labels_matched_list))
-                epoch_list.append(epoch)
-                patient_ids.append(test_patient_ids[t])
-                f1_scores.append(np.nansum(f1_mean_list)/len(f1_mean_list))
-                label_matched_1.append(np.sum(labels_matched_list)/len(labels_matched_list))
+            f1_mean_list, labels_matched_list,actual_label_list, pred_label_list = evaluate_one_epoch( model, dataset_test_location,test_patient_ids, test_config, device)
+            print(f1_mean_list)
+            print(labels_matched_list)
+            print(actual_label_list, pred_label_list)
+            precision, recall,fbeta_score, support = precision_recall_fscore_support(actual_label_list, pred_label_list)
+            run.log({"Precision "+str(epoch): precision, "recall "+str(epoch): recall,"support "+str(epoch): support})
+            confusion_matrix = multilabel_confusion_matrix(actual_label_list, pred_label_list, labels = [1.0,2.0,3.0,4.0])
+            run.log({"confusion_matrix "+str(epoch):confusion_matrix})
+            epoch_list.append(epoch)
+            f1_scores.append(np.nansum(f1_mean_list)/len(f1_mean_list))
+            label_matched_1.append(np.sum(labels_matched_list)/len(labels_matched_list))
+            
         model.train(True)
-    val_df = pd.DataFrame({"epoch":epoch_list, "patient_id":patient_ids, "f1_score":f1_scores, "percent_label_match":label_matched_1})
+    #val_df = pd.DataFrame({"epoch":epoch_list, "patient_id":patient_ids, "f1_score":f1_scores, "percent_label_match":label_matched_1})
+    val_df = pd.DataFrame({"epoch":epoch_list,  "f1_score":f1_scores, "percent_label_match":label_matched_1})
     tbl = wandb.Table(data=val_df)
     run.log({"Val Evaluation Metric Patient-wise " + artifact_name: tbl})
-    val_df.to_csv("/gladstone/finkbeiner/steve//work/data/npsad_data/vivek/reports/validation_metrics/"+artifact_name+"_val_metric.csv")
+    val_df.to_csv("/workspace/Projects/Amyb_plaque_detection/reports/"+artifact_name+"_val_metric.csv")
+    
     # TODO change the directory if running on desktop
-    model_save_name = "/gladstone/finkbeiner/steve//work/data/npsad_data/vivek/" + "models/{name}_mrcnn_model_{epoch}.pth"
+    model_save_name = "/workspace/Projects/Amyb_plaque_detection/" + "models/{name}_mrcnn_model_{epoch}.pth"
     torch.save(model.state_dict(), model_save_name.format(name=exp_name, epoch=train_config['epochs']))
     run.finish()
