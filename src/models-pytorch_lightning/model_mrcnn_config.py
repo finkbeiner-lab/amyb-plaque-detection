@@ -13,6 +13,7 @@ from torchvision.ops.poolers import MultiScaleRoIAlign
 from torchvision.models.detection import backbone_utils
 from torchvision.models.detection.generalized_rcnn import GeneralizedRCNN
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
+from torchvision.models.resnet import resnext101_32x8d
 
 #from models.generalized_rcnn import GeneralizedRCNN
 
@@ -246,7 +247,9 @@ def build_default(config, im_size=1024, backbone=None, transform=None):
 
     if backbone is None:
         backbone = backbone_utils.resnet_fpn_backbone(
+            #'resnext101_32x8d',
             'resnet152',
+            #'resnet50',
             pretrained=True,
             trainable_layers=3
         )
@@ -257,8 +260,10 @@ def build_default(config, im_size=1024, backbone=None, transform=None):
         transform = GeneralizedRCNNTransform(
             min_size=im_size,
             max_size=im_size,
-            image_mean=[0.8687, 0.8770, 0.8657],
-            image_std=[0.1292, 0.1395, 0.1760],
+            image_mean=[0.8931, 0.8297, 0.7361],
+            #image_mean=[0.9123, 0.8811, 0.8198],
+            image_std=[0.1311, 0.1732, 0.2597],
+            #image_std = [0.1278, 0.1467, 0.2022]
         )
     else:
         transform

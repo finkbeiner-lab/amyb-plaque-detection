@@ -1,11 +1,12 @@
 import os
-from matplotlib import image
+#from matplotlib import image
 
 import torch
 import numpy as np
 from PIL import Image
 import pdb
 import glob
+import cv2
 
 
 class AmyBDataset(object):
@@ -38,44 +39,55 @@ class AmyBDataset(object):
         # Palette "P" mode works by creating a mapping table, which corresponds to an 
         # index (between 0 and 255) to a discrete color in a larger 
         # color space (like RGB).
-        mask = Image.open(mask_path).convert('L')
+        mask = Image.open(mask_path).convert('P')
 
         mask = np.array(mask)
+        mask = mask//50
         # instances are encoded as different colors
-        obj_ids = np.unique(mask)
+        num_labels, mask2 = cv2.connectedComponents(mask)
+        
+        #obj_ids = np.unique(mask)
         #print(img_path)
         #print(obj_ids)
         # first id is the background, so remove it
-        obj_ids = obj_ids[1:]
+        #obj_ids = obj_ids[1:]
 
         # split the color-encoded mask into a set
         # of binary masks
-        masks = mask == obj_ids[:, None, None]
+        #masks = mask == obj_ids[:, None, None]
         # masks.shape (1, 1024, 1024) first element denotes number of objects
         # (num_objects, height, width)
 
-
+        masks = [mask2==i for i in range(1,num_labels)]
 
         # get bounding box coordinates for each mask
-        num_objs = len(obj_ids)
+        num_objs = num_labels-1
         #print(obj_ids)
         #print(num_objs)
        
         boxes = []
         areas =[]
+        labels = []
+        final_masks=[]
         for i in range(num_objs):
-            pos = np.where(masks[i])
+            pos = np.where(masks[i]==True)
             xmin = np.min(pos[1])
             xmax = np.max(pos[1])
             ymin = np.min(pos[0])
             ymax = np.max(pos[0])
-            
+            label = np.unique(mask[masks[i]])[0]
             if xmax <= xmin and ymax <=ymin:
                 print("degenrate boxes", mask_path)
-                print(len(obj_ids))
-                break
-            boxes.append([xmin, ymin, xmax, ymax])
-            areas.append([(ymax-ymin)*(xmax-xmin)])
+                #print("pos",pos)
+                #print("xmax, xmin, ymax,ymin",xmax, xmin, ymax,ymin)
+                
+            if ((ymax-ymin)>0) and ((xmax-xmin)>0):
+                boxes.append([xmin, ymin, xmax, ymax])
+                areas.append([(ymax-ymin)*(xmax-xmin)])
+                labels.append(label)
+                final_masks.append(masks[i])
+
+                
         
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
        
@@ -83,13 +95,15 @@ class AmyBDataset(object):
         # labels = torch.tensor(labels, dtype=torch.int64)
         # labels = torch.ones((num_objs,), dtype=torch.int64)
 
-        x = [id // 50 for id in obj_ids]
-        labels = torch.tensor(x)
+        #x = [id // 50 for id in obj_ids]
+        labels = torch.as_tensor(labels, dtype=torch.int64)
+        #labels = torch.tensor(np.array(labels), dtype=torch.int64)
         if len(boxes.shape)!=2:
             print(img_path)
             print(mask_path)
             print(labels, np.unique(mask))
 
+        masks = np.array(final_masks, dtype=np.uint8)
         masks = torch.as_tensor(masks, dtype=torch.uint8)
 
         image_id = torch.tensor([idx])

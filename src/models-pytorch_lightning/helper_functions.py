@@ -16,19 +16,20 @@ def get_outputs(outputs, threshold):
     mask_list = []
     label_list = []
     for j in range(len(outputs)):
-        scores = list(outputs[j]['scores'].detach().cpu().numpy())
+        scores = outputs[j]['scores'].tolist()
+        #scores = list(outputs[j]['scores'].detach().cpu().numpy())
         # print("\n scores", max(scores))
         # index of those scores which are above a certain threshold
         thresholded_preds_inidices = [scores.index(i) for i in scores if i > threshold]
         #print(thresholded_preds_inidices)
         scores = [scores[x] for x in thresholded_preds_inidices]
         # get the masks
-        masks = (outputs[j]['masks']>0.5).squeeze().detach().cpu().numpy()
+        masks = (outputs[j]['masks']>0.5).squeeze()
         # print("masks", masks)
         # discard masks for objects which are below threshold
         masks = [masks[x] for x in thresholded_preds_inidices]
         # get the bounding boxes, in (x1, y1), (x2, y2) format
-        boxes = [[(int(i[0]), int(i[1])), (int(i[2]), int(i[3]))]  for i in outputs[j]['boxes'].detach().cpu()]
+        boxes = [[(int(i[0]), int(i[1])), (int(i[2]), int(i[3]))]  for i in outputs[j]['boxes'].tolist()]
         # discard bounding boxes below threshold value
         boxes = [boxes[x] for x in thresholded_preds_inidices]
         # get the classes labels
@@ -36,7 +37,7 @@ def get_outputs(outputs, threshold):
         #print(outputs[0]['labels'])
         #print(thresholded_preds_count)
         #print(outputs[0]['labels'])
-        labels = list(outputs[j]['labels'].detach().cpu().numpy())
+        labels = outputs[j]['labels'].tolist()
         #labels = [i for i in outputs[j]['labels'].detach().cpu().numpy()]
         #labels = [i for i in outputs[0]['labels']]
         #print(labels)
@@ -81,40 +82,47 @@ def match_label(pred_label, gt_label):
         return 0
 
 def actual_label_target(gt_label):
-    return gt_label.cpu().numpy()
+    return gt_label
     #idx = gt_label.cpu().numpy()
     #if idx>0:
     #    return class_names[idx-1]
     #return idx.astype(int)
 
 
+def compute_iou(mask1, mask2):
+    intersection = torch.logical_and(mask1, mask2).sum().item()
+    union = torch.logical_or(mask1, mask2).sum().item()
+    iou = (2*intersection) / union if union != 0 else 0
+    return iou
+
+
 def evaluate_metrics(target,masks, labels):
     f1_score_list=[]
     matched_label_list=[]
-    mean_f1_score = -1
-    mean_matched_label=-1
+    mean_f1_score = 0
+    mean_matched_label=0
+    actual_label_list = []
+    pred_label_list = []
     for i in range(len(target)):
-        target_label = actual_label_target(target[i]['labels'])
+        target_labels = actual_label_target(target[i]['labels'])
         #print(target[i]['masks'][0].shape, masks[0].shape)
-        for j in range(len(masks)):
-            for k in range(len(masks[j])):
-                target_mask = target[i]['masks'][0].cpu().numpy()
-                target_mask= np.where(target_mask > 0, 1, 0)
-                if target_mask.shape==masks[j][k].shape:
-                    f1_score = match_mask(masks[j][k],target_mask)
-                    f1_score_list.append(f1_score)
-                    if f1_score>0:
-                        matched_label = match_label(labels[j][k],target_label)
-                        matched_label_list.append(matched_label)
-                    else:
-                        matched_label_list.append(0)
-    if len(f1_score_list)>0:
-        mean_f1_score=np.nansum(f1_score_list)/len(f1_score_list)
-    if len(matched_label_list)>0:
-        mean_matched_label = sum(matched_label_list)/len(matched_label_list)
-    #print(f1_score_list, matched_label_list)
-    return mean_f1_score, mean_matched_label
-    #return f1_score_list, matched_label_list
-
-
-
+        for l in range(len(target_labels)):
+            for j in range(len(masks)):
+                for k in range(len(masks[j])):
+                    target_mask = target[i]['masks'][l]
+                    target_mask = torch.where(target_mask > 0, torch.tensor(1), torch.tensor(0))
+                    #pdb.set_trace()
+                    if target_mask.shape==masks[j][k].shape:
+                        f1_score = compute_iou(masks[j][k],target_mask)
+                        #f1_score_list.append(f1_score)
+                        if f1_score>0:
+                            matched_label = match_label(labels[j][k],target_labels[l])
+                            matched_label_list.append(matched_label)
+                        else:
+                            matched_label_list.append(0)
+        if len(f1_score_list)>0:
+            mean_f1_score=np.nansum(f1_score_list)/len(f1_score_list)
+        if len(matched_label_list)>0:
+            mean_matched_label = sum(matched_label_list)/len(matched_label_list)
+        #print(f1_score_list, matched_label_list)
+        return mean_f1_score, mean_matched_label

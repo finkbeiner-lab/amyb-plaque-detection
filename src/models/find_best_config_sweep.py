@@ -33,11 +33,10 @@ sweep_configuration = {
     "name": "sweep",
     "metric": {"goal": "maximize", "name": "val_acc"},
     "parameters": {
-        "batch_size": {"values": [8, 16, 64]},
-        "epochs": {"values": [25, 50]},
-        "lr": {"max": 0.0001, "min": 0.00001},
-        
-        
+        "batch_size": {"values": [16]},
+        "epochs": {"values": [50]},
+        "lr": {"max": 0.0001, "min": 0.000001},
+        "weight_decay":{"max": 0.00001, "min": 0.0000001}
     },
 }
 sweep_id = wandb.sweep(sweep=sweep_configuration, project="nps-ad-nature")
@@ -86,8 +85,9 @@ def train_one_epoch(
         assert set(g['params']).issubset(model_params)
 
     log_metrics = list()
-    average_loss = 0.0
+    total_loss = 0.0
     for i, (images, targets) in enumerate(data_loader):
+        average_loss = 0.0
         images = [image.to(device) for image in images]
         targets = [dict([(k, v.to(device)) for k, v in target.items()]) for target in targets]
         # visualize_augmentations(images , targets)
@@ -105,13 +105,14 @@ def train_one_epoch(
         #print(list(loss.item())[0])
         average_loss = average_loss+loss.item()
         print(average_loss)
+        total_loss = total_loss+average_loss
         #if (i % log_freq) == 0:
         #    yield log_metrics
         #    log_metrics = list()
     #scheduler.step()
     #yield log_metrics
     #print(list(loss.item()))
-    return average_loss
+    return total_loss
 
 
 def evaluate_one_epoch(
@@ -123,22 +124,23 @@ def evaluate_one_epoch(
 ):
     f1_mean_list = []
     labels_matched_list = []
-    for t in range(len(test_patient_ids)):
-        model.eval()
-        if len(os.listdir(os.path.join(dataset_test_location,test_patient_ids[t],"images")))==0:
-            continue
-        test_ds = build_features.AmyBDataset(os.path.join(dataset_test_location,test_patient_ids[t]),T.Compose([T.ToTensor()]))
-        test_loader = torch.utils.data.DataLoader(test_ds, batch_size=test_config['batch_size'], shuffle=False, num_workers=4, collate_fn=collate_fn)
-        for i, (images, targets) in enumerate(test_loader):
-            images = [image.to(device) for image in images]
-            targets = [dict([(k, v.to(device)) for k, v in target.items()]) for target in targets]
-            outputs = model.forward(images, targets)
-            masks, labels = get_outputs(outputs, 0.50)
-            f1_mean, labels_matched, _, _ =  evaluate_metrics(targets, masks, labels)
-            if len(f1_mean)>0 or len(labels_matched)>0:
-                #print(" Validation f1 mean score:", f1_mean, " perc labels matched", labels_matched)
-                f1_mean_list.extend(f1_mean)
-                labels_matched_list.extend(labels_matched)
+    #for t in range(len(test_patient_ids)):
+    model.eval()
+    #if len(os.listdir(os.path.join(dataset_test_location,test_patient_ids[t],"images")))==0:
+    #        continue
+    #test_ds = build_features.AmyBDataset(os.path.join(dataset_test_location,test_patient_ids[t]),T.Compose([T.ToTensor()]))
+    test_ds = build_features.AmyBDataset(dataset_test_location,T.Compose([T.ToTensor()]))
+    test_loader = torch.utils.data.DataLoader(test_ds, batch_size=test_config['batch_size'], shuffle=False, num_workers=4, collate_fn=collate_fn)
+    for i, (images, targets) in enumerate(test_loader):
+        images = [image.to(device) for image in images]
+        targets = [dict([(k, v.to(device)) for k, v in target.items()]) for target in targets]
+        _, outputs = model.forward(images, targets)
+        masks, labels, scores = get_outputs(outputs, 0.25)
+        f1_mean, labels_matched, _, _, _ =  evaluate_metrics(targets, masks, labels,scores, 0.5)
+        if len(f1_mean)>0 or len(labels_matched)>0:
+            #print(" Validation f1 mean score:", f1_mean, " perc labels matched", labels_matched)
+            f1_mean_list.extend(f1_mean)
+            labels_matched_list.extend(labels_matched)
     return np.nansum(f1_mean_list)/len(f1_mean_list), np.sum(labels_matched_list)/len(labels_matched_list)
 
     
@@ -184,7 +186,7 @@ def main():
     optim_config = dict(
         # cls=grad_optim.GradSGD,
         cls=torch.optim.Adam,
-        defaults=dict(lr=wandb.config.lr,weight_decay=1e-5)  #-4 is too slow,
+        defaults=dict(lr=wandb.config.lr,weight_decay=wandb.config.weight_decay)  #-4 is too slow,
         #cls=torch.optim.SGD,
         #defaults=dict(lr=1. * (10. ** (-3)))  #-4 is too slow 
     )
@@ -250,7 +252,7 @@ def main():
 
     #run.finish()
 
-wandb.agent(sweep_id, function=main, count=4)
+wandb.agent(sweep_id, function=main, count=5)
 #run.finish()
 
 

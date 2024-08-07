@@ -94,7 +94,7 @@ def actual_label_target(gt_label):
     #return idx.astype(int)
 
 
-def evaluate_metrics(target,masks, labels, scores):
+def evaluate_metrics(target,masks, labels, scores, iou_threshold):
     f1_score_list=[]
     matched_label_list=[]
     #mean_f1_score = -1
@@ -112,20 +112,13 @@ def evaluate_metrics(target,masks, labels, scores):
                     target_mask= np.where(target_mask > 0, 1, 0)
                     if target_mask.shape==masks[j][k].shape:
                         f1_score = match_mask(masks[j][k],target_mask)
-                        f1_score_list.append(f1_score)
-                        if f1_score>0:
+                        if f1_score>iou_threshold:
+                            f1_score_list.append(f1_score)
                             matched_label = match_label(labels[j][k],target_labels[l])
                             matched_label_list.append(matched_label)
-                        else:
-                            matched_label_list.append(0)
-                        actual_label_list.append(target_labels[l])
-                        pred_label_list.append(labels[j][k])
-                        score_list.append(scores[j][k])
-    #if len(f1_score_list)>0:
-    #    mean_f1_score=np.nansum(f1_score_list)/len(f1_score_list)
-    #if len(matched_label_list)>0:
-    #    mean_matched_label = sum(matched_label_list)/len(matched_label_list)
-    #print(f1_score_list, matched_label_list)
+                            actual_label_list.append(target_labels[l])
+                            pred_label_list.append(labels[j][k])
+                            score_list.append(scores[j][k])
     return f1_score_list, matched_label_list, actual_label_list,pred_label_list, score_list
 
 
@@ -167,9 +160,3 @@ def evaluate_mask_rcnn(predictions, ground_truths, iou_threshold=0.5):
 
     return mean_precision, mean_recall, mean_f1
 
-# Example usage
-#predictions = [{'masks': [mask1, mask2], 'labels': [label1, label2]}]
-#ground_truths = [{'masks': [gt_mask1, gt_mask2], 'labels': [gt_label1, gt_label2]}]
-
-#mean_precision, mean_recall, mean_f1 = evaluate_mask_rcnn(predictions, ground_truths)
-#print(f'Mean Precision: {mean_precision}, Mean Recall: {mean_recall}, Mean F1 Score: {mean_f1}')

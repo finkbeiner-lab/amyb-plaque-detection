@@ -753,9 +753,12 @@ class RoIHeads(nn.Module):
         if self.training:
             proposals, matched_idxs, labels, regression_targets = self.select_training_samples(proposals, targets)
         else:
-            labels = None
-            regression_targets = None
-            matched_idxs = None
+            # add this line and commented lines below for validation loss
+            proposals, matched_idxs, labels, regression_targets = self.select_training_samples(proposals, targets)
+            #labels = None
+            #regression_targets = None
+            #matched_idxs = None
+            
 
         box_features = self.box_roi_pool(features, proposals, image_shapes)
         box_features = self.box_head(box_features)
@@ -771,6 +774,14 @@ class RoIHeads(nn.Module):
             loss_classifier, loss_box_reg = fastrcnn_loss(class_logits, box_regression, labels, regression_targets)
             losses = {"loss_classifier": loss_classifier, "loss_box_reg": loss_box_reg}
         else:
+            # added for loss in validation
+            #if labels is None:
+            #    raise ValueError("labels cannot be None")
+            #if regression_targets is None:
+            #    raise ValueError("regression_targets cannot be None")
+            loss_classifier, loss_box_reg = fastrcnn_loss(class_logits, box_regression, labels, regression_targets)
+            losses = {"loss_classifier": loss_classifier, "loss_box_reg": loss_box_reg}
+            #added till here------------------------------
             boxes, scores, labels = self.postprocess_detections(class_logits, box_regression, proposals, image_shapes)
             num_images = len(boxes)
             for i in range(num_images):
@@ -797,7 +808,16 @@ class RoIHeads(nn.Module):
                     mask_proposals.append(proposals[img_id][pos])
                     pos_matched_idxs.append(matched_idxs[img_id][pos])
             else:
-                pos_matched_idxs = None
+                # commented and added a for loop below for validation loss
+                #pos_matched_idxs = None
+                # during training, only focus on positive boxes
+                num_images = len(proposals)
+                mask_proposals = []
+                pos_matched_idxs = []
+                for img_id in range(num_images):
+                    pos = torch.where(labels[img_id] > 0)[0]
+                    mask_proposals.append(proposals[img_id][pos])
+                    pos_matched_idxs.append(matched_idxs[img_id][pos])
 
             if self.mask_roi_pool is not None:
                 mask_features = self.mask_roi_pool(features, mask_proposals, image_shapes)
@@ -816,6 +836,14 @@ class RoIHeads(nn.Module):
                 rcnn_loss_mask = maskrcnn_loss(mask_logits, mask_proposals, gt_masks, gt_labels, pos_matched_idxs)
                 loss_mask = {"loss_mask": rcnn_loss_mask}
             else:
+                #if targets is None or pos_matched_idxs is None or mask_logits is None:
+                #    raise ValueError("targets, pos_matched_idxs, mask_logits cannot be None when validation")
+                #added lines below for validation loss
+                gt_masks = [t["masks"] for t in targets]
+                gt_labels = [t["labels"] for t in targets]
+                rcnn_loss_mask = maskrcnn_loss(mask_logits, mask_proposals, gt_masks, gt_labels, pos_matched_idxs)
+                loss_mask = {"loss_mask": rcnn_loss_mask}
+                
                 labels = [r["labels"] for r in result]
                 masks_probs = maskrcnn_inference(mask_logits, labels)
                 for mask_prob, r in zip(masks_probs, result):
@@ -844,7 +872,17 @@ class RoIHeads(nn.Module):
                     keypoint_proposals.append(proposals[img_id][pos])
                     pos_matched_idxs.append(matched_idxs[img_id][pos])
             else:
-                pos_matched_idxs = None
+                #pos_matched_idxs = None
+                num_images = len(proposals)
+                keypoint_proposals = []
+                pos_matched_idxs = []
+                #if matched_idxs is None:
+                #    raise ValueError("if in trainning, matched_idxs should not be None")
+
+                for img_id in range(num_images):
+                    pos = torch.where(labels[img_id] > 0)[0]
+                    keypoint_proposals.append(proposals[img_id][pos])
+                    pos_matched_idxs.append(matched_idxs[img_id][pos])
 
             keypoint_features = self.keypoint_roi_pool(features, keypoint_proposals, image_shapes)
             keypoint_features = self.keypoint_head(keypoint_features)
@@ -861,6 +899,12 @@ class RoIHeads(nn.Module):
                 )
                 loss_keypoint = {"loss_keypoint": rcnn_loss_keypoint}
             else:
+                gt_keypoints = [t["keypoints"] for t in targets]
+                rcnn_loss_keypoint = keypointrcnn_loss(
+                    keypoint_logits, keypoint_proposals, gt_keypoints, pos_matched_idxs
+                )
+                loss_keypoint = {"loss_keypoint": rcnn_loss_keypoint}
+                
                 if keypoint_logits is None or keypoint_proposals is None:
                     raise ValueError(
                         "both keypoint_logits and keypoint_proposals should not be None when not in training mode"

@@ -1,7 +1,7 @@
 from genericpath import exists
 import pdb
 from pickletools import uint8
-from turtle import pd
+#from turtle import pd
 import torchvision
 import torch
 

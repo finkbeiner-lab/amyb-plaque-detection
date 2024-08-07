@@ -35,6 +35,8 @@ class LitMaskRCNN(L.LightningModule):
         self.save_hyperparameters()
         self.avg_segmentation_overlap = 0.0
         self.val_acc = 0.0
+        
+        #self.run = run
 
     @torch.jit.unused
     def eager_outputs(self, losses, detections):
@@ -42,7 +44,7 @@ class LitMaskRCNN(L.LightningModule):
         if self.training:
             return losses
 
-        return detections
+        return losses, detections
 
     def forward(self, images, targets=None):
         # type: (List[Tensor], Optional[List[Dict[str, Tensor]]]) -> Tuple[Dict[str, Tensor], List[Dict[str, Tensor]]]
@@ -93,7 +95,7 @@ class LitMaskRCNN(L.LightningModule):
                 if degenerate_boxes.any():
                     print(target_idx)
                     print(target["boxes"])
-                    pdb.set_trace()
+                    #pdb.set_trace()
                     # print the first degenerate box
                     bb_idx = torch.where(degenerate_boxes.any(dim=1))[0][0]
                     degen_bb: List[float] = boxes[bb_idx].tolist()
@@ -132,8 +134,7 @@ class LitMaskRCNN(L.LightningModule):
         else:
             return self.eager_outputs(losses, detections)
         
-        
-        
+       
     def get_loss_fn(self, weights, default=0.):
         def compute_loss_fn(losses):
             item = lambda k: (k, losses[k].item())
@@ -159,9 +160,9 @@ class LitMaskRCNN(L.LightningModule):
         #log_metrics.append(dict(epoch=epoch, loss=loss.item(), metrics=metrics))
         print_logs = "batch no : {batch_no}, total loss : {loss},  classifier :{classifier}, mask: {mask} ==================="
         print(print_logs.format( batch_no=batch_idx, loss=loss.item(),  classifier=metrics['loss_classifier'], mask=metrics['loss_mask']))
-        self.log("loss", loss.item())
-        self.log("metrics-loss_classifier", metrics['loss_classifier'])
-        self.log("metrics-loss_mask", metrics['loss_mask'])
+        self.log("loss", loss.item(),logger=True)
+        self.log("metrics-loss_classifier", metrics['loss_classifier'],logger=True)
+        self.log("metrics-loss_mask", metrics['loss_mask'],logger=True)
       
         #yield log_metrics
     
@@ -171,6 +172,78 @@ class LitMaskRCNN(L.LightningModule):
     def configure_optimizers(self):
         optimizer = self.optim_config['cls']([dict(params=list(self.parameters()))], **self.optim_config['defaults'])
         return optimizer
+
+    
+    def get_outputs(self, outputs, threshold):
+        mask_list = []
+        label_list = []
+        class_names = ['Cored', 'Diffuse', 'Coarse-Grained', 'CAA']
+        for j in range(len(outputs)):
+            scores = outputs[j]['scores'].tolist()
+            thresholded_preds_inidices = [scores.index(i) for i in scores if i > threshold]
+            scores = [scores[x] for x in thresholded_preds_inidices]
+            # get the masks
+            masks = (outputs[j]['masks']>0.5).squeeze()
+            # print("masks", masks)
+            # discard masks for objects which are below threshold
+            masks = [masks[x] for x in thresholded_preds_inidices]
+            # get the bounding boxes, in (x1, y1), (x2, y2) format
+            boxes = [[(int(i[0]), int(i[1])), (int(i[2]), int(i[3]))]  for i in outputs[j]['boxes'].tolist()]
+            # discard bounding boxes below threshold value
+            boxes = [boxes[x] for x in thresholded_preds_inidices]
+            # get the classes labels
+            labels = outputs[j]['labels'].tolist()
+            labels = [labels[x] for x in thresholded_preds_inidices]
+            mask_list.append(masks)
+            label_list.append(labels)
+        return mask_list, label_list
+
+    def match_label(self, pred_label, gt_label):
+        if pred_label==gt_label:
+            return 1
+        else:
+            return 0
+    
+    def actual_label_target(self, gt_label):
+        return gt_label
+    
+    
+    def compute_iou(self, mask1, mask2):
+        intersection = torch.logical_and(mask1, mask2).sum().item()
+        union = torch.logical_or(mask1, mask2).sum().item()
+        iou = (2*intersection) / union if union != 0 else 0
+        return iou
+    
+    
+    def evaluate_metrics(self, target,masks, labels, iou_threshold):
+        f1_score_list=[]
+        matched_label_list=[]
+        mean_f1_score = 0
+        mean_matched_label=0
+        actual_label_list = []
+        pred_label_list = []
+        for i in range(len(target)):
+            target_labels = self.actual_label_target(target[i]['labels'])
+            for l in range(len(target_labels)):
+                for j in range(len(masks)):
+                    for k in range(len(masks[j])):
+                        target_mask = target[i]['masks'][l]
+                        target_mask = torch.where(target_mask > 0, torch.tensor(1), torch.tensor(0))
+                        if target_mask.shape==masks[j][k].shape:
+                            f1_score = self.compute_iou(masks[j][k],target_mask)
+                            if f1_score>iou_threshold:
+                                f1_score_list.append(f1_score)
+                                matched_label = self.match_label(labels[j][k],target_labels[l])
+                                matched_label_list.append(matched_label)
+                            #else:
+                            #    matched_label_list.append(0)
+            if len(f1_score_list)>0:
+                mean_f1_score=sum(f1_score_list)/len(f1_score_list)
+            if len(matched_label_list)>0:
+                mean_matched_label = sum(matched_label_list)/len(matched_label_list)
+            #print(f1_score_list, matched_label_list)
+            return mean_f1_score, mean_matched_label
+
     
     def validation_step(self, batch, batch_idx):
         # this is the validation loop
@@ -178,15 +251,25 @@ class LitMaskRCNN(L.LightningModule):
         #images = [image for image in batch[0]]
         #targets = [dict([(k, v) for k, v in target.items()]) for target in batch[1]]
         #loss_fn = self.get_loss_fn(self.loss_weights)
-        outputs = self.forward(images, targets)
-        masks, labels = get_outputs(outputs, 0.10)
-        f1_mean, labels_matched =  evaluate_metrics(targets, masks, labels)
+        val_loss_fn = self.get_loss_fn(self.loss_weights)
+        
+        losses, outputs = self.forward(images, targets)
+        print(losses)
+        val_loss, val_metrics = val_loss_fn(losses)
+        #print(val_loss, val_metrics)
+        masks, labels = self.get_outputs(outputs, 0.5)
+        f1_mean, labels_matched =  self.evaluate_metrics(targets, masks, labels, 0.5)
         self.avg_segmentation_overlap = f1_mean
         self.val_acc = labels_matched
         if (f1_mean>=0) or (labels_matched>=0):
             print(" Validation f1 mean score:", f1_mean, " perc labels matched", labels_matched)
-        self.log('avg_seg_overlap',f1_mean)
-        self.log('val_acc', labels_matched)
+        self.log('avg_seg_overlap',f1_mean,logger=True)
+        self.log('val_acc', labels_matched,logger=True)
+        self.log("val_loss", val_loss.item(),logger=True)
+        self.log("val_metrics-loss_classifier", val_metrics['loss_classifier'],logger=True)
+        self.log("val_metrics-loss_mask", val_metrics['loss_mask'],logger=True)
+
+        
         return f1_mean, labels_matched
         #outputs1 = [x for x in outputs if len(x["labels"])!=0]
         #if len(outputs1)>0:
@@ -205,7 +288,7 @@ class LitMaskRCNN(L.LightningModule):
         #loss_fn = self.get_loss_fn(self.loss_weights)
         #loss, metrics = loss_fn(self.forward(images, targets))
         outputs = self.forward(images)
-        masks, labels = get_outputs(outputs, 0.25)
-        f1_mean, labels_matched =  evaluate_metrics(targets, masks, labels)
+        masks, labels = self.get_outputs(outputs, 0.25)
+        f1_mean, labels_matched =  self.evaluate_metrics(targets, masks, labels)
         return f1_mean, labels_matched
     

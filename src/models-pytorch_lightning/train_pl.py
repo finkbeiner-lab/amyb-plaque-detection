@@ -33,47 +33,55 @@ from torch import nn, Tensor
 import warnings
 from typing import Tuple, List, Dict, Optional, Union
 from lightning.pytorch.callbacks import ModelCheckpoint
-from pytorch_lightning.loggers import WandbLogger
-import wandb
+#from pytorch_lightning.loggers import WandbLogger
+#import wandb
+from lightning.pytorch.callbacks.early_stopping import EarlyStopping
+from lightning.pytorch.loggers import WandbLogger
+import datetime
 
 
-
-def train_model(wandb_config,train_config,model_config,optim_config, dataset_base_dir, dataset_train_location, dataset_val_location  ):
-    run = wandb.init(**wandb_config)
-    run_id, run_dir = run.id, run.dir
-    wandb_logger = WandbLogger()
+def train_model(wandb_logger, train_config,model_config,optim_config, dataset_base_dir, dataset_train_location, dataset_val_location  ):
+    #run = wandb.init(**wandb_config)
+    #run_id, run_dir = run.id, run.dir
+    #wandb_logger = WandbLogger()
     collate_fn=lambda x: tuple(zip(*x))
-
+    #exp_name = str(datetime.datetime.now())
     train_dataset = build_features.AmyBDataset(dataset_train_location, T.Compose([T.ToTensor()]))
     val_dataset = build_features.AmyBDataset(dataset_val_location, T.Compose([T.ToTensor()]))
 
     train_data_loader = torch.utils.data.DataLoader(
-                train_dataset, batch_size=train_config['batch_size'], shuffle=True, num_workers=4,
+                train_dataset, batch_size=train_config['batch_size'], shuffle=True, num_workers=18, persistent_workers=False,
                 collate_fn=collate_fn)
 
     val_data_loader = torch.utils.data.DataLoader(
-                val_dataset, batch_size=train_config['batch_size'], shuffle=False, num_workers=4,
+                val_dataset, batch_size=train_config['batch_size'], shuffle=False, num_workers=18, persistent_workers=False,
                 collate_fn=collate_fn)
 
     backbone, rpn, roi_heads, transform1 = build_default(model_config, im_size=1024)
 
     model  = LitMaskRCNN(optim_config,backbone,rpn,roi_heads,transform1)
 
-    ckpt_path= os.path.join(dataset_base_dir, "pytorch_lightning_model_output/"+str(run_id))
-    os.makedirs(ckpt_path)
+    #ckpt_path= os.path.join(dataset_base_dir, "pytorch_lightning_model_output/"+str(exp_name))
+    #os.makedirs(ckpt_path)
     #model_ckpt = 
-    chkpt = ModelCheckpoint(monitor="val_acc", mode="max")
+    #chkpt = ModelCheckpoint(monitor="val_metrics-loss_classifier", mode="min", save_top_k=5,save_last=True)
+    chkpt = ModelCheckpoint(monitor="val_acc", mode="max", save_top_k=7,save_last=True)
 
     #tensorboard = pl_loggers.TensorBoardLogger(save_dir="/gladstone/finkbeiner/steve/work/data/npsad_data/monika/models/")
-
-    trainer = L.Trainer(limit_train_batches=6, max_epochs=train_config['epochs'],devices=1, accelerator="gpu",default_root_dir = ckpt_path, num_sanity_val_steps=0,
-                        check_val_every_n_epoch=1,callbacks=[chkpt])
+    early_stop_callback = EarlyStopping(monitor="val_acc", min_delta=0.01, patience=5, verbose=False, mode="max")
+    
+    trainer = L.Trainer(limit_train_batches=train_config["batch_size"], max_epochs=train_config['epochs'],devices=4, accelerator="gpu", num_sanity_val_steps=0,enable_checkpointing=True, check_val_every_n_epoch=train_config["eval_freq"],callbacks=[chkpt], logger =wandb_logger )
+    #,early_stop_callback
     train_loader = train_data_loader
     valid_loader = val_data_loader
     trainer.fit(model, train_loader, valid_loader) 
-    run.finish()
-    return Model.load_from_checkpoint(chkpt.best_model_path)
-
+    #exp_name = run.name
+    
+    #model_save_name = "/workspace/Projects/Amyb_plaque_detection/" + "models/{name}_mrcnn_model_{epoch}.pth"
+    #torch.save(model.state_dict(), model_save_name.format(name=exp_name, epoch=train_config['epochs']))
+    #run.finish()
+    #return model.load_from_checkpoint(chkpt.best_model_path)
+    return chkpt.best_model_path
 
 
 if __name__ == '__main__':
@@ -101,53 +109,41 @@ if __name__ == '__main__':
     dataset_train_location = args.dataset_train_location
     dataset_test_location = args.dataset_test_location
     """
-    dataset_base_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/'
-    dataset_train_location = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/train'
-    dataset_val_location = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/val/XE07-047_1_AmyB_1'
+    dataset_base_dir = '/workspace/Projects/Amyb_plaque_detection/'
+    dataset_train_location = '/workspace/Projects/Amyb_plaque_detection/Datasets/train'
+    dataset_val_location = '/workspace/Projects/Amyb_plaque_detection/Datasets/val'
     
     train_config = dict(
-        epochs = 5,
-        batch_size = 2,
+        epochs = 75,
+        batch_size = 16,
         num_classes = 4,
         device_id = 0,
         ckpt_freq =500,
-        eval_freq = 25,
+        eval_freq = 1,
     )
     model_config = _default_mrcnn_config(num_classes=1 + train_config['num_classes']).config
     optim_config = dict(
             cls=torch.optim.Adam,
-            defaults=dict(lr=0.0001,weight_decay=1e-5) 
+            #cls = torch.optim.SGD,
+
+            defaults=dict(lr=0.001,weight_decay=0.00001) 
+            #defaults=dict(lr=1. * (10. ** (-3)))
         )
-    """
-    wandb_config = dict(
-        project='nps-ad-vivek',
-        entity='hellovivek',
-        config=dict(
-            train_config=train_config,
-            model_config=model_config,
-            optim_config=optim_config,
-        ),
-        save_code=False,
-        group='runs',
-        job_type='train',
-    )
-    """
-    wandb_config = dict(
-        project='nps-ad-nature',
-        entity='monika-ahirwar',
-        config=dict(
-            train_config=train_config,
-            model_config=model_config,
-            optim_config=optim_config,
-        ),
-        save_code=False,
-        group='runs',
-        job_type='train',
-    )
 
-device = torch.device('cpu')
-if torch.cuda.is_available():
-    assert train_config['device_id'] >= 0 and train_config['device_id'] < torch.cuda.device_count()
-    device = torch.device('cuda', train_config['device_id'])
+wandb_logger = WandbLogger(log_model="True",project='nps-ad-nature',
+        entity='monika-ahirwar')
 
-best_model = train_model(wandb_config,train_config,model_config,optim_config, dataset_base_dir, dataset_train_location, dataset_val_location  )
+best_model_path = train_model(wandb_logger, train_config,model_config,optim_config, dataset_base_dir, dataset_train_location, dataset_val_location  )
+print(best_model_path)
+#backbone, rpn, roi_heads, transform1 = build_default(model_config, im_size=1024)
+#model  = LitMaskRCNN(optim_config,backbone,rpn,roi_heads,transform1)
+
+#model = model.load_from_checkpoint(chkpt.best_model_path)
+
+#print(model)
+
+
+
+
+
+
