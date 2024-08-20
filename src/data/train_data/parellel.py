@@ -25,7 +25,7 @@ ID_MASK_SHAPE = (1024, 1024)
 lablel2id = {'Cored':'50', 'Diffuse':'100',
              'Coarse-Grained':'150', 'CAA': '200', 'Unknown':'0'}
 
-DATASET_PATH = "/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi"
+DATASET_PATH = "/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi_v2/interater_data/monika-rater"
 
 def save_img(img, file_name, tileX, tileY, label="mask"):
     im = Image.fromarray(img)
@@ -109,6 +109,7 @@ def process_single_image(img, json_path, visualize=False):
     if not exists(json_file_name):
         return
 
+
     print("file name : ", json_file_name)
 
     with open(json_file_name) as f:
@@ -172,10 +173,10 @@ def process_single_image(img, json_path, visualize=False):
 
             # Use polygon2id function to create a mask
             id_mask = polygon2id(ID_MASK_SHAPE, id_mask, ids, coords_y, coords_x)
-
+    
         base_name = os.path.basename(img)
         file_name = os.path.splitext(base_name)[0]
-
+        
         save_img(vips_img_crop, file_name, tileX, tileY, "image")
         save_img(id_mask, file_name, tileX, tileY, "mask")
         id_mask = np.zeros(ID_MASK_SHAPE, dtype=np.uint8)
@@ -188,6 +189,7 @@ def process_single_image(img, json_path, visualize=False):
 def process_json(WSI_path, json_path, visualize=False, max_workers=4):
     imagenames = glob.glob(os.path.join(WSI_path, "*.mrxs"))
     imagenames = sorted(imagenames)
+    print(imagenames)
     plaque_dict = {'Cored': 0, 'Coarse-Grained': 0, 'Diffuse': 0, 'CAA': 0, 'Unknown': 0}
 
     with ProcessPoolExecutor(max_workers=max_workers) as executor:

@@ -32,9 +32,12 @@ from skimage import data
 from skimage.color import rgb2hed, hed2rgb
 import sys
 sys.path.insert(0, '../')
-from models.model_mrcnn import _default_mrcnn_config, build_default
-
-
+#from models.model_mrcnn import _default_mrcnn_config, build_default
+from models_pytorch_lightning.model_mrcnn_config import _default_mrcnn_config, build_default
+from features import build_features
+from models_pytorch_lightning.generalized_mask_rcnn_pl import LitMaskRCNN
+from utils.helper_functions import evaluate_metrics, get_outputs, compute_iou, evaluate_mask_rcnn
+from features import build_features
 
 
 class ExplainPredictions():
@@ -49,10 +52,11 @@ class ExplainPredictions():
         self.save_result = save_result
         self.ablation_cam = ablation_cam
         self.save_thresholds = save_thresholds
-        self.class_names = ['Core', 'Diffuse', 'Neuritic', 'CAA']
-        self.class_to_colors = {'Core': (255, 0, 0), 'Neuritic' : (0, 0, 255), 'Diffuse': (0,255,0), 'CAA':(225, 255, 0)}
+        self.class_names = ['Cored', 'Diffuse', 'Coarse-Grained', 'CAA']
+        #self.class_to_colors = {'Core': (255, 0, 0), 'Neuritic' : (0, 0, 255), 'Diffuse': (0,255,0), 'CAA':(225, 255, 0)}
+        self.class_to_colors = {'Cored': (255, 0, 0), 'Diffuse' : (0, 0, 255), 'Coarse-Grained': (0,255,0), 'CAA':(225, 255, 0)}
         #self.result_save_dir= "/mnt/new-nas/work/data/npsad_data/vivek/reports/figures/"
-        self.result_save_dir= "/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/reports/metrics/"
+        self.result_save_dir= os.path.join( "/home/mahirwar/Desktop/Monika/npsad_data/vivek/reports/metrics", self.model_input_path.split("/")[-1])
         self.colors = np.random.uniform(0, 255, size=(len(self.class_names), 3))
         self.column_names = ["image_name", "region", "region_mask", "label", 
                             "confidence", "brown_pixels", "centroid", 
@@ -113,49 +117,43 @@ class ExplainPredictions():
 
 
     def get_outputs(self, input_tensor, model, threshold):
+        mask_list = []
+        label_list = []
+        score_list =[]
+        box_list = []
         with torch.no_grad():
             # forward pass of the image through the modle
             outputs = model(input_tensor)
-        
-        # get all the scores
-        scores = list(outputs[0]['scores'].detach().cpu().numpy())
+            print(len(outputs))
+        #for j in range(len(outputs)):
+        j = 0
+        scores = list(outputs[j]['scores'].detach().cpu().numpy())
         # print("\n scores", max(scores))
         # index of those scores which are above a certain threshold
         thresholded_preds_inidices = [scores.index(i) for i in scores if i > threshold]
-        thresholded_preds_count = len(thresholded_preds_inidices)
-        
-        scores = np.array(scores)[thresholded_preds_inidices]
-        #print("score after", scores)
+        #print(thresholded_preds_inidices)
+        scores = [scores[x] for x in thresholded_preds_inidices]
         # get the masks
-        #print(np.unique(outputs[0]['masks'].cpu().numpy()))
-        masks = (outputs[0]['masks']>0.5).squeeze().detach().cpu().numpy()
-
-        #print(masks.shape)
-        # get the bounding boxes, in (x1, y1), (x2, y2) format
-        boxes = [[(int(i[0]), int(i[1])), (int(i[2]), int(i[3]))]  for i in outputs[0]['boxes'].detach().cpu()]
-
-        if len(masks.shape)==2:
-            masks = np.array([masks])
-            
-        if len(masks)!=len(boxes):
-            print("True")
+        masks = (outputs[j]['masks']>0.5).squeeze().detach().cpu().numpy()
+        # print("masks", masks)
         # discard masks for objects which are below threshold
-        masks = masks[thresholded_preds_inidices]
+        masks = [masks[x] for x in thresholded_preds_inidices]
+        # get the bounding boxes, in (x1, y1), (x2, y2) format
+        boxes = [[(int(i[0]), int(i[1])), (int(i[2]), int(i[3]))]  for i in outputs[j]['boxes'].detach().cpu()]
         # discard bounding boxes below threshold value
-        boxes = np.array(boxes)[thresholded_preds_inidices]
-        #print(boxes)
+        boxes = [boxes[x] for x in thresholded_preds_inidices]
         # get the classes labels
-        # print('labels', outputs[0]['labels'])
-        #print(outputs[0]['labels'])
-        #print(thresholded_preds_count)
-        #print(outputs[0]['labels'])
-        #print(outputs[0]['labels'])
-        labels = [self.class_names[i-1] for i in outputs[0]['labels']]
-        #labels = [i for i in outputs[0]['labels']]
-        #print(labels)
-        #labels = labels[:thresholded_preds_count+1]
-        labels = np.array(labels)[thresholded_preds_inidices]
+        labels = list(outputs[j]['labels'].detach().cpu().numpy())
+        labels = [labels[x] for x in thresholded_preds_inidices]
+        labels = [self.class_names[i-1] for i in labels]
+        mask_list.append(masks)
+        label_list.append(labels)
+        score_list.append(scores)
+        box_list.append(boxes)
         return masks, boxes, labels, scores
+        #return mask_list, box_list, label_list, score_list
+            
+
 
     def draw_segmentation_map(self, image, masks, boxes, labels):
         alpha = 1 
@@ -227,7 +225,7 @@ class ExplainPredictions():
     def predict(self, input_tensor, model, device, detection_threshold):
         outputs = model(input_tensor)
         # i- 1 zero indexing - the model outputs a non zero indexing format ( 1, 2, 3)
-        pred_classes = [self.class_names[i] for i in outputs[0]['labels'].cpu().numpy()]
+        pred_classes = [self.class_names[i-1] for i in outputs[0]['labels'].cpu().numpy()]
         pred_labels = outputs[0]['labels'].cpu().numpy()
         pred_scores = outputs[0]['scores'].detach().cpu().numpy()
         pred_bboxes = outputs[0]['boxes'].detach().cpu().numpy()
@@ -244,7 +242,7 @@ class ExplainPredictions():
 
     def draw_boxes(self, boxes, labels, classes, image):
         for i, box in enumerate(boxes):
-            color = self.colors[labels[i]]
+            color = self.colors[labels[i]-1]
             cv2.rectangle(
                 image,
                 (int(box[0]), int(box[1])),
@@ -299,8 +297,9 @@ class ExplainPredictions():
             data = {}
             # Here x and y axis are flipped
             total_core_plaques = 0
-            total_neuritic_plaques = 0
+            total_cg_plaques = 0
             total_diffused_plaques = 0
+            total_caa_plaques = 0
 
             if len(boxes)!= 0:
 
@@ -326,16 +325,19 @@ class ExplainPredictions():
                 else:
                     mask_present=0
                 for props in regions:
-                    if labels[i] == "Core":
+                    if labels[i] == "Cored":
                         total_core_plaques+=1
-                    elif labels[i] == "Neuritic":
-                        total_neuritic_plaques+=1
+                    elif labels[i] == "Coarse-Grained":
+                        total_cg_plaques+=1
                     elif labels[i] == "Diffuse":
                         total_diffused_plaques+=1
+                    elif labels[i] == "CAA":
+                        total_caa_plaques+=1
                     
                     data_record = pd.DataFrame.from_records([{ 'image_name': img_name, 'label': labels[i] , 'confidence': scores[i],
                                                                'brown_pixels': total_brown_pixels,
-                                                               'core': total_core_plaques, 'neuritic': total_neuritic_plaques, 'diffuse': total_diffused_plaques,
+                                                               'core': total_core_plaques, 'coarse_grained': total_cg_plaques, 'diffuse': total_diffused_plaques,
+                                                               'caa':total_caa_plaques,
                                                                'centroid': props.centroid, 'eccentricity': props.eccentricity, 
                                                                'area': props.area, 'equivalent_diameter': props.equivalent_diameter, 'mask_present':mask_present}])
                     wandb_result.append([img_name, wandb.Image(cropped_img), wandb.Image(cropped_img_mask), labels[i], scores[i], 
@@ -345,37 +347,45 @@ class ExplainPredictions():
                    
         
         return df, wandb_result
+    
  
     def generate_results(self):
         # This will help us create a different color for each class
         # Load Trained 
         
-        self.model.load_state_dict(torch.load(self.model_input_path))
+        #self.model.load_state_dict(torch.load(self.model_input_path))
     
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model.eval().to(device)
 
-        #test_folders = glob.glob(os.path.join(self.test_input_path, "*"))
+        test_folders = glob.glob(os.path.join(self.test_input_path, "*"))
         
         # Test images from each WSI folder
-        #test_folders = sorted(test_folders)
-        test_folders = self.test_input_path
-        print(test_folders)
+        test_folders = sorted(test_folders)
+        #test_folders = self.test_input_path
+        #print(test_folders)
+        
+        
         for test_folder in tqdm(test_folders):
 
             print("\n", test_folder)
             folder_name = os.path.basename(test_folder)
-            
+            #print(folder_name)
 
-            if folder_name == "labels":
-                continue
+            #if folder_name == "labels":
+            #    continue
             
-            folder_name =  os.path.join("evaluation-test", folder_name)
+            folder_name =  os.path.join(self.result_save_dir, folder_name)
             
             # make all necessary folders
             self.make_result_dirs(folder_name)
-            images = glob.glob(os.path.join(test_folder, '*.png'))
-
+            images = glob.glob(os.path.join(test_folder, "images", '*.png'))
+            #actual_labels = glob.glob(os.path.join(test_folder, "labels", '*.png'))
+            
+            #test_dataset = build_features.AmyBDataset(test_folder, T.Compose([T.ToTensor()]))
+            #collate_fn=lambda x: tuple(zip(*x))
+            #exp_name = run.name
+            #val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=1, shuffle=False, num_workers=4, collate_fn=collate_fn)
             i = 0
             df = pd.DataFrame()
             wandb_result = []
@@ -384,9 +394,9 @@ class ExplainPredictions():
             total_diffused_plaques = 0
             total_brown_pixels = 0
             total_image_pixels = 0
-
+            #for i, (img, targets) in tqdm(enumerate(val_loader)):
+            #for img, actual_mask_label in tqdm(zip(images,actual_labels)):
             for img in tqdm(images):
-                result_img = 0
                 img_name = os.path.basename(img).split('.')[0]
         
                 image = np.array(Image.open(img))
@@ -398,7 +408,8 @@ class ExplainPredictions():
 
                 input_tensor, image_float_np = self.prepare_input(image)
                 masks, boxes, labels, scores = self.get_outputs(input_tensor, self.model, self.detection_threshold)
-
+                #f1_mean, labels_matched,actual_labels,pred_labels, scores =  evaluate_metrics(targets, masks, labels,scores )
+                
                 result_img, result_masks = self.draw_segmentation_map(image, masks, boxes, labels)
 
                 total_brown_pixels+= self.get_brown_pixel_cnt(image, img_name)
@@ -470,7 +481,7 @@ class ExplainPredictions():
                 i = i + 1
                 # plt.show()
 
-            print("Total area of brown pixel", (total_brown_pixels/ total_image_pixels)*100)
+            #print("Total area of brown pixel", (total_brown_pixels))
             df.to_csv(self.quantify_path, index=False)
             #test_table = wandb.Table(data=wandb_result, columns=self.column_names)
             # self.wandb.log({'quantifications': test_table})
@@ -478,10 +489,9 @@ class ExplainPredictions():
                 
         
 if __name__ == "__main__":
+    """
     input_path = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/test1'
     model_input_path = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/models/eager-frog-489_mrcnn_model_100.pth'
-   
-
     test_config = dict(
         batch_size = 1,
         num_classes = 4
@@ -497,4 +507,35 @@ if __name__ == "__main__":
     run = wandb.init(project="nps-ad-vivek",  entity="hellovivek")
     explain = ExplainPredictions(model, model_input_path = model_input_path, test_input_path=input_path, 
                                     detection_threshold=0.75, wandb=run, save_result=True, ablation_cam=True, save_thresholds=False)
+    explain.generate_results()
+    """
+    
+    input_path = '/home/mahirwar/Desktop/Monika/npsad_data/vivek/Datasets/amyb_wsi/test'
+    #model_name = "/home/mahirwar/Desktop/Monika/npsad_data/vivek/runpod_mrcnn_models/270ij5uq_epoch_66_step_800.ckpt"
+    #model_name = "/home/mahirwar/Desktop/Monika/npsad_data/vivek/runpod_mrcnn_models/csvy8yix_epoch=31-step=384.ckpt"
+    model_name = "/home/mahirwar/Desktop/Monika/npsad_data/vivek/runpod_mrcnn_models/yp2mf3i8_epoch=108-step=872.ckpt"
+    test_config = dict(
+        batch_size = 4,
+        num_classes = 4
+    )
+    
+    model_config = _default_mrcnn_config(num_classes=1 + test_config['num_classes']).config
+    backbone, rpn, roi_heads, transform1 = build_default(model_config, im_size=1024)
+
+    optim_config = dict(
+        cls=torch.optim.Adam,
+        defaults=dict(lr=0.00001,weight_decay=1e-6) 
+    )
+
+    #model  = LitMaskRCNN(optim_config,backbone,rpn,roi_heads,transform1)
+    model = LitMaskRCNN.load_from_checkpoint(model_name)
+    print(model)
+    #checkpoint = torch.load(model_name)
+    #model.load_state_dict(checkpoint["state_dict"])
+
+    
+    #run = wandb.init(project="nps-ad-nature",  entity="monika-ahirwar")
+    
+    explain = ExplainPredictions(model, model_input_path = model_name, test_input_path=input_path, 
+                                    detection_threshold=0.75, wandb=None, save_result=True, ablation_cam=True, save_thresholds=False)
     explain.generate_results()

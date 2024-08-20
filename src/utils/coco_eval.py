@@ -10,15 +10,17 @@ from pycocotools.coco import COCO
 # from pycocotools.cocoeval import COCOeval
 from utils.cocoeval import COCOeval
 import pdb
-import pandas as pd
+
 
 class CocoEvaluator:
-    def __init__(self, coco_gt, iou_types):
+    def __init__(self, coco_gt, iou_types, epoch, exp_name):
         assert isinstance(iou_types, (list, tuple))
         coco_gt = copy.deepcopy(coco_gt)
         self.coco_gt = coco_gt
 
         self.iou_types = iou_types
+        self.epoch = epoch
+        self.exp_name = exp_name
         self.coco_eval = {}
 
         #Instantiating COCOeval class for different ioutypes
@@ -40,7 +42,7 @@ class CocoEvaluator:
 
             coco_eval.cocoDt = coco_dt
             coco_eval.params.imgIds = list(img_ids)
-            img_ids, eval_imgs = evaluate(coco_eval)
+            img_ids, eval_imgs = evaluate(coco_eval, self.epoch, self.exp_name)
 
             self.eval_imgs[iou_type].append(eval_imgs)
 
@@ -52,16 +54,12 @@ class CocoEvaluator:
     def accumulate(self):
         for coco_eval in self.coco_eval.values():
             coco_eval.accumulate()
+        return self.eval_imgs
 
     def summarize(self, run):
-        # run metrics for different iou_type and concatenate output in one dataframe
-        results = pd.DataFrame(columns=["iou_type","metric_name","metric_value"])
         for iou_type, coco_eval in self.coco_eval.items():
             print(f"IoU metric: {iou_type}")
-            x = coco_eval.summarize(run, iou_type)
-            x["iou_type"] = iou_type
-            results = pd.concat([results,x])
-        return results
+            coco_eval.summarize(run, iou_type)
 
     def prepare(self, predictions, iou_type):
         if iou_type == "bbox":
@@ -169,7 +167,7 @@ def create_common_coco_eval(coco_eval, img_ids, eval_imgs):
     coco_eval._paramsEval = copy.deepcopy(coco_eval.params)
 
 
-def evaluate(imgs):
+def evaluate(imgs, epoch, exp_name):
     with redirect_stdout(io.StringIO()):
-        imgs.evaluate()
+        imgs.evaluate(epoch, exp_name)
     return imgs.params.imgIds, np.asarray(imgs.evalImgs).reshape(-1, len(imgs.params.areaRng), len(imgs.params.imgIds))

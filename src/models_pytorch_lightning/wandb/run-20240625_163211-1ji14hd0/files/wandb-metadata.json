@@ -1,0 +1,185 @@
+{
+    "os": "Linux-5.19.0-46-generic-x86_64-with-glibc2.35",
+    "python": "3.9.7",
+    "heartbeatAt": "2024-06-25T23:32:12.352942",
+    "startedAt": "2024-06-25T23:32:11.855484",
+    "docker": null,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "/home/mahirwar/Projects/amyb-plaque-detection/src/models-pytorch_lightning/train_pl.py",
+    "codePath": "src/models-pytorch_lightning/train_pl.py",
+    "git": {
+        "remote": "https://github.com/finkbeiner-lab/amyb-plaque-detection.git",
+        "commit": "1026cbbba8fb7652ed6b2bd1c7e0113974843df6"
+    },
+    "email": "monika.ahirwar@gladstone.ucsf.edu",
+    "root": "/home/mahirwar/Projects/amyb-plaque-detection",
+    "host": "DDLUFB08808",
+    "username": "mahirwar",
+    "executable": "/home/mahirwar/miniconda3/envs/kfold_amy_plaque1/bin/python3",
+    "cpu_count": 14,
+    "cpu_count_logical": 28,
+    "cpu_freq": {
+        "current": 2.7178571428571416,
+        "min": 1200.0,
+        "max": 4642.857142857143
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 1.6,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1.2,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1.2,
+            "min": 1200.0,
+            "max": 4800.0
+        },
+        {
+            "current": 1.2,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 3.3,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1.2,
+            "min": 1200.0,
+            "max": 4700.0
+        },
+        {
+            "current": 3.3,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 3.3,
+            "min": 1200.0,
+            "max": 4800.0
+        },
+        {
+            "current": 1.2,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1.2,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 3.3,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1.2,
+            "min": 1200.0,
+            "max": 4700.0
+        },
+        {
+            "current": 3.3,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 1.199,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 3.3,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 3.3,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 3.3,
+            "min": 1200.0,
+            "max": 4800.0
+        },
+        {
+            "current": 3.3,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 3.3,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 3.3,
+            "min": 1200.0,
+            "max": 4700.0
+        },
+        {
+            "current": 3.3,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 3.3,
+            "min": 1200.0,
+            "max": 4800.0
+        },
+        {
+            "current": 3.3,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 3.3,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 3.3,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 3.3,
+            "min": 1200.0,
+            "max": 4700.0
+        },
+        {
+            "current": 3.3,
+            "min": 1200.0,
+            "max": 4600.0
+        },
+        {
+            "current": 3.3,
+            "min": 1200.0,
+            "max": 4600.0
+        }
+    ],
+    "disk": {
+        "total": 937.3305015563965,
+        "used": 238.2672233581543
+    },
+    "gpu": "NVIDIA RTX A4000",
+    "gpu_count": 1,
+    "gpu_devices": [
+        {
+            "name": "NVIDIA RTX A4000",
+            "memory_total": 17171480576
+        }
+    ],
+    "memory": {
+        "total": 62.506080627441406
+    }
+}

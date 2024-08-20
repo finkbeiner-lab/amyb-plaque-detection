@@ -1,6 +1,7 @@
 __author__ = 'tsungyi'
 
 import numpy as np
+import matplotlib.pyplot as plt
 import datetime
 import time
 from collections import defaultdict
@@ -9,6 +10,7 @@ import copy
 import pdb
 import pandas as pd
 import wandb
+import pdb
 
 class COCOeval:
     # Interface for evaluating detection on the Microsoft COCO dataset.
@@ -80,6 +82,10 @@ class COCOeval:
         self.stats = []                     # result summarization
         self.ious = {}                      # ious between all gts and dts
         self.table = wandb.Table(columns=["eval_metrics"])
+        self.epoch = 0
+        self.exp_name = {}
+        self.result_flag_precison = False
+        self.result_flag_recall = False
         if not cocoGt is None:
             self.params.imgIds = sorted(cocoGt.getImgIds())
             self.params.catIds = sorted(cocoGt.getCatIds())
@@ -122,7 +128,7 @@ class COCOeval:
         self.evalImgs = defaultdict(list)   # per-image per-category evaluation results
         self.eval     = {}                  # accumulated evaluation results
 
-    def evaluate(self):
+    def evaluate(self, epoch, exp_name):
         '''
         Run per image evaluation on given images and store results (a list of dict) in self.evalImgs
         :return: 
@@ -130,6 +136,8 @@ class COCOeval:
         '''
         tic = time.time()
         print('Running per image evaluation...')
+        self.epoch = epoch
+        self.exp_name = exp_name
         p = self.params
         # add backward compatibility if useSegm is specified in params
         if not p.useSegm is None:
@@ -165,6 +173,9 @@ class COCOeval:
         print('DONE (t={:0.2f}s).'.format(toc-tic))
 
     def computeIoU(self, imgId, catId):
+
+        print("Compute IOU")
+
         p = self.params
         if p.useCats:
             gt = self._gts[imgId,catId]
@@ -198,6 +209,8 @@ class COCOeval:
         perform evaluation for single category and image
         :return: dict (single image results)
         '''
+
+        print("evaluateImg")
         p = self.params
         if p.useCats:
             gt = self._gts[imgId,catId]
@@ -338,6 +351,9 @@ class COCOeval:
 
                     tp_sum = np.cumsum(tps, axis=1).astype(dtype=np.float)
                     fp_sum = np.cumsum(fps, axis=1).astype(dtype=np.float)
+                    # print("TP Sum", tp_sum)
+                    # print("fp Sum", fp_sum)
+
                     for t, (tp, fp) in enumerate(zip(tp_sum, fp_sum)):
                         tp = np.array(tp)
                         fp = np.array(fp)
@@ -377,22 +393,77 @@ class COCOeval:
             'recall':   recall,
             'scores': scores,
         }
+
         toc = time.time()
         print('DONE-test (t={:0.2f}s).'.format( toc-tic))
+    
+    def plotPRCurve1(self):
+
+        precision = self.eval['precision']
+        recall = self.eval['recall']
+        scores = self.eval['scores']
+        iouThrs = self.params.iouThrs
+        K =len(self.params.catIds) if self.params.useCats else 1
+        A = len(self.params.areaRng)
+
+        for t, iouThr in enumerate(iouThrs):
+            # Select the precision and recall for the current iou threshold
+            precision_t = precision[t, :, :, :, :] 
+            precision_t = np.mean(precision_t, axis=0)
+            recall_t = recall[t, :, :, :]
+            scores_t = scores[t, 0, :, :, :]
+            
+
+            # Here you can loop over the categories and area ranges to plot the PR curve for each category and area range
+            for k in range(K):
+                # for a in range(A):
+                plt.plot(recall_t[k, 0, :], precision_t[k, 0, :], label=f'Category {k}, IoU {iouThr}')
+                plt.xlabel('Recall')
+                plt.ylabel('Precision')
+                plt.xlim(0, 1)
+                plt.ylim(0, 1)
+                plt.axis('equal')
+                plt.legend(loc='best')
+                plt.title(f'Precision-Recall Curve for IoU Threshold {iouThr}')
+            
+
+                save_name = "../../reports/figures/prcurve/{exp_name}_prcurve_Cat_{K}_IOU_{iouThr}_epoch_{epoch}.png"
+                plt.savefig(save_name.format(exp_name=self.exp_name,K=k, iouThr=iouThr, epoch=self.epoch))
+                plt.close("all")
+                # plt.show()
+
+
+
+    def plotPRCurve(self, label):
+        print("\n\n -----Plotting PR Curve------")
+       
+        # Create a new figure and plot the PR curves for all categories
+        fig, ax = plt.subplots()
+        ax.scatter(self.recall,self.precision, label=label)
+
+
+        ax.set_xlabel('Recall')
+        ax.set_ylabel('Precision')
+        ax.set_xlim([0, 1])
+        ax.set_ylim([0, 1])
+        ax.set_title('PR Curve')
+        ax.legend()
+        plt.show()
+
+        # Display the plot
+        save_name = "../../reports/figures/{exp_name}_prcurve_epoch_{epoch}.png"
+        plt.savefig(save_name.format(exp_name=self.exp_name,epoch=self.epoch))
+
 
     def summarize(self, run, iou_type):
         '''
         Compute and display summary metrics for evaluation results.
         Note this functin can *only* be applied on the default parameter setting
         '''
-        # define List to store metric names
-        metric_names = []
-        # define List to store metric values
-        metric_values = []
         def _summarize( ap=1, iouThr=None, areaRng='all', maxDets=100 ):
+            print("summarize")
             p = self.params
             iStr = ' {:<18} {} @[ IoU={:<9} | area={:>6s} | maxDets={:>3d} ] = {:0.3f}'
-            iStr2 = ' {:<18} {} @[ IoU={:<9} | area={:>6s} | maxDets={:>3d} ]'
             titleStr = 'Average Precision' if ap == 1 else 'Average Recall'
             typeStr = '(AP)' if ap==1 else '(AR)'
             iouStr = '{:0.2f}:{:0.2f}'.format(p.iouThrs[0], p.iouThrs[-1]) \
@@ -419,13 +490,13 @@ class COCOeval:
                 mean_s = -1
             else:
                 mean_s = np.mean(s[s>-1])
+            
             print(iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets, mean_s))
-            result = {iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets,mean_s): mean_s }
-            # Adding metric names to the list
-            metric_names.append(iStr2.format(titleStr, typeStr, iouStr, areaRng, maxDets))
-            # Adding metric values to the list
-            metric_values.append(mean_s)
+
+            # x = pd.DataFrame(results)
+            # wandb
             self.table.add_data(iStr.format(titleStr, typeStr, iouStr, areaRng, maxDets, mean_s)) 
+            
             return mean_s
 
         def _summarizeDets():
@@ -451,8 +522,8 @@ class COCOeval:
         if iouType == 'segm' or iouType == 'bbox':
             summarize = _summarizeDets
         self.stats = summarize()
-        return pd.DataFrame({"metric_name":metric_names, "metric_value":metric_values})
-    
+       
+
     def __str__(self):
         self.summarize(run)
 

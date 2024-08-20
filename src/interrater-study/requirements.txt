@@ -1,0 +1,6 @@
+geojson
+pandas
+opencv-python
+numpy
+scikit-learn
+

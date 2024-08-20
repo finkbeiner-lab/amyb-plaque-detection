@@ -10,12 +10,19 @@ from functools import reduce
 import cv2
 import numpy as np
 import pyvips
+# Check if OpenSlide support is available
+#if 'openslide' in pyvips.foreign.find_loaders():
+#    print("OpenSlide support is available in pyvips.")
+#else:
+#    print("OpenSlide support is NOT available in pyvips.")
 
 import torch
 from torch import nn, Tensor
 
 import torchvision
 from torchvision.transforms import ToPILImage
+import pandas as pd
+import pdb
 
 
 def norm(x: Tensor):
@@ -54,16 +61,21 @@ def norm_to_str(norm_values):
 
 
 def crop_tile(slide, out_dir, tile, ext='png'):
-    out_file = os.path.join(out_dir, '_'.join(map(lambda _: '_'.join(_), zip('xy', map(str, tile[:2])))) + f'.{ext}')
+    out_file = out_dir +'_'.join(map(lambda _: '_'.join(_), zip('xy', map(str, tile[:2])))) + f'.{ext}'
     crop = slide.crop(*tile).numpy()
+    #print(out_file)
+    #print(crop.shape)
+    #print(len(out_file))
+    #print(len(crop))
     #ToPILImage()(crop).save(out_file)
     #return True
-    return crop
+    #print(crop, out_file)
+    return (out_file, crop)
 
 def crop_lambda(out_dir, slide_name, ext='png'):
-    out_dir = os.path.join(out_dir, slide_name)
-    if not os.path.isdir(out_dir):
-        os.mkdir(out_dir)
+    out_dir = slide_name
+    #if not os.path.isdir(out_dir):
+    #    os.mkdir(out_dir)
     #return lambda slide, tiles: len([crop_tile(slide, out_dir, tile, ext=ext) for tile in tiles])
     return lambda slide, tiles: ([crop_tile(slide, out_dir, tile, ext=ext) for tile in tiles])
 
@@ -75,11 +87,14 @@ def slide_tile_map(slide_name, slide_dir, tile_dir, size, f=None):
 
     slide_path = os.path.join(slide_dir, f'{slide_name}.mrxs')
     tile_path = os.path.join(tile_dir, f'{slide_name}.tiles.npy')
-
+    
     slide = pyvips.Image.new_from_file(slide_path, level=0)[:3]
-
+    #slide = pyvips.Image.Openslide(slide_path, access='sequential')[:3]
+    print(slide.width,slide.height )
     tiles = np.load(tile_path, allow_pickle=False)
+    #print(tiles)
     tiles = np.concatenate([tiles + i for i in range(2)], axis=1) * np.array(size * 2)
+    #print(tiles)
     tiles = np.minimum(np.maximum(tiles, 0), np.array([slide.width, slide.height] * 2))
     tiles[:, 2:] -= tiles[:, :2]
     assert (tiles[:, :2] >= 0).all() and (tiles[:, 2:] > 0).all()
@@ -120,17 +135,32 @@ def write_metrics(slide_name, slide_dir, tile_dir, metrics_file, tile_size):
 
 if __name__ == '__main__':
     slide_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/amy-def-mfg-test'
+    #slide_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/Full-Minerva-Data/AmyB-MFG'
+    
+    csv_test_amyb_mdf = pd.read_csv("/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Metadata/overlap_with_metadata_srna_flag/AmyB-MFG_hasClinicalDataflag_hassnRNAflag.csv")
+    vips_img_dir_new = csv_test_amyb_mdf[csv_test_amyb_mdf["hasClinicalData"]==True]["path"].values
+    
     tile_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/slide_masks'
+    #tile_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi-backup/test-patients/images-npy'
     out_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/test/images'
     tile_size = (1024, 1024)
 
     # watch out for '.DS_Store'
     slide_names = ['.'.join(file.split('.')[:-1]) for file in next(os.walk(slide_dir))[2]]
-    slide_names = ['XE16-057_1_AmyB_1', 'XE10-020_1_AmyB_1', 'XE14-051_1_AmyB_1', 'XE12-037_1_AmyB_1', 'XE16-027_1_AmyB_1', 'XE17-013_1_AmyB_1', 'XE15-007_1_AmyB_1', 'XE09-006_1_AmyB_1', 'XE07-060_1_AmyB_1', 'XE10-019_1_AmyB_1', 'XE10-042_1_AmyB_1', 'XE12-007_1_AmyB_1', 'XE10-006_1_AmyB_1', 'XE09-035_1_AmyB_1', 'XE17-014_1_AmyB_1', 'XE13-017_1_AmyB_1', 'XE15-022_1_AmyB_1', 'XE17-059_1_AmyB_1', 'XE10-018_1_AmyB_1', 'XE18-040_1_AmyB_1', 'XE12-036_1_AmyB_1', 'XE08-047_1_AmyB_1', 'XE17-030_1_AmyB_1', 'XE14-004_1_AmyB_1', 'XE10-005_1_AmyB_1', 'XE07-067_1_AmyB_1', 'XE12-031_1_AmyB_1', 'XE12-009_1_AmyB_1', 'XE16-014_1_AmyB_1', 'XE09-063_1_AmyB_1', 'XE12-012_1_AmyB_1', 'XE17-022_1_AmyB_1', 'XE17-048_1_AmyB_1', 'XE13-018_1_AmyB_1', 'XE10-026_1_AmyB_1', 'XE10-033_1_AmyB_1', 'XE08-033_1_AmyB_1', 'XE17-039_1_AmyB_1', 'XE17-029_1_AmyB_1', 'XE13-028_1_AmyB_1', 'XE08-018_1_AmyB_1', 'XE14-047_1_AmyB_1', 'XE16-023_1_AmyB_1', 'XE17-010_1_AmyB_1', 'XE12-042_1_AmyB_1', 'XE18-001_1_AmyB_1', 'XE12-023_1_AmyB_1', 'XE14-037_1_AmyB_1', 'XE11-025_1_AmyB_1', 'XE18-004_1_AmyB_1', 'XE12-010_1_AmyB_1', 'XE08-016_1_AmyB_1', 'XE09-056_1_AmyB_1', 'XE12-016_1_AmyB_1', 'XE14-033_1_AmyB_1', 'XE07-057_1_AmyB_1', 'XE11-027_1_AmyB_1', 'XE17-065_1_AmyB_1', 'XE07-056_1_AmyB_1', 'XE08-015_1_AmyB_1', 'XE09-013_1_AmyB_1', 'XE16-033_1_AmyB_1', 'XE13-007_1_AmyB_1']
-
+    #slide_names = [x.split("/")[-1].split(".")[0] for x in vips_img_dir_new]
+    #slide_names= ["XE16-014_1_AmyB_1"]
+    print(slide_names[0])
+    #slide_names = ['XE16-057_1_AmyB_1', 'XE10-020_1_AmyB_1', 'XE14-051_1_AmyB_1', 'XE12-037_1_AmyB_1', 'XE16-027_1_AmyB_1', 'XE17-013_1_AmyB_1', 'XE15-007_1_AmyB_1', 'XE09-006_1_AmyB_1', 'XE07-060_1_AmyB_1', 'XE10-019_1_AmyB_1', 'XE10-042_1_AmyB_1', 'XE12-007_1_AmyB_1', 'XE10-006_1_AmyB_1', 'XE09-035_1_AmyB_1', 'XE17-014_1_AmyB_1', 'XE13-017_1_AmyB_1', 'XE15-022_1_AmyB_1', 'XE17-059_1_AmyB_1', 'XE10-018_1_AmyB_1', 'XE18-040_1_AmyB_1', 'XE12-036_1_AmyB_1', 'XE08-047_1_AmyB_1', 'XE17-030_1_AmyB_1', 'XE14-004_1_AmyB_1', 'XE10-005_1_AmyB_1', 'XE07-067_1_AmyB_1', 'XE12-031_1_AmyB_1', 'XE12-009_1_AmyB_1', 'XE16-014_1_AmyB_1', 'XE09-063_1_AmyB_1', 'XE12-012_1_AmyB_1', 'XE17-022_1_AmyB_1', 'XE17-048_1_AmyB_1', 'XE13-018_1_AmyB_1', 'XE10-026_1_AmyB_1', 'XE10-033_1_AmyB_1', 'XE08-033_1_AmyB_1', 'XE17-039_1_AmyB_1', 'XE17-029_1_AmyB_1', 'XE13-028_1_AmyB_1', 'XE08-018_1_AmyB_1', 'XE14-047_1_AmyB_1', 'XE16-023_1_AmyB_1', 'XE17-010_1_AmyB_1', 'XE12-042_1_AmyB_1', 'XE18-001_1_AmyB_1', 'XE12-023_1_AmyB_1', 'XE14-037_1_AmyB_1', 'XE11-025_1_AmyB_1', 'XE18-004_1_AmyB_1', 'XE12-010_1_AmyB_1', 'XE08-016_1_AmyB_1', 'XE09-056_1_AmyB_1', 'XE12-016_1_AmyB_1', 'XE14-033_1_AmyB_1', 'XE07-057_1_AmyB_1', 'XE11-027_1_AmyB_1', 'XE17-065_1_AmyB_1', 'XE07-056_1_AmyB_1', 'XE08-015_1_AmyB_1', 'XE09-013_1_AmyB_1', 'XE16-033_1_AmyB_1', 'XE13-007_1_AmyB_1']
+    #slide_names = ['XE16-057_1_AmyB_1']
     for slide_name in slide_names:
         num_tiles = slide_tile_map(slide_name, slide_dir, tile_dir, tile_size, f=crop_lambda(out_dir, slide_name))
-        print(f'{slide_name}: {num_tiles} tiles')
+        print(num_tiles[0])
+        #print(num_tiles[0].shape)
+        #print(list(num_tiles))
+        #print(f'{slide_name}: {list(y)} tiles')
+        # Extract the data from zip objects
+        pdb.set_trace()
+        break
 
 
     # # Metrics

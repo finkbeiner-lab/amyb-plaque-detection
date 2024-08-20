@@ -16,7 +16,9 @@ from torch import nn, Tensor
 import torchvision
 from torchvision.transforms import ToPILImage
 import pandas as pd
-
+from timeit import default_timer as timer 
+import glob
+import pdb
 
 def norm(x: Tensor):
     dims = tuple(range(1, len(x.size())))
@@ -59,7 +61,7 @@ def close_mask(mask, k, i):
     return cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((k, k)), iterations=i)
 
 def mask_contours(mask):
-    contours, _ = cv2.findContours(mask.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(mask.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
     return list(map(lambda t: t[0], sorted([(contour, cv2.contourArea(contour)) for contour in contours], key=lambda t: -t[1])))
 
 def fill_contours(contours, shape):
@@ -70,13 +72,19 @@ def fill_contours(contours, shape):
 
 if __name__ == '__main__':
     #vips_img_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/amy-def-mfg-test'
-    #vips_img_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/amy-def-mfg-test'
-    out_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/slide_masks'
+    all_files = glob.glob(os.path.join("/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/New-Minerva-Data/finkbeiner-124208/Images","*.mrxs"))
+    vips_img_fnames =  [i for i in all_files if i.endswith("_1_AmyB_1.mrxs")] # keeping only AMYB-MFG region images
+    #vips_img_fnames =  [os.path.join("/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/New-Minerva-Data/finkbeiner-124208/Images","XE14-033_1_AmyB_1.mrxs")]
+    
+    out_dir = '/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/New-Minerva-Data-Test/tiles-npy'
+    
+    """
     csv_test_amyb_mdf = pd.read_csv("/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Metadata/overlap_with_metadata_srna_flag/AmyB-MFG_hasClinicalDataflag_hassnRNAflag.csv")
     vips_img_dir_new = csv_test_amyb_mdf[csv_test_amyb_mdf["hasClinicalData"]==True]["path"].values
     print(len(vips_img_dir_new))
     vips_img_names = os.listdir(out_dir)
     print(vips_img_names[:2])
+    
     files_to_run = []
     for file in vips_img_dir_new:
         if file.split("/")[-1].split(".")[0]+".mask.png" in vips_img_names:
@@ -84,10 +92,10 @@ if __name__ == '__main__':
             
             
     print(len(files_to_run))
-    
-    
-    
     out_dir_new = "/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/test-patients/images-npy"
+    """
+    
+    
     
     
     
@@ -98,28 +106,35 @@ if __name__ == '__main__':
     #vips_img_names = sorted(list(set(vips_img_names).difference(vips_img_skip)))
 
     #vips_img_fnames = [os.path.join(vips_img_dir, f'XE{vips_img_name}_1_AmyB_1.mrxs') for vips_img_name in vips_img_names]
-    vips_img_fnames = files_to_run
+    #vips_img_fnames = files_to_run
 
     tile_size = 128
     level = 3
     k1, i1, r1 = 9, 4, .01
     k2, i2 = 9, 4
 
+    start = timer()
     for i, fname in enumerate(vips_img_fnames):
-        print(i)
-        #name = os.path.join(out_dir, '.'.join(os.path.split(fname)[1].split('.')[:-1]))
-        name = os.path.join(out_dir_new, '.'.join(os.path.split(fname)[1].split('.')[:-1]))
+        print(fname)
+        #print(i)
+        name = os.path.join(out_dir, '.'.join(os.path.split(fname)[1].split('.')[:-1]))
+        #name = os.path.join(out_dir_new, '.'.join(os.path.split(fname)[1].split('.')[:-1]))
         tile_name, mask_name, viz_name = [f'{name}.{suffix}' for suffix in ('tiles.npy', 'mask.png', 'viz.png')]
         #print(name,tile_name, mask_name, viz_name )
+        
         try:
-            slide = pyvips.Image.new_from_file(fname)
+            slide = pyvips.Image.new_from_file(fname, level=level)
+            pdb.set_trace()
         except pyvips.error.Error:
+            print("error")
             pass
+        
         # slide = get_cropped(slide, level)
 
-        im = slide.numpy()[..., :3]
+        im = slide.numpy()[..., :3]        
         gray = cv2.cvtColor(im, cv2.COLOR_RGB2GRAY)
-        thresh, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
+        #thresh, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
+        thresh, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_TRIANGLE)
 
         filled_mask = mask
         for _ in range(i1):
@@ -133,10 +148,12 @@ if __name__ == '__main__':
 
         for y1, x1, y2, x2 in coords_neg:
             im[y1:y2, x1:x2] = 0
+            
         mask_out = ToPILImage()(filled_mask)
-        viz_out = ToPILImage()(im)
+        #viz_out = ToPILImage()(im)
 
         np.save(tile_name, tiles_pos, allow_pickle=False)
         mask_out.save(mask_name)
-        viz_out.save(viz_name)
+        #viz_out.save(viz_name)
+    print("total time taken for 324 files",timer()-start)
    

@@ -233,12 +233,12 @@ if __name__ == '__main__':
     dataset_test_location = args.dataset_test_location
 
     train_config = dict(
-        epochs = 100,
+        epochs = 2,
         batch_size = 4,
         num_classes = 4,
         device_id = 0,
         ckpt_freq =500,
-        eval_freq = 10,
+        eval_freq = 1,
     )
 
     test_config = dict(
@@ -368,6 +368,7 @@ if __name__ == '__main__':
             # plotPRcurve(eval_res, epoch)
             model_save_name = "/gladstone/finkbeiner/steve//work/data/npsad_data/vivek/" + "models/{name}_mrcnn_model_{epoch}.pth"
             torch.save(model.state_dict(), model_save_name.format(name=exp_name, epoch=epoch))
+            test_patient_ids = ['XE12-016_1_AmyB_1']
             for t in range(len(test_patient_ids)):
                 model.eval()
                 if len(os.listdir(os.path.join(dataset_test_location,test_patient_ids[t],"images")))==0:
@@ -380,13 +381,13 @@ if __name__ == '__main__':
                     images = [image.to(device) for image in images]
                     targets = [dict([(k, v.to(device)) for k, v in target.items()]) for target in targets]
                     outputs = model.forward(images, targets)
-                    masks, labels = get_outputs(outputs, 0.50)
+                    masks, labels = get_outputs(outputs, 0.10)
                     f1_mean, labels_matched, _, _ =  evaluate_metrics(targets, masks, labels)
                     if len(f1_mean)>0 or len(labels_matched)>0:
                         #print(" Validation f1 mean score:", f1_mean, " perc labels matched", labels_matched)
                         f1_mean_list.extend(f1_mean)
                         labels_matched_list.extend(labels_matched)
-                
+                print(f1_mean_list,labels_matched )
                 print(test_patient_ids[t], " -f1 mean- ", np.nansum(f1_mean_list)/len(f1_mean_list),  " - % match - ", np.sum(labels_matched_list)/len(labels_matched_list), "---count----", len(labels_matched_list))
                 epoch_list.append(epoch)
                 patient_ids.append(test_patient_ids[t])
