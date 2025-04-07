@@ -247,8 +247,8 @@ def build_default(config, im_size=1024, backbone=None, transform=None):
 
     if backbone is None:
         backbone = backbone_utils.resnet_fpn_backbone(
-            'resnext101_32x8d',
-            #'resnet152',
+            #'resnext101_32x8d',
+            'resnet152',
             #'resnet152',
             pretrained=True,
             trainable_layers=3
