@@ -25,8 +25,6 @@ from tqdm import tqdm
 from PIL import Image
 import pyvips as Vips
 
-# import openslide
-
 # Mask size should be same as image size
 # TODO Remove hardcoding
 ID_MASK_SHAPE = (1024, 1024)
@@ -35,9 +33,18 @@ ID_MASK_SHAPE = (1024, 1024)
 lablel2id = {'Cored':'50', 'Diffuse':'100',
              'Coarse-Grained':'150', 'CAA': '200', 'Unknown':'0'}
 
-DATASET_PATH = "/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/Datasets/amyb_wsi/test-interrrater"
+DATASET_PATH = "/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/interrater-study/tiles"
 
 def save_img(img, file_name, tileX, tileY, label="mask"):
+    """save image - use filename, tileX,tileY in the saved filename
+
+    Args:
+        img (np.array): numpy image to save
+        file_name (string): filename (slide name)
+        tileX (int): tile X coord
+        tileY (int): tile Y coord
+        label (str, optional): _description_. Defaults to "mask".
+    """
     im = Image.fromarray(img)
 
     base_name_with_ext = os.path.basename(file_name)
@@ -51,7 +58,6 @@ def save_img(img, file_name, tileX, tileY, label="mask"):
     if not os.path.exists(folder_name):
         os.makedirs(folder_name)
     
-    
      # Mask Folder
     save_dir = os.path.join(folder_name, label)
     if not os.path.exists(save_dir):
@@ -64,13 +70,25 @@ def save_img(img, file_name, tileX, tileY, label="mask"):
 
 
 def polygon2id(image_shape, mask, ids, coords_x, coords_y):
+    """Draw polygon with x and y coords on mask with ids provided
+
+    Args:
+        image_shape (np.array): _description_
+        mask (numpy array): _description_
+        ids (string): _description_
+        coords_x (np.array): X coordinates
+        coords_y (np.array): Y coordinates
+
+    Returns:
+        np.array: mask 
+    """
     vertex_row_coords, vertex_col_coords = coords_y, coords_x
     fill_row_coords, fill_col_coords = draw.polygon(
         vertex_row_coords, vertex_col_coords, image_shape)
 
     # Row and col are flipped
     mask[fill_col_coords, fill_row_coords] = ids
-    return mask
+    return masks
 
 def polygon2mask1(image_shape, mask, color, coords_x, coords_y):
     """Compute a mask with labels having different colors
@@ -125,23 +143,13 @@ def process_json(WSI_path, json_path,  visualize=False):
     imagenames = sorted(imagenames)
     plaque_dict = {'Cored': 0, 'Coarse-Grained': 0, 'Diffuse': 0, 'CAA': 0, 'Unknown': 0}
 
-
     for img in imagenames:
-
-        
         # Read the WSI image
         vips_img = Vips.Image.new_from_file(img, level=0)
         vinfo = get_vips_info(vips_img)
-
         # Get the corresponding json file
         json_file_name = os.path.basename(img).split(".mrxs")[0] + ".json"
-        json_file_name = os.path.join(json_path, json_file_name)
-        # json_file_list = [json_file_name, "/home/vivek/Datasets/AmyB/amyb_wsi/XE19-010_1_AmyB_1_1.json"]
-        # merge_json(json_file_list, "/home/vivek/Datasets/AmyB/amyb_wsi/test.json")
-        # json_file_name = os.path.join(os.path.dirname(img), "XE19-010_1_AmyB_1_37894x_177901y_image.png[--series, 0].json")
-
-        # json_file_name = "/home/vivek/Datasets/AmyB/amyb_wsi/test.json"
-        
+        json_file_name = os.path.join(json_path, json_file_name)        
         
         if not exists(json_file_name):
             continue
@@ -183,26 +191,9 @@ def process_json(WSI_path, json_path,  visualize=False):
 
             # Create an Empty mask of size similar to image
             id_mask = np.zeros(ID_MASK_SHAPE, dtype=np.uint8)
-
-            # region_id = 0
-            # prev_label = ""
-            # i = 0
-            # plaque_dict[ele['label']] = plaque_dict[ele['label']] + len(ele['region_attributes'])
-
             # Different Objects in the same tile
             for region in ele:
-                print(img)
-
-                # print(region['label'].keys())
-                # # Get tileX and tileY
-                # tileX = region['tiles'][0]['tileId'][0]
-                # tileY = region['tiles'][0]['tileId'][1]
-                # tileWidth = region['tiles'][0]['tileBounds']["WH"][0]
-                # tileHeight = region['tiles'][0]['tileBounds']["WH"][1]
-
-                # crop the image
                 # get the bound-x and bounds-y, offset as Vips crops the empty spaces. Qupath does not
-            
                 if 'label' in region:
                     # Check if 'name' key exists in the dictionary under 'label'
                     
@@ -210,33 +201,31 @@ def process_json(WSI_path, json_path,  visualize=False):
                         print("Continue")
                         continue
             
-                coords_x, coords_y = zip(*region["region_attributes"][0]['points'])
-                coords_x = np.array(coords_x)
-                coords_y = np.array(coords_y)
+                    coords_x, coords_y = zip(*region["region_attributes"][0]['points'])
+                    coords_x = np.array(coords_x)
+                    coords_y = np.array(coords_y)
 
-                # Remove overlap annotations
-                if len(coords_x[coords_x > x2]) > 0 or len(coords_y[coords_y > y2]) > 0:
-                    print('Overlap')
-                    continue
+                    # Remove overlap annotations
+                    if len(coords_x[coords_x > x2]) > 0 or len(coords_y[coords_y > y2]) > 0:
+                        print('Overlap')
+                        continue
 
 
-                # Translate the coordinates to fit within the image crop
-                coords_x = np.mod(coords_x, tileWidth)
-                coords_y = np.mod(coords_y, tileHeight)
+                    # Translate the coordinates to fit within the image crop
+                    coords_x = np.mod(coords_x, tileWidth)
+                    coords_y = np.mod(coords_y, tileHeight)
 
-                # label
-                label = region['label']["name"]
-                print("label", label)
-                ids = int(lablel2id[label])
+                    # label
+                    label = region['label']["name"]
+                    print("label", label)
+                    if label in lablel2id.keys():
+                        ids = int(lablel2id[label])
 
-                print("label", label)
-                print("IDs", ids)
-            
-                # Use polygon2id function to create a mask
-                id_mask = polygon2id(ID_MASK_SHAPE, id_mask, ids, coords_y, coords_x)
-
-        
-
+                        print("label", label)
+                        print("IDs", ids)
+                    
+                        # Use polygon2id function to create a mask
+                        id_mask = polygon2id(ID_MASK_SHAPE, id_mask, ids, coords_y, coords_x)
             # Extract FIlename
             # Extract the base name (file name with extension)
             base_name = os.path.basename(img)
@@ -271,8 +260,7 @@ def merge_json(json_files, json_output_file=None):
 
 if __name__ == '__main__':
     result = pyfiglet.figlet_format("Generate Mask", font="slant")
-    print(result)
-   # """
+    
     parser = argparse.ArgumentParser(description='Generate Mask')
     
     parser.add_argument('WSI_path',
@@ -282,8 +270,8 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     process_json(args.WSI_path, args.json_path)
-    #"""
-    #WSI_path = "/Volumes/Finkbeiner-Steve/work/data/npsad_data/vivek/amy-def-mfg-images/"
-    #json_path = "/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/interrater-test-jsons/"
+    
+    WSI_path = "/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/interrater-study/Interrater_data"
+    json_path = "/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/interrater-study/test_jsons_Max"
 
-    #process_json(WSI_path, json_path)
+    process_json(WSI_path, json_path)

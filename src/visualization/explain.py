@@ -537,5 +537,5 @@ if __name__ == "__main__":
     #run = wandb.init(project="nps-ad-nature",  entity="monika-ahirwar")
     
     explain = ExplainPredictions(model, model_input_path = model_name, test_input_path=input_path, 
-                                    detection_threshold=0.75, wandb=None, save_result=True, ablation_cam=True, save_thresholds=False)
+                                    detection_threshold=0.75, wandb=None, save_result=True, ablation_cam=True, save_thresholds=True)
     explain.generate_results()

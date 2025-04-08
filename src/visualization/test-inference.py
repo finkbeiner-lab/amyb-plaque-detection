@@ -33,6 +33,15 @@ import plotly.graph_objects as go
 from sklearn.metrics import roc_curve, auc
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
+import pdb
+
+
+#OUTPUT_DIR = "/home/mahirwar/Desktop/Monika/npsad_data/vivek/reports/interrater-test-metrics"
+OUTPUT_DIR = "/home/mahirwar/Desktop/Monika/npsad_data/vivek/reports/test-metrics"
+
+model_name= "/home/mahirwar/Desktop/Monika/npsad_data/vivek/runpod_mrcnn_models/yp2mf3i8_epoch=108-step=872.ckpt"
+#dataset_test_location = '/home/mahirwar/Desktop/Monika/npsad_data/vivek/interrater-study/tiles'
+dataset_test_location = '/home/mahirwar/Desktop/Monika/npsad_data/vivek/Datasets/amyb_wsi_v2/test
 
 colors={"Cored":"royalblue", "Diffuse":"firebrick","Coarse-Grained":"orange","CAA":"green"}
 class_names = ["Cored","Diffuse","Coarse-Grained","CAA"]
@@ -116,7 +125,7 @@ def plot_confusion_matrix(conf_mat, save_path):
 
 
 test_config = dict(
-    batch_size = 2,
+    batch_size = 1,
     num_classes=4,
     device_id =0
 )
@@ -129,7 +138,8 @@ test_config = dict(
 #model_name=  "/home/mahirwar/Desktop/Monika/npsad_data/vivek/runpod_mrcnn_models/csvy8yix_epoch=31-step=384.ckpt"
 #model_name = "/home/mahirwar/Desktop/Monika/npsad_data/vivek/runpod_mrcnn_models/3ul8krzf_epoch=47-step=576.ckpt"
 #model_name = "/home/mahirwar/Desktop/Monika/npsad_data/vivek/runpod_mrcnn_models/cnf1sro4_epoch=68-step=690.ckpt"
-model_name = "/home/mahirwar/Desktop/Monika/npsad_data/vivek/runpod_mrcnn_models/3kw68a8y_epoch=52-step=848.ckpt"
+#model_name = "/home/mahirwar/Desktop/Monika/npsad_data/vivek/runpod_mrcnn_models/3kw68a8y_epoch=52-step=848.ckpt"
+
 model_config = _default_mrcnn_config(num_classes=1 + test_config['num_classes']).config
 backbone, rpn, roi_heads, transform1 = build_default(model_config, im_size=1024)
 
@@ -152,7 +162,7 @@ model = model.to(device)
 model.eval()
 
 
-output_path = os.path.join("/home/mahirwar/Desktop/Monika/npsad_data/vivek/reports/test-metrics",model_name.split("/")[-1])
+output_path = os.path.join(OUTPUT_DIR,model_name.split("/")[-1])
 if not os.path.exists(output_path):
     os.mkdir(output_path)
 
@@ -168,18 +178,23 @@ score_list = []
 
 collate_fn=lambda x: tuple(zip(*x))
     #exp_name = run.name
-dataset_test_location = '/home/mahirwar/Desktop/Monika/npsad_data/vivek/Datasets/amyb_wsi_v2/test'
+
 test_folders = glob.glob(os.path.join(dataset_test_location, "*"))
+print("test_folders",test_folders)
+
 df = pd.DataFrame()
 for test_folder in test_folders:
-    test_dataset = build_features.AmyBDataset(os.path.join(dataset_test_location,test_folder), T.Compose([T.ToTensor()]))
+    test_dataset = build_features.AmyBDataset(os.path.join(dataset_test_location, test_folder), T.Compose([T.ToTensor()]))
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=test_config['batch_size'], shuffle=False, num_workers=4, collate_fn=collate_fn)
     for i, (images, targets) in enumerate(test_loader):
         images = [image.to(device) for image in images]
         targets = [dict([(k, v.to(device)) for k, v in target.items()]) for target in targets]
+        #print(images)
+        #print(targets)
+        #break
         outputs = model.forward(images, targets)
         #print(outputs)
-        
+
         masks, labels, scores ,_ = get_outputs(outputs, 0.5)
         f1_mean, labels_matched,actual_labels,pred_labels, scores =  evaluate_metrics(targets, masks, labels,scores,0.5 )
         f1_list.extend(f1_mean)
@@ -187,6 +202,7 @@ for test_folder in test_folders:
         actual_labels_list.extend(actual_labels)
         pred_labels_list.extend(pred_labels)
         score_list.extend(scores)
+
         
     
 """ 
@@ -236,10 +252,10 @@ all_df["CAA"] = np.where(all_df["actual_labels"]==4, 1, 0)
 #all_df["Coarse-Grained"]= all_df["actual_labels"].apply(lambda l: 1 if l==2 else 0)
 #all_df["CAA"]= all_df["actual_labels"].apply(lambda l: 1 if l==3 else 0)
 roc_save_path = os.path.join(output_path,"ROC_Curve.html" )
-plot_roc_curve(all_df, roc_save_path)
+#plot_roc_curve(all_df, roc_save_path)
 
 pr_save_path = os.path.join(output_path,"PR_Curve.html" )
-plot_pr_curve(all_df,pr_save_path)
+#plot_pr_curve(all_df,pr_save_path)
 
 conf_mat_save_path = os.path.join(output_path,"conf_mat.png" )
 conf_mat = confusion_matrix(all_df["actual_labels"], all_df["pred_labels"])
@@ -250,6 +266,6 @@ disp.plot()
 plot_confusion_matrix(conf_mat, conf_mat_save_path)
 
 pd.DataFrame(conf_mat ).to_csv((os.path.join(output_path,"confusion_matrix.csv")))
-precision, recall, fscore, support = precision_recall_fscore_support(all_df["actual_labels"], all_df["pred_labels"])
-temp = pd.DataFrame({"class":["Cored", "Diffuse","Coarse-Grained","CAA"], "precision":list(precision), "recall":list(recall), "fscore":fscore, "support":support} )
-temp.to_csv(os.path.join(output_path,"prec_recall.csv"))
+#precision, recall, fscore, support = precision_recall_fscore_support(all_df["actual_labels"], all_df["pred_labels"])
+#temp = pd.DataFrame({"class":["Cored", "Diffuse","Coarse-Grained","CAA"], "precision":list(precision), "recall":list(recall), "fscore":fscore, "support":support} )
+#temp.to_csv(os.path.join(output_path,"prec_recall.csv"))
