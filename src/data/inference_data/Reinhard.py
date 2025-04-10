@@ -1,3 +1,6 @@
+"""
+Reinhard normalization - can be used for both slide and crops
+"""
 import pyvips as Vips
 from PIL import Image
 

@@ -1,3 +1,6 @@
+"""
+This code creates customized dataset object for dataloaders 
+"""
 import os
 from matplotlib import image
 

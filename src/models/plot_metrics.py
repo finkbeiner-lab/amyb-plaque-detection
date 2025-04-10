@@ -1,3 +1,6 @@
+"""
+This code is used to generate performance metrics such as confusion matrix, ROC curve, PR curve of training dataset
+"""
 import os
 os.environ['OMP_NUM_THREADS'] = '1'
 import glob
@@ -14,138 +17,232 @@ from models_pytorch_lightning.model_mrcnn_config import _default_mrcnn_config, b
 from features import build_features
 from models_pytorch_lightning.generalized_mask_rcnn_pl import LitMaskRCNN
 from utils.helper_functions import evaluate_metrics, get_outputs, compute_iou, evaluate_mask_rcnn
-from features import build_features
-from features import build_features
 from features import transforms as T
-#from utils.engine import evaluate
 import torchvision
-from utils.helper_functions import evaluate_metrics, get_outputs, compute_iou, evaluate_mask_rcnn
 import pandas as pd
-from sklearn.metrics import precision_recall_fscore_support
 from lightning.pytorch.callbacks import ModelCheckpoint
-from sklearn.metrics import confusion_matrix
-from sklearn.metrics import classification_report
-from sklearn.metrics import accuracy_score
 import plotly.graph_objects as go
-from sklearn.metrics import roc_curve, auc
-from sklearn.metrics import precision_recall_curve
-import plotly.graph_objects as go
-from sklearn.metrics import roc_curve, auc
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import roc_curve, auc, precision_recall_curve
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report, accuracy_score, precision_recall_fscore_support
 import matplotlib.pyplot as plt
 import pdb
 
-
 def plot_roc_curve(all_df, save_path):
+    """
+    Plots and saves the Receiver Operating Characteristic (ROC) curve for multiple classes.
+
+    Parameters:
+    -----------
+    all_df : pandas.DataFrame
+        A dataframe containing true labels for each class and the predicted scores. 
+        It must contain one column per class with true binary labels (0 or 1) and a 
+        'pred_score' column with prediction probabilities or scores.
     
+    save_path : str
+        The path where the interactive ROC plot (as an HTML file) will be saved.
+
+    Notes:
+    ------
+    This function assumes the presence of global variables:
+    - class_names: list of class names corresponding to columns in `all_df`
+    - colors: dictionary mapping class names to colors for the plot
+    """
+    
+    # Initialize plotly figure
     fig = go.Figure()
+
+    # Add a diagonal reference line representing random classifier performance
     fig.add_shape(
-        type='line', line=dict(dash='dash'),
+        type='line',
+        line=dict(dash='dash'),
         x0=0, x1=1, y0=0, y1=1
     )
     
+    # Plot ROC curve for each class
     for class_name in class_names:
+        # Compute False Positive Rate (FPR) and True Positive Rate (TPR)
         fpr, tpr, _ = roc_curve(all_df[class_name], all_df["pred_score"])
-        fig.add_trace(go.Scatter(x=fpr, y=tpr, name=class_name, mode='lines',line=dict(color=colors[class_name], width=2)))
+        # Add ROC curve trace to the figure
+        fig.add_trace(go.Scatter(
+            x=fpr, y=tpr,
+            name=class_name,
+            mode='lines',
+            line=dict(color=colors[class_name], width=2)
+        ))
     
+    # Update axis labels, title, and layout properties
     fig.update_layout(
         xaxis_title='False Positive Rate',
         yaxis_title='True Positive Rate',
         yaxis=dict(scaleanchor="x", scaleratio=1),
         xaxis=dict(constrain='domain'),
-        width=700, height=700
+        width=700,
+        height=700,
+        plot_bgcolor='white',
+        title="Receiver Operating Characteristic Curve"
     )
-    fig.update_layout( plot_bgcolor='white', title="Receiver operating characteristic Curve")
-    fig.update_xaxes(mirror=True, ticks='outside', showline=True, linecolor='black',gridcolor='lightgrey')
-    fig.update_yaxes(mirror=True, ticks='outside', showline=True, linecolor='black',gridcolor='lightgrey')
+
+    # Improve axis visibility with mirrored lines and light grid
+    fig.update_xaxes(mirror=True, ticks='outside', showline=True, linecolor='black', gridcolor='lightgrey')
+    fig.update_yaxes(mirror=True, ticks='outside', showline=True, linecolor='black', gridcolor='lightgrey')
+
+    # Save the plot as an interactive HTML file
     fig.write_html(save_path)
 
 
-def plot_pr_curve(all_df, save_path) :
+
+def plot_pr_curve(all_df, save_path):
+    """
+    Plots and saves the Precision-Recall (PR) curve for multiple classes.
+
+    Parameters:
+    -----------
+    all_df : pandas.DataFrame
+        A dataframe containing true labels for each class and the predicted scores.
+        It must contain one column per class with true binary labels (0 or 1), and a 
+        'pred_score' column with prediction probabilities or scores.
+    
+    save_path : str
+        The path where the interactive PR plot (as an HTML file) will be saved.
+
+    Notes:
+    ------
+    This function assumes the presence of global variables:
+    - class_names: list of class names corresponding to columns in `all_df`
+    - colors: dictionary mapping class names to colors for the plot
+    """
+    
+    # Initialize an empty Plotly figure
     fig = go.Figure()
+
+    # Plot PR curve for each class
     for class_name in class_names:
+        # Compute Precision and Recall values
         pr, rc, _ = precision_recall_curve(all_df[class_name], all_df["pred_score"])
-        rp = (all_df[class_name]).sum()/len(all_df)
-        fig.add_trace(go.Scatter(x=rc, y=pr, name=class_name, mode='lines',line=dict(color=colors[class_name], width=2)))
-        
+
+        # Optional: Compute the proportion of positive samples (for reference)
+        rp = (all_df[class_name]).sum() / len(all_df)
+
+        # Add PR curve trace to the figure
+        fig.add_trace(go.Scatter(
+            x=rc, y=pr,
+            name=class_name,
+            mode='lines',
+            line=dict(color=colors[class_name], width=2)
+        ))
+    
+    # Update axis labels, title, and layout properties
     fig.update_layout(
         xaxis_title='Recall',
         yaxis_title='Precision',
         yaxis=dict(scaleanchor="x", scaleratio=1),
         xaxis=dict(constrain='domain'),
-        width=700, height=700
+        width=700,
+        height=700,
+        plot_bgcolor='white',
+        title="Precision-Recall Curve"
     )
-    fig.update_layout( plot_bgcolor='white',title="Precision-Recall Curve")
-    fig.update_xaxes(mirror=True, ticks='outside', showline=True, linecolor='black',gridcolor='lightgrey')
-    fig.update_yaxes(mirror=True, ticks='outside', showline=True, linecolor='black',gridcolor='lightgrey')
+
+    # Improve axis visibility with mirrored lines and light grid
+    fig.update_xaxes(mirror=True, ticks='outside', showline=True, linecolor='black', gridcolor='lightgrey')
+    fig.update_yaxes(mirror=True, ticks='outside', showline=True, linecolor='black', gridcolor='lightgrey')
+
+    # Save the plot as an interactive HTML file
     fig.write_html(save_path)
 
 
 
-def plot_confusion_matrix(conf_mat, save_path):
-    
-    # Set formatting and styling options for the confusion matrices
-    title_size = 16
-    plt.rcParams.update({'font.size':16})
-    display_labels = class_names  # Customize labels of the classes
-    colorbar = False
-    cmap = "Blues"  # Try "Greens". Change the color of the confusion matrix.
-    ## Please see other alternatives at https://matplotlib.org/stable/tutorials/colors/colormaps.html
-    values_format = ".3f"  # Determine the number of decimal places to be displayed.
 
+def plot_confusion_matrix(conf_mat, save_path):
+    """
+    Plots and saves a confusion matrix using matplotlib with custom styling.
+
+    Parameters:
+    -----------
+    conf_mat : numpy.ndarray
+        A 2D array representing the confusion matrix, typically of shape (n_classes, n_classes).
+    
+    save_path : str
+        The path where the plotted confusion matrix figure (as a PDF file) will be saved.
+
+    Notes:
+    ------
+    This function assumes the presence of a global variable:
+    - class_names: a list of class names for axis labeling.
+
+    The function displays the confusion matrix with formatted values, and uses a blue color map by default.
+    """
+    
+    # Set the title font size and update global font size for matplotlib
+    title_size = 16
+    plt.rcParams.update({'font.size': 16})
+
+    # Labels to be used for the x and y axes
+    display_labels = class_names
+
+    # Display options for the confusion matrix
+    colorbar = False  # Whether to show the colorbar alongside the plot
+    cmap = "Blues"    # Colormap for the confusion matrix. Alternatives: "Greens", "Oranges", etc.
+    values_format = ".3f"  # Format for displaying cell values (up to 3 decimal places)
+
+    # Create a matplotlib figure and axes
     f, ax = plt.subplots(1, 1, figsize=(10, 16))
 
-    # Plot the confusion matrix
-    #ax.set_title("Model 1", size=title_size)
+    # Plot the confusion matrix with values
     ConfusionMatrixDisplay(confusion_matrix=conf_mat, display_labels=display_labels).plot(
-        include_values=True, cmap=cmap, ax=ax, colorbar=colorbar, values_format=values_format)
+        include_values=True,
+        cmap=cmap,
+        ax=ax,
+        colorbar=colorbar,
+        values_format=values_format
+    )
 
-    # Remove x-axis labels and ticks
-    #ax.xaxis.set_ticklabels(['', '', '', ''])
-    #ax.set_xlabel('')
-    #ax.tick_params(axis='x', which='both')
+    # Optional: Clean up or customize axis ticks and labels (currently commented out)
+    # ax.xaxis.set_ticklabels(['', '', '', ''])
+    # ax.set_xlabel('')
+    # ax.tick_params(axis='x', which='both')
 
-    # Set the overall title and show the plot
+    # Set a suptitle for the entire figure
     f.suptitle("Multiple Confusion Matrices", size=title_size, y=0.93)
+
+    # Display the plot in the notebook or script output
     plt.show()
 
-    # Save the figure as a PDF file
+    # Save the figure to the specified path in high quality
     f.savefig(save_path, bbox_inches='tight')
 
 
+
 if __name__ == "__main__":
+    
     OUTPUT_DIR = "/home/mahirwar/Desktop/Monika/npsad_data/vivek/reports/test-metrics"
     model_name= "/home/mahirwar/Desktop/Monika/npsad_data/vivek/runpod_mrcnn_models/yp2mf3i8_epoch=108-step=872.ckpt"
     dataset_test_location = '/home/mahirwar/Desktop/Monika/npsad_data/vivek/Datasets/amyb_wsi_v2/test
     colors={"Cored":"royalblue", "Diffuse":"firebrick","Coarse-Grained":"orange","CAA":"green"}
     class_names = ["Cored","Diffuse","Coarse-Grained","CAA"]
 
+    # Load model
     test_config = dict(
         batch_size = 1,
         num_classes=4,
         device_id =0
     )
-    model_config = _default_mrcnn_config(num_classes=1 + test_config['num_classes']).config
-    backbone, rpn, roi_heads, transform1 = build_default(model_config, im_size=1024)
-
     optim_config = dict(
         cls=torch.optim.Adam,
         defaults=dict(lr=0.00001,weight_decay=1e-6) 
     )
     model = LitMaskRCNN.load_from_checkpoint(model_name)
+        device = torch.device('cuda', test_config['device_id'])
+    model = model.to(device)
+    model.eval()
 
 
+    #initialize lists and paths
     f1_list =[]
     label_matched_list =[]
     actual_labels_list = []
     pred_labels_list = []
     score_list = []
-
-    device = torch.device('cuda', test_config['device_id'])
-    model = model.to(device)
-    model.eval()
-
-
     output_path = os.path.join(OUTPUT_DIR,model_name.split("/")[-1])
     if not os.path.exists(output_path):
         os.mkdir(output_path)
@@ -153,9 +250,9 @@ if __name__ == "__main__":
     collate_fn=lambda x: tuple(zip(*x))
         #exp_name = run.name
 
+    # generate predictions for test data
     test_folders = glob.glob(os.path.join(dataset_test_location, "*"))
     print("test_folders",test_folders)
-
     df = pd.DataFrame()
     for test_folder in test_folders:
         test_dataset = build_features.AmyBDataset(os.path.join(dataset_test_location, test_folder), T.Compose([T.ToTensor()]))

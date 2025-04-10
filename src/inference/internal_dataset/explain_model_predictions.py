@@ -37,9 +37,9 @@ from skimage.color import rgb2hed, hed2rgb
 import sys
 sys.path.insert(0, '../')
 #from models.model_mrcnn import _default_mrcnn_config, build_default
-from models_pytorch_lightning.model_mrcnn_config import _default_mrcnn_config, build_default
+from models.model_mrcnn_config import _default_mrcnn_config, build_default
 from features import build_features
-from models_pytorch_lightning.generalized_mask_rcnn_pl import LitMaskRCNN
+from models.generalized_mask_rcnn_pl import LitMaskRCNN
 from utils.helper_functions import evaluate_metrics, get_outputs, compute_iou, evaluate_mask_rcnn
 from features import build_features
 

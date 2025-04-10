@@ -1,3 +1,6 @@
+"""
+copy all csv files in a single folder 
+"""
 import os
 import glob
 import shutil
