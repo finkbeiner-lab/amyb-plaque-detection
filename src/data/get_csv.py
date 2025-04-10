@@ -4,19 +4,19 @@ import shutil
 import pdb
 
 
-result_data_path = "/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/reports/figures/good-star-659/"
+#result_data_path = "/home/vivek/Projects/amyb-plaque-detection/reports/figures/"
+result_data_path = "/home/mahirwar/Desktop/Monika/npsad_data/vivek/reports/New-Minerva-Data-output/yp2mf3i8_epoch=108-step=872.ckpt"
 result_folders = glob.glob(os.path.join(result_data_path, "*"))
 
-destination_path = "/gladstone/finkbeiner/steve/work/data/npsad_data/vivek/"
-#csv_dir = os.path.join(os.path.dirname(destination_path), "csv_data","Internal_dataset")
-csv_dir = os.path.join(os.path.dirname(destination_path), "csv_data","Internal_dataset_latest")
+destination_path = "/home/vivek/Projects/amyb-plaque-detection/reports/New-Minerva-Data-output/Merged_csv"
 
-#if not os.path.exists(csv_dir):
- #   os.makedirs(csv_dir)
+csv_dir = os.path.join(os.path.dirname(destination_path), "csv_data")
+if not os.path.exists(csv_dir):
+    os.makedirs(csv_dir)
 
 for result_folder in result_folders:
     csv_file = glob.glob(os.path.join(result_folder, "*.csv"))
-    print(csv_file)
+    
     if len(csv_file) == 0:
         print("Empty", result_folder)
         continue

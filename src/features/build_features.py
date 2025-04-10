@@ -1,31 +1,50 @@
-from typing import Any, Callable, List, Mapping, Optional, Tuple
-
 import os
 from matplotlib import image
+
+import torch
 import numpy as np
 from PIL import Image
 import pdb
+import glob
+import cv2
 
-import torch
-from torch import nn, Tensor
 
+class AmyBDataset(object):
+    """
+    Custom dataset class for loading Amyloid Beta-stained images and corresponding masks.
 
-class AmyBDataset(torch.utils.data.Dataset):
+    Args:
+        root (str): Root directory containing 'images' and 'labels' subdirectories.
+        transforms (callable): A function/transform to apply to the image and target.
+    """
     def __init__(self, root, transforms):
         self.root = root
         self.transforms = transforms
-        # load all image files, sorting them to
-        # ensure that they are aligned
+        # load all image files, sorting them to ensure that they are aligned
         self.imgs = list(sorted(os.listdir(os.path.join(root, "images"))))
         self.masks = list(sorted(os.listdir(os.path.join(root, "labels"))))
-
+        # Remove unnecessary files
+        if ".DS_Store" in self.imgs:
+            self.imgs.remove(".DS_Store")
+        if ".DS_Store" in self.masks:
+            self.masks.remove(".DS_Store")
         assert set([len(set(['_'.join('.'.join(s.split('.')[:-1]).split('_')[:-1]) for s in item])) for item in zip(self.imgs, self.masks)]) == {1}
-        # print("\nImages Order ", self.imgs)
-        # print("\nLabels Order", self.masks)
 
 
     def __getitem__(self, idx):
-        # load images and masks
+        """
+        Load an image and its corresponding segmentation mask and return 
+        the transformed image along with target dictionary for training.
+
+        Args:
+            idx (int): Index of the image/mask pair.
+
+        Returns:
+            Tuple: (image, target) where image is the PIL image after transformation,
+            and target is a dictionary containing bounding boxes, labels, masks,
+            image ID, area, and crowd information.
+        """
+        # Paths to image and mask
         img_path = os.path.join(self.root, "images", self.imgs[idx])
         mask_path = os.path.join(self.root, "labels", self.masks[idx])
 
@@ -38,52 +57,50 @@ class AmyBDataset(torch.utils.data.Dataset):
         # index (between 0 and 255) to a discrete color in a larger 
         # color space (like RGB).
         mask = Image.open(mask_path).convert('P')
-
         mask = np.array(mask)
+        mask = mask//50
         # instances are encoded as different colors
-        obj_ids = np.unique(mask)
-        # first id is the background, so remove it
-        obj_ids = obj_ids[1:]
-
-        # split the color-encoded mask into a set
-        # of binary masks
-        masks = mask == obj_ids[:, None, None]
-        # masks.shape (1, 1024, 1024) first element denotes number of objects
-        # (num_objects, height, width)
-
-
-
+        num_labels, mask2 = cv2.connectedComponents(mask)
+        masks = [mask2==i for i in range(1,num_labels)]
         # get bounding box coordinates for each mask
-        num_objs = len(obj_ids)
+        num_objs = num_labels-1
         boxes = []
+        areas =[]
+        labels = []
+        final_masks=[]
         for i in range(num_objs):
-            pos = np.where(masks[i])
+            pos = np.where(masks[i]==True)
             xmin = np.min(pos[1])
             xmax = np.max(pos[1])
             ymin = np.min(pos[0])
             ymax = np.max(pos[0])
-            
+            label = np.unique(mask[masks[i]])[0]
             if xmax <= xmin and ymax <=ymin:
                 print("degenrate boxes", mask_path)
-                print(len(obj_ids))
-                break
-            boxes.append([xmin, ymin, xmax, ymax])
+                print("pos",pos)
+                print("xmax, xmin, ymax,ymin",xmax, xmin, ymax,ymin)
+                
+            if ((ymax-ymin)>0) and ((xmax-xmin)>0):
+                boxes.append([xmin, ymin, xmax, ymax])
+                areas.append([(ymax-ymin)*(xmax-xmin)])
+                labels.append(label)
+                final_masks.append(masks[i])
+
+                
         
-
         boxes = torch.as_tensor(boxes, dtype=torch.float32)
+        areas = torch.as_tensor(areas, dtype=torch.float32)
+        labels = torch.as_tensor(labels, dtype=torch.int64)
 
-        # labels = torch.tensor(labels, dtype=torch.int64)
-        # labels = torch.ones((num_objs,), dtype=torch.int64)
+        if len(boxes.shape)!=2:
+            print(img_path)
+            print(mask_path)
+            print(labels, np.unique(mask))
 
-        x = [id // 50 for id in obj_ids]
-        labels = torch.tensor(x)
-       
-
-
+        masks = np.array(final_masks, dtype=np.uint8)
         masks = torch.as_tensor(masks, dtype=torch.uint8)
-
         image_id = torch.tensor([idx])
-        area = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])
+        
         # suppose all instances are not crowd
         iscrowd = torch.zeros((num_objs,), dtype=torch.int64)
 
@@ -92,35 +109,13 @@ class AmyBDataset(torch.utils.data.Dataset):
         target["labels"] = labels
         target["masks"] = masks
         target["image_id"] = image_id
-        target["area"] = area
+        target["area"] = areas
         target["iscrowd"] = iscrowd
 
         if self.transforms is not None:
             img, target = self.transforms(img, target)
-
+        
         return img, target
 
     def __len__(self):
         return len(self.imgs)
-
-
-class DatasetRelabeled(torch.utils.data.Dataset):
-    def __init__(self,
-        dataset: torch.utils.data.Dataset,
-        fn: Callable[[int,], int],
-    ) -> None:
-        self.dataset = dataset
-        self.fn = fn
-
-    def __len__(self) -> int:
-        return self.dataset.__len__()
-
-    def __getitem__(self,
-        idx: int,
-    ) -> Tuple[Tensor, Mapping[str, Tensor]]:
-        image, target = self.dataset.__getitem__(idx)
-        for i, v in enumerate(target['labels']):
-            target['labels'][i] = self.fn(v)
-        return image, target
-
-

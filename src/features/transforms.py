@@ -11,6 +11,21 @@ import pdb
 
 
 def _flip_coco_person_keypoints(kps, width):
+    """
+    Horizontally flip COCO person keypoints.
+
+    This function flips the x-coordinates of the COCO keypoints to mirror them horizontally,
+    adjusting for the image width, and swaps left/right keypoints accordingly. It also ensures
+    that keypoints with visibility == 0 are reset to (0, 0, 0) as per COCO convention.
+
+    Args:
+        kps (ndarray): An array of shape (..., 17, 3) representing keypoints, where the last
+                       dimension contains (x, y, visibility) for each keypoint.
+        width (int): Width of the image, used to flip the x-coordinates.
+
+    Returns:
+        ndarray: Flipped keypoints with the same shape as input.
+    """
     flip_inds = [0, 2, 1, 4, 3, 6, 5, 8, 7, 10, 9, 12, 11, 14, 13, 16, 15]
     flipped_data = kps[:, flip_inds]
     flipped_data[..., 0] = width - flipped_data[..., 0]
@@ -21,19 +36,60 @@ def _flip_coco_person_keypoints(kps, width):
 
 
 class Compose:
+    """
+    Composes several transforms together.
+
+    This class is used to apply a sequence of transformations to both the input image 
+    and its corresponding target (e.g., bounding boxes, masks, labels).
+
+    Args:
+        transforms (list): A list of transform callables. Each transform should accept 
+                           an image and target as input and return the transformed image and target.
+    """
     def __init__(self, transforms):
         self.transforms = transforms
 
     def __call__(self, image, target):
+        """
+        Apply each transform in the sequence to the image and target.
+
+        Args:
+            image (PIL.Image or Tensor): The input image.
+            target (dict): A dictionary containing target data like boxes, labels, masks, etc.
+
+        Returns:
+            Tuple: The transformed image and target.
+        """
         for t in self.transforms:
             image, target = t(image, target)
         return image, target
 
 
 class RandomHorizontalFlip(T.RandomHorizontalFlip):
+    """
+    Horizontally flip the given image and its corresponding target randomly with a given probability.
+
+    This class extends torchvision's RandomHorizontalFlip to also apply the horizontal flip
+    to the target dictionary, updating bounding boxes, masks, and keypoints appropriately.
+    """
     def forward(
         self, image: Tensor, target: Optional[Dict[str, Tensor]] = None
     ) -> Tuple[Tensor, Optional[Dict[str, Tensor]]]:
+        """
+        Apply the horizontal flip to the image and its target with probability `p`.
+
+        Args:
+            image (Tensor): The input image tensor of shape (C, H, W).
+            target (dict, optional): Dictionary with keys such as "boxes", "masks", "keypoints".
+                - "boxes" (Tensor): Bounding boxes in (xmin, ymin, xmax, ymax) format.
+                - "masks" (Tensor): Segmentation masks (optional).
+                - "keypoints" (Tensor): COCO-format keypoints (optional).
+
+        Returns:
+            Tuple[Tensor, Optional[Dict[str, Tensor]]]: 
+                - Flipped image tensor.
+                - Correspondingly updated target dictionary (if provided).
+        """
         if torch.rand(1) < self.p:
             image = F.hflip(image)
             if target is not None:
@@ -58,6 +114,11 @@ class ToTensor(nn.Module):
 
 
 class PILToTensor(nn.Module):
+    """
+    Convert a PIL image to a PyTorch tensor and normalize its pixel values to [0, 1].
+
+    This transform does not modify the `target` dictionary, it only processes the input image.
+    """
     def forward(
         self, image: Tensor, target: Optional[Dict[str, Tensor]] = None
     ) -> Tuple[Tensor, Optional[Dict[str, Tensor]]]:
@@ -66,6 +127,14 @@ class PILToTensor(nn.Module):
 
 
 class ConvertImageDtype(nn.Module):
+    """
+    Transform that converts an image tensor to a specified data type.
+
+    Useful when you want to ensure that the image tensor has the correct dtype
+    (e.g., float32 for model input).
+
+    This transform does not modify the `target` dictionary.
+    """
     def __init__(self, dtype: torch.dtype) -> None:
         super().__init__()
         self.dtype = dtype
@@ -78,6 +147,22 @@ class ConvertImageDtype(nn.Module):
 
 
 class RandomIoUCrop(nn.Module):
+    """
+    Randomly crops the input image and corresponding target based on IoU thresholds.
+
+    This transform tries to crop a subregion of the image while preserving bounding boxes.
+    It uses Intersection over Union (IoU) criteria to ensure that at least one object remains
+    in the crop with a certain overlap. Based on the SSD data augmentation strategy.
+
+    Args:
+        min_scale (float): Minimum scale of the cropped region relative to the original image.
+        max_scale (float): Maximum scale of the cropped region relative to the original image.
+        min_aspect_ratio (float): Minimum aspect ratio of the cropped region.
+        max_aspect_ratio (float): Maximum aspect ratio of the cropped region.
+        sampler_options (List[float], optional): List of minimum IoU thresholds to sample from.
+            A value of 1.0 or higher represents no cropping (keep image as is).
+        trials (int): Number of trials to find a valid crop.
+    """
     def __init__(
         self,
         min_scale: float = 0.3,
@@ -165,6 +250,15 @@ class RandomIoUCrop(nn.Module):
 
 
 class RandomZoomOut(nn.Module):
+    """
+    Randomly zooms out the image by placing it on a larger canvas filled with a specified color.
+
+    Args:
+        fill (Optional[List[float]]): RGB values to fill the canvas. Default is black [0.0, 0.0, 0.0].
+        side_range (Tuple[float, float]): Range for scaling the canvas size relative to the image size.
+            Must be >= 1.0. Default is (1.0, 4.0).
+        p (float): Probability of applying the zoom-out. Default is 0.5.
+    """
     def __init__(
         self, fill: Optional[List[float]] = None, side_range: Tuple[float, float] = (1.0, 4.0), p: float = 0.5
     ):
@@ -228,6 +322,17 @@ class RandomZoomOut(nn.Module):
 
 
 class RandomPhotometricDistort(nn.Module):
+    """
+    Applies a series of photometric distortions in a random order, including brightness, contrast,
+    saturation, hue adjustments, and optional random channel permutation.
+
+    Args:
+        contrast (Tuple[float]): Range to adjust contrast. Default is (0.5, 1.5).
+        saturation (Tuple[float]): Range to adjust saturation. Default is (0.5, 1.5).
+        hue (Tuple[float]): Range to adjust hue. Default is (-0.05, 0.05).
+        brightness (Tuple[float]): Range to adjust brightness. Default is (0.875, 1.125).
+        p (float): Probability for each distortion operation. Default is 0.5.
+    """
     def __init__(
         self,
         contrast: Tuple[float] = (0.5, 1.5),

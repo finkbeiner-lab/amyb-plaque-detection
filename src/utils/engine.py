@@ -88,8 +88,8 @@ def evaluate(run, model, data_loader, device, epoch):
     #TODO: HardCode Exp name # later replace by run.name
     # exp_name = "runtest"
     coco_evaluator = CocoEvaluator(coco, iou_types, epoch, run.name)
-    explain = ExplainPredictions(model, model_input_path = "", test_input_path="", detection_threshold=0.75, 
-                                wandb=wandb, save_result=True, ablation_cam=True, save_thresholds=False)
+    #explain = ExplainPredictions(model, model_input_path = "", test_input_path="", detection_threshold=0.75, 
+    #                            wandb=wandb, save_result=True, ablation_cam=True, save_thresholds=False)
 
     gt_list = []
     predicted_list = []
