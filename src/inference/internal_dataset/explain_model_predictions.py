@@ -17,7 +17,6 @@ from PIL import Image
 import matplotlib.pyplot as plt
 from torchvision import transforms
 from pytorch_grad_cam.utils.image import show_cam_on_image
-
 import numpy as np
 import cv2
 import requests
