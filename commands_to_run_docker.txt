@@ -1,0 +1,6 @@
+## build docker file
+docker build -t amy_plaque .
+
+# Run docker container 
+
+docker run -it amy_plaque python3 /src/inference/internal_dataset/explain_model_predictions.py
