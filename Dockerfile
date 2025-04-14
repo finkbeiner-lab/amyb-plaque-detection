@@ -1,7 +1,7 @@
 FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
 
 # Install dependencies
-RUN apt-get update && apt-get install -y wget bzip2 ca-certificates curl gnupg2 software-properties-common
+RUN apt-get update && apt-get install -y wget bzip2 ca-certificates curl gnupg2 software-properties-common libgl1
 
 # Remove existing Miniconda installation (if any)
 RUN rm -rf /opt/conda

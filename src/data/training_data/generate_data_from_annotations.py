@@ -115,7 +115,7 @@ def get_vips_info(vips_img):
     # # Get bounds-x and bounds-y offset
     vfields = [f.split('.') for f in vips_img.get_fields()]
     vfields = [f for f in vfields if f[0] == 'openslide']
-    vfields = dict([('.'.join(k[1:]), vips_img.get('.'.join(k))) for k in vfields])Ted@
+    vfields = dict([('.'.join(k[1:]), vips_img.get('.'.join(k))) for k in vfields])
     return vfields
 
 
