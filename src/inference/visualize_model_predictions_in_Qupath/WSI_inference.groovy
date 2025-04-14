@@ -1,8 +1,5 @@
 import qupath.lib.objects.PathAnnotationObject
-import qupath.lib.objects.PathObjects
 import qupath.lib.roi.RectangleROI
-import qupath.lib.roi.PointsROI
-import qupath.lib.roi.interfaces.ROI
 import qupath.lib.regions.RegionRequest
 import javax.imageio.ImageIO
 import java.awt.image.BufferedImage
@@ -13,71 +10,87 @@ import java.net.http.HttpResponse
 import java.time.Duration
 import org.json.JSONArray
 import org.json.JSONObject
+import qupath.lib.roi.PolygonROI
+import qupath.lib.objects.PathObjects
+import qupath.lib.roi.ROIs
+import qupath.lib.geom.Point2
+import qupath.lib.gui.QuPathGUI
+import qupath.lib.gui.dialogs.Dialogs
+import qupath.lib.io.GsonTools
 
 
-class WSIInferenceExtension {
-    // Define the API endpoint and API key
-    def apiUrl = "https://api.runpod.ai/v2/8xa742wutj14fm/run"
-    def apiKey = "api-key, for runpod cloud environment"
+// ==========================================
+// 🔧 CONFIGURATION SECTION
+// ==========================================
 
-    // Method to execute the main functionality
-    def execute() {
-        // Get the current image data
-        def imageData = getCurrentImageData()
+// ✨ SIGN UP to get your own RunPod API Key and Endpoint
+// 👉 https://runpod.io?ref=1mh0obxo
 
-        // Get the user-drawn square annotation
-        def annotations = getAnnotationObjects()
+// ✅ STEP 1: Replace with your unique RunPod endpoint ID (from your model dashboard)
+def url_endpoint = "your_endpoint_id_here"
 
-        // Print the ROI type and class for each annotation
-        annotations.each { annotation ->
-            def roi = annotation.getROI()
-            println "Annotation ROI Type: ${roi.getRoiType().toString()}"
-            println "Annotation ROI Class: ${roi.getClass().getName()}"
-        }
+// ✅ STEP 2: Replace with the full API URL for your endpoint
+def apiUrl = "https://api.runpod.ai/v2/your_endpoint_id_here/run"
 
-        def squareAnnotation = annotations.find { it.getROI() instanceof RectangleROI }
+// ✅ STEP 3: Paste your personal RunPod API key here
+def apiKey = "your_api_key_here"
 
-        if (squareAnnotation == null) {
-            println "No square annotation found."
-            return
-        }
+// ✅ STEP 4: Set the full path where you want to save the output CSV
+def csv_path = "/your/output/path/detections.csv"
 
-        def roi = squareAnnotation.getROI()
-        def x1 = roi.getBoundsX().toInteger()
-        def y1 = roi.getBoundsY().toInteger()
-        def width = roi.getBoundsWidth().toInteger()
-        def height = roi.getBoundsHeight().toInteger()
+def printMessage(String message) {
+    println message
+}
 
-        // Crop the image based on the annotation coordinates
-        def server = imageData.getServer()
-        def regionRequest = RegionRequest.createInstance(server.getPath(), 1.0, x1, y1, width, height)
+println "\uD83D\uDC40 Script started at " + new Date()
+
+def imageData = getCurrentImageData()
+def annotations = getAnnotationObjects()
+
+def squareAnnotation = annotations.find { it.getROI() instanceof RectangleROI }
+
+if (squareAnnotation == null) {
+    printMessage("⚠️ No square annotation found.")
+    return
+}
+
+def roi = squareAnnotation.getROI()
+def xStart = roi.getBoundsX().toInteger()
+def yStart = roi.getBoundsY().toInteger()
+def width = roi.getBoundsWidth().toInteger()
+def height = roi.getBoundsHeight().toInteger()
+
+def tileSize = 1024
+def server = imageData.getServer()
+
+def allDetections = []
+def labelCounters = [:].withDefault { 0 }
+
+def client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build()
+
+for (int tileY = yStart; tileY < yStart + height; tileY += tileSize) {
+    for (int tileX = xStart; tileX < xStart + width; tileX += tileSize) {
+        int tileWidth = Math.min(tileSize, xStart + width - tileX)
+        int tileHeight = Math.min(tileSize, yStart + height - tileY)
+
+        def regionRequest = RegionRequest.createInstance(server.getPath(), 1.0, tileX, tileY, tileWidth, tileHeight)
         def croppedImage = server.readRegion(regionRequest)
 
-        // Convert the cropped image to bytes
         def baos = new ByteArrayOutputStream()
         ImageIO.write(croppedImage, "png", baos)
         def imageBytes = baos.toByteArray()
-
-        // Encode image bytes to Base64
         def encodedImage = imageBytes.encodeBase64().toString()
 
-        // Prepare the payload
         def payload = """
-{
-  "input": {
-    "x": ${x1},
-    "y": ${y1},
-    "Image_buffer": "${encodedImage}"
-  }
-}
-"""
+        {
+          "input": {
+            "x": ${tileX},
+            "y": ${tileY},
+            "Image_buffer": "${encodedImage}"
+          }
+        }
+        """
 
-        // Create an HTTP client
-        def client = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .build()
-
-        // Create the HTTP request to start the job
         def httpRequest = HttpRequest.newBuilder()
             .uri(URI.create(apiUrl))
             .header("Content-Type", "application/json")
@@ -85,22 +98,16 @@ class WSIInferenceExtension {
             .POST(HttpRequest.BodyPublishers.ofString(payload))
             .build()
 
-        // Send the request to start the job
         def response = client.send(httpRequest, HttpResponse.BodyHandlers.ofString())
-
-        // Check if the job was started successfully
         if (response.statusCode() == 200) {
             def responseBody = response.body()
             def jobIdMatcher = (responseBody =~ /"id"\s*:\s*"([^"]+)"/)
             def jobId = jobIdMatcher ? jobIdMatcher[0][1] : null
 
             if (jobId) {
-                println "Job started with ID: ${jobId}"
-
-                // Poll for the job result
-                def statusUrl = "https://api.runpod.ai/v2/8xa742wutj14fm/status/${jobId}"
+                def statusUrl = "https://api.runpod.ai/v2/${url_endpoint}/status/${jobId}"
                 def maxAttempts = 10
-                def attemptInterval = 3000 // 10 seconds
+                def attemptInterval = 3000
 
                 for (int i = 0; i < maxAttempts; i++) {
                     Thread.sleep(attemptInterval)
@@ -112,90 +119,99 @@ class WSIInferenceExtension {
                         .build()
 
                     def statusResponse = client.send(statusRequest, HttpResponse.BodyHandlers.ofString())
-                    println statusResponse.statusCode()
 
                     if (statusResponse.statusCode() == 200) {
                         def statusBody = statusResponse.body()
-                        def statusJson = new JSONObject(statusBody) // Parse statusBody as JSON
-                        def status = statusJson.getString("status") // Get the "status" field from the JSON object
+                        def statusJson = new JSONObject(statusBody)
+                        def status = statusJson.getString("status")
 
                         if (status == "COMPLETED") {
-                            def output = statusJson.getString("output") // Get the "output" field from the JSON object
-                            println "Job completed. Result: ${output}"
-                            
-                            if (output) {
-                                // Parse the JSON output using org.json
-                                def jsonArray = new JSONArray(output)
+                            def output = statusJson.getString("output")
+                            def jsonArray = new JSONArray(output)
 
-                                // Print details for each result
-                                jsonArray.each { result ->
-                                    def jsonObjectResult = result as JSONObject
-                                    println "Image Name: ${jsonObjectResult.getString('image_name')}"
-                                    println "Label: ${jsonObjectResult.getString('label')}"
-                                    println "Confidence: ${jsonObjectResult.getDouble('confidence')}"
-                                    println "Brown Pixels: ${jsonObjectResult.getInt('brown_pixels')}"
-                                    println "Area: ${jsonObjectResult.getDouble('area')}"
-                                    println "Equivalent Diameter: ${jsonObjectResult.getDouble('equivalent_diameter')}"
-                                    println "Centroid: ${jsonObjectResult.getJSONArray('centroid').toList()}"
-                                    println "Eccentricity: ${jsonObjectResult.getDouble('eccentricity')}"
-                                    println "QuPath Coordinates: (${jsonObjectResult.getInt('qupath_coord_x1')}, ${jsonObjectResult.getInt('qupath_coord_y1')}) to (${jsonObjectResult.getInt('qupath_coord_x2')}, ${jsonObjectResult.getInt('qupath_coord_y2')})"
-                                    println "-----------------------------"
+                            jsonArray.each { result ->
+                                def jsonObjectResult = result as JSONObject
+                                def label = jsonObjectResult.getString('label')
 
-                                    // Extract QuPath coordinates
-                                    int annotX1 = jsonObjectResult.getInt('qupath_coord_x1')
-                                    int annotY1 = jsonObjectResult.getInt('qupath_coord_y1')
-                                    int annotX2 = jsonObjectResult.getInt('qupath_coord_x2')
-                                    int annotY2 = jsonObjectResult.getInt('qupath_coord_y2')
+                                labelCounters[label] += 1
+                                def annotationId = "${label}-${labelCounters[label]}"
 
-                                    // Extract label
-                                    String label = jsonObjectResult.getString('label')
+                                def annotX1 = jsonObjectResult.getInt('qupath_coord_x1')
+                                def annotY1 = jsonObjectResult.getInt('qupath_coord_y1')
+                                def annotX2 = jsonObjectResult.getInt('qupath_coord_x2')
+                                def annotY2 = jsonObjectResult.getInt('qupath_coord_y2')
+                                def annotRoi = new RectangleROI(annotX1, annotY1, annotX2 - annotX1, annotY2 - annotY1)
 
-                                    // Create a RectangleROI
-                                    def annotRoi = new RectangleROI(annotX1, annotY1, annotX2 - annotX1, annotY2 - annotY1)
+                                def annotation = new PathAnnotationObject(annotRoi)
+                                def pathClass = getPathClass(label)
+                                annotation.setPathClass(pathClass)
+                                annotation.setName(annotationId)
+                                annotation.getProperties().put("ID", annotationId)
 
-                                    // Create a PathAnnotationObject with the ROI
-                                    def annotation = new PathAnnotationObject(annotRoi)
+                                annotation.getMeasurementList().putMeasurement("model_confidence", jsonObjectResult.getDouble("confidence"))
+                                annotation.getMeasurementList().putMeasurement("brown_pixels", jsonObjectResult.getInt("brown_pixels"))
+                                annotation.getMeasurementList().putMeasurement("area", jsonObjectResult.getDouble("area"))
+                                annotation.getMeasurementList().putMeasurement("equivalent_diameter", jsonObjectResult.getDouble("equivalent_diameter"))
+                                annotation.getMeasurementList().putMeasurement("eccentricity", jsonObjectResult.getDouble("eccentricity"))
 
-                                    // Set the classification (label) for the annotation
-                                    annotation.setPathClass(getPathClass(label))
-                                    annotation.setName(label)
+                                def centroidList = jsonObjectResult.getJSONArray("centroid").toList()
+                                annotation.getProperties().put("centroid", centroidList.toString())
+                                annotation.getProperties().put("qupath_bbox", "(${annotX1}, ${annotY1}) to (${annotX2}, ${annotY2})")
+                                annotation.getProperties().put("image_name", jsonObjectResult.getString("image_name"))
 
-                                    // Add the annotation to the current image
-                                    addObject(annotation)
+                                addObject(annotation)
+                                allDetections << annotation
 
-                               
+                                if (jsonObjectResult.has("polygon_coordinates")) {
+                                    def polygonArray = jsonObjectResult.getJSONArray("polygon_coordinates")
+                                    for (int j = 0; j < polygonArray.length(); j++) {
+                                        def coords = polygonArray.getJSONArray(j)
+                                        def points = []
+                                        for (int k = 0; k < coords.length(); k++) {
+                                            def point = coords.getJSONArray(k)
+                                            def x = point.getDouble(0)
+                                            def y = point.getDouble(1)
+                                            points << new Point2(x, y)
+                                        }
+                                        def polygonROI = ROIs.createPolygonROI(points, null)
+                                        def annotationPoly = PathObjects.createAnnotationObject(polygonROI, pathClass)
+                                        annotationPoly.setName(annotationId)
+                                        annotationPoly.getProperties().put("ID", annotationId)
+                                        addObject(annotationPoly)
+                                    }
                                 }
                             }
                             break
                         } else if (status == "FAILED") {
                             def errorMatcher = (statusBody =~ /"error"\s*:\s*"([^"]+)"/)
                             def error = errorMatcher ? errorMatcher[0][1] : null
-                            println "Job failed. Error: ${error}"
+                            printMessage("❌ Job failed. Error: ${error}")
                             break
-                        } else if (status == "IN_QUEUE") {
-                            println "Job is in queue. Waiting..."
-                        } else {
-                            println "Job status: ${status}. Waiting..."
                         }
-                    } else {
-                        println "Error checking job status: ${statusResponse.statusCode()} - ${statusResponse.body()}"
                     }
                 }
-            } else {
-                println "Error: Unable to retrieve Job ID from the response."
             }
-        } else {
-            println "Error starting job: ${response.statusCode()} - ${response.body()}"
         }
     }
 }
 
-// Register the extension in the extension tab
-def extension = new WSIInferenceExtension()
-extension.execute()
+// Export summary to CSV
+def csvHeader = "ID,QuPath Annotation ID,Label, Model Confidence,Brown Pixels,Area,Diameter,Eccentricity"
+def csvRows = allDetections.collect { det ->
+    def id = det.getProperties().get("ID")
+    def name = det.getName()  // This is like "Diffuse-1"
+    def label = det.getPathClass()?.getName()
+    def conf = det.getMeasurementList().getMeasurementValue("model_confidence")
+    def brown = det.getMeasurementList().getMeasurementValue("brown_pixels")
+    def area = det.getMeasurementList().getMeasurementValue("area")
+    def diam = det.getMeasurementList().getMeasurementValue("equivalent_diameter")
+    def ecc = det.getMeasurementList().getMeasurementValue("eccentricity")
+    return "${id},${name},${label},${conf},${brown},${area},${diam},${ecc}"
+}
 
+def outputFile = new File(csv_path)
+outputFile.getParentFile().mkdirs()
+outputFile.text = csvHeader + "\n" + csvRows.join("\n")
 
-
-
-
-
+printMessage("\uD83D\uDCC4 Exported detection summary to: ${outputFile}")
+printMessage("✅ Script finished at " + new Date())
