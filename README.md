@@ -89,7 +89,7 @@ docker pull monikaahirwar/amy_plaque:latest
 ### Step 2: Run the Docker Container
 
 ```bash
-docker run -it --rm amy_plaque:latest
+docker run -it -e PYTHONPATH=/app/src --rm amy_plaque:latest
 ```
 
 > Replace `/path/to/your/data` with the actual path to your image and annotation files. This will mount your local data directory into the container.
