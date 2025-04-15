@@ -2,7 +2,7 @@
 ## [Generalizable Prediction of Alzheimer’s Disease Pathologies with Human-Level Accuracy](https://www.medrxiv.org/content/10.1101/2025.02.03.25321603v1.full.pdf) 
 
 
-![Alt text](assests/image1.png)
+![Detection Results in QuPath](assets/image1.png)
 
 ---
 
