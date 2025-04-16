@@ -1,5 +1,5 @@
 
-## [Generalizable Prediction of Alzheimer’s Disease Pathologies with Human-Level Accuracy]
+## Generalizable Prediction of Alzheimer’s Disease Pathologies with Human-Level Accuracy
 
 [[`Model`](https://huggingface.co/vivekgr92/amyb-detection)] [[`MedRxiv`](https://www.medrxiv.org/content/10.1101/2025.02.03.25321603v1.full.pdf)] [[`BibTeX`](#Citation)]
 
