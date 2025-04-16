@@ -22,7 +22,7 @@ The script from src/inference/visualize_model_predictions_in_Qupath/WSI_inferenc
 
 A RunPod API key (for running the model in the cloud)
 
-![RunPod Setup Video](https://www.loom.com/share/2e3a9e8772d94106963f52be0642bbe7?sid=8f2f2027-ed8a-41bf-bd9f-17fa1facaf0b)
+[RunPod Setup Video](https://www.loom.com/share/2e3a9e8772d94106963f52be0642bbe7?sid=8f2f2027-ed8a-41bf-bd9f-17fa1facaf0b)
 
 
 
