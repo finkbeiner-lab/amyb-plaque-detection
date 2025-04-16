@@ -1,10 +1,16 @@
 
-## [Generalizable Prediction of Alzheimer’s Disease Pathologies with Human-Level Accuracy](https://www.medrxiv.org/content/10.1101/2025.02.03.25321603v1.full.pdf) 
+## [Generalizable Prediction of Alzheimer’s Disease Pathologies with Human-Level Accuracy]
 
-
-![Detection Results in QuPath](assets/image1.png)
+[[`Model`](https://huggingface.co/vivekgr92/amyb-detection)] [[`MedRxiv`](https://www.medrxiv.org/content/10.1101/2025.02.03.25321603v1.full.pdf)] [[`BibTeX`](#Citation)]
 
 ---
+
+## Detection results in Qupath
+![Detection Results in QuPath](assets/image1.png)
+
+
+## Model Overview
+![Model Overview](assests/mainFig.pdf)
 
 ## Quick Start: Use with QuPath (No Coding Needed!)
 You can run the AmyB-plaque detection model directly inside QuPath using a script. This allows you to analyze your slides and see results visually — no deep learning or Python required!
@@ -226,3 +232,18 @@ Combine plaque-level features (e.g. count, size, area) with clinical metadata to
 
 ---
 
+## Citation
+If you find this paper useful for your your research and applications, please cite using this BibTeX:
+
+```bibtex
+@article {Gopal Ramaswamy2025.02.03.25321603,
+	author = {Gopal Ramaswamy, Vivek and Ahirwar, Monika and Ryan, Gennadi and Dugger, Brittany N. and Al Dalahmah, Osama and Signaevsky, Maxim and Purohit, Dushyant P. and Haroutunian, Vahram and Finkbeiner, Steven},
+	title = {Generalizable Prediction of Alzheimer Disease Pathologies with a Scalable Annotation Tool and an High-Accuracy Model},
+	elocation-id = {2025.02.03.25321603},
+	year = {2025},
+	doi = {10.1101/2025.02.03.25321603},
+	URL = {https://www.medrxiv.org/content/early/2025/02/05/2025.02.03.25321603},
+	eprint = {https://www.medrxiv.org/content/early/2025/02/05/2025.02.03.25321603.full.pdf},
+	journal = {medRxiv}
+}
+```
