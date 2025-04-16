@@ -10,7 +10,7 @@
 
 
 ## Model Overview
-![Model Overview](assests/mainFig.png)
+![Model Overview](assets/mainFig.png)
 
 ## Quick Start: Use with QuPath (No Coding Needed!)
 You can run the AmyB-plaque detection model directly inside QuPath using a script. This allows you to analyze your slides and see results visually — no deep learning or Python required!
