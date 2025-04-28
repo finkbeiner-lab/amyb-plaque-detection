@@ -278,29 +278,39 @@ folder.eachFileRecurse(FileType.FILES) { file ->
 
             def results = []
             def roi_count = 0
-
-            for (item in roisByType) { 
-                def roiType = item.key
-                def rois = item.value
-                def temp_results = [:]  
+            
+            for (item in annotations) {
+                def roiType = item.pathClass
+                def rois = item.ROI
+                def objectName = item.getName()
+                def temp_results = [:]
                 temp_results["label"] = roiType
                 temp_results["filename"] = filename
-                
+                temp_results["object_name"] = objectName
+                //def temp_attributes = ROIToDict(tileSize, roi)
                 def temp_attributes = []
-                
                 for (_item in ROIsToTilesMap(tileSize, rois)) {
                     def roi = _item.key
                     def tiles = _item.value
                     temp_attributes.add(ROIToDict(tileSize, roi))
             //        println ROIToDict(tileSize, roi)
                 }
-                
                 temp_results["region_attributes"] =  temp_attributes
-                
                 results.add(temp_results)
-                
                 roi_count = roi_count + 1
             }
+            
+            def tile_list_dict = [:];
+            
+            for (item in results) {
+                key = item["region_attributes"][0]["tiles"][0]["tileId"]
+                if (tile_list_dict[key] == null) {
+                    tile_list_dict.put(key, [])
+                    }
+                    tile_list_dict[key].add(item)
+            }
+            
+            print(tile_list_dict)
 
 
 
@@ -308,7 +318,7 @@ folder.eachFileRecurse(FileType.FILES) { file ->
             print(savepath)
 
             try (Writer writer = new FileWriter(savepath)) {
-                    gson.toJson(results, writer);
+                    gson.toJson(tile_list_dict, writer);
                 }
 
 
